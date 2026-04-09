@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product_bundle["product"]["name"] }} | Matcha Home Cafe{% endblock %}
+
+{% block content %}
+  <section class="drink-layout">
+    <article class="card">
+      <div class="carousel" data-carousel>
+        <div class="carousel-viewport">
+          <div class="carousel-track" data-carousel-track>
+            {% for image in product_bundle["images"] %}
+              <figure
+                class="carousel-slide{% if loop.first %} is-active{% endif %}"
+                data-carousel-slide
+              >
+                <button
+                  aria-label="Open full image of {{ product_bundle['product']['name'] }}"
+                  class="image-open-button"
+                  data-lightbox-trigger
+                  data-lightbox-alt="{{ image['alt_text'] }}"
+                  data-lightbox-caption="{{ product_bundle['product']['name'] }} | {{ image['alt_text'] }}"
+                  data-lightbox-src="{{ image['image_path'] }}"
+                  type="button"
+                >
+                  <img
+                    alt="{{ image['alt_text'] }}"
+                    class="drink-detail-image"
+                    src="{{ image['image_path'] }}"
+                  >
+                </button>
+              </figure>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if product_bundle["images"]|length > 1 %}
+          <div class="carousel-controls">
+            <button class="button secondary-button" data-carousel-prev type="button">Previous</button>
+            <button class="button secondary-button" data-carousel-next type="button">Next</button>
+          </div>
+
+          <div class="carousel-dots">
+            {% for image in product_bundle["images"] %}
+              <button
+                aria-label="Show image {{ loop.index }}"
+                class="carousel-dot{% if loop.first %} is-active{% endif %}"
+                data-carousel-dot
+                data-carousel-index="{{ loop.index0 }}"
+                type="button"
+              ></button>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="card drink-copy">
+      <p class="eyebrow">{{ product_bundle["product"]["stock_pool_name"] }}</p>
+      <h1>{{ product_bundle["product"]["name"] }}</h1>
+      <p class="price">EUR {{ "%.2f"|format(product_bundle["product"]["price_eur"]) }}</p>
+      <p class="menu-item-description">{{ product_bundle["product"]["description"] }}</p>
+      <p class="stock-caption">
+        {{ product_bundle["product"]["servings_available"] }} servings left |
+        {{ product_bundle["product"]["grams_per_serving"] }}g matcha per cup
+      </p>
+
+      <section class="detail-block">
+        <h2>Drink styles</h2>
+        <p class="menu-item-description">Type 1: whisk with water, add low-fat milk</p>
+        <p class="menu-item-description">Type 2: whisk with oat or regular milk for a frothier, thicker drink</p>
+      </section>
+
+      <p class="menu-item-description">Click the drink image to open the full uncropped photo.</p>
+
+      <a class="button" href="{{ url_for('main.checkout') }}">Order this drink</a>
+    </article>
+  </section>
+{% endblock %}

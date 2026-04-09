@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Admin | Matcha Home Cafe{% endblock %}
+
+{% block content %}
+  <section class="section-heading">
+    <p class="eyebrow">Admin</p>
+    <h1>Incoming orders</h1>
+  </section>
+
+  <section class="stack">
+    <article class="card">
+      <h2>Homepage alert</h2>
+      <p class="menu-item-description">Write a short message for all users on the menu page, such as sold-out notes or collection reminders.</p>
+      <form action="{{ url_for('main.update_site_alert') }}" class="stacked-form" method="post">
+        <label>
+          Alert message
+          <textarea name="homepage_alert" rows="3">{{ homepage_alert or '' }}</textarea>
+        </label>
+        <div class="button-row">
+          <button class="button secondary-button" type="submit">Save alert</button>
+          {% if homepage_alert %}
+            <button class="button danger-button" name="homepage_alert" type="submit" value="">Clear alert</button>
+          {% endif %}
+        </div>
+      </form>
+    </article>
+  </section>
+
+  <section class="grid compact-grid">
+    {% for stock_pool in stock_pools %}
+      <article class="card">
+        <form action="{{ url_for('main.update_stock', stock_pool_id=stock_pool['id']) }}" class="stacked-form" method="post">
+          <p class="eyebrow">{{ stock_pool["name"] }}</p>
+          <h2>{{ stock_pool["servings_available"] }} servings left</h2>
+          <label>
+            Servings available
+            <input min="0" name="servings_available" type="number" value="{{ stock_pool['servings_available'] }}">
+          </label>
+          <label>
+            Grams per serving
+            <input min="1" name="grams_per_serving" type="number" value="{{ stock_pool['grams_per_serving'] }}">
+          </label>
+          <button class="button secondary-button" type="submit">Save stock</button>
+        </form>
+      </article>
+    {% endfor %}
+  </section>
+
+  <section class="stack">
+    <article class="card">
+      <h2>Create drink</h2>
+      <form action="{{ url_for('main.create_product_admin') }}" class="stacked-form" method="post">
+        <label>
+          Name
+          <input name="name" required type="text">
+        </label>
+        <label>
+          Price in EUR
+          <input min="0" name="price_eur" required step="0.01" type="number">
+        </label>
+        <label>
+          Description
+          <textarea name="description" required rows="3"></textarea>
+        </label>
+        <label>
+          Stock pool
+          <select name="stock_pool_id">
+            {% for stock_pool in stock_pools %}
+              <option value="{{ stock_pool['id'] }}">{{ stock_pool["name"] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="button" type="submit">Create drink</button>
+      </form>
+    </article>
+
+    <article class="card">
+      <h2>Manage drinks and photos</h2>
+      <p class="menu-item-description">Edit drinks, upload photos, reorder galleries, and delete uploaded images.</p>
+      <div class="admin-product-grid">
+        {% for item in menu_items %}
+          <article class="card upload-card">
+            <form action="{{ url_for('main.update_product_admin', product_id=item['id']) }}" class="stacked-form" method="post">
+              <h3 class="menu-item-title">{{ item["name"] }}</h3>
+              <label>
+                Name
+                <input name="name" required type="text" value="{{ item['name'] }}">
+              </label>
+              <label>
+                Price in EUR
+                <input min="0" name="price_eur" required step="0.01" type="number" value="{{ '%.2f'|format(item['price_eur']) }}">
+              </label>
+              <label>
+                Description
+                <textarea name="description" required rows="3">{{ item["description"] }}</textarea>
+              </label>
+              <label>
+                Stock pool
+                <select name="stock_pool_id">
+                  {% for stock_pool in stock_pools %}
+                    <option value="{{ stock_pool['id'] }}" {% if stock_pool["name"] == item["stock_pool_name"] %}selected{% endif %}>{{ stock_pool["name"] }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button class="button secondary-button" type="submit">Save drink</button>
+            </form>
+
+            <form
+              action="{{ url_for('main.upload_product_image', product_id=item['id']) }}"
+              class="stacked-form"
+              enctype="multipart/form-data"
+              method="post"
+            >
+              <label>
+                Image file
+                <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/*" name="image_file" required type="file">
+              </label>
+              <label>
+                Alt text
+                <input name="alt_text" placeholder="Describe the drink photo" type="text">
+              </label>
+              <button class="button" type="submit">Upload image</button>
+            </form>
+
+            {% if item["images"] %}
+              <form action="{{ url_for('main.reorder_product_images', product_id=item['id']) }}" class="image-order-form" method="post">
+                <h4>Current image order</h4>
+                {% for image in item["images"] %}
+                  <div class="image-order-row">
+                    <img alt="{{ image['alt_text'] }}" class="admin-thumbnail" src="{{ image['image_path'] }}">
+                    <div class="image-order-copy">
+                      <p class="menu-item-description">{{ image["alt_text"] }}</p>
+                      <label>
+                        Position
+                        <input min="1" name="sort_order_{{ image['id'] }}" type="number" value="{{ loop.index }}">
+                      </label>
+                      <button class="button danger-button" formaction="{{ url_for('main.delete_product_image_admin', image_id=image['id']) }}" formmethod="post" type="submit">
+                        Delete image
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+                <button class="button secondary-button" type="submit">Save image order</button>
+              </form>
+            {% endif %}
+
+            <form action="{{ url_for('main.delete_product_admin', product_id=item['id']) }}" method="post">
+              <button class="button danger-button" type="submit">Delete drink</button>
+            </form>
+          </article>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  {% if orders %}
+    <section class="stack">
+      {% for bundle in orders %}
+        <article class="card">
+          <div class="order-header">
+            <div>
+              <h2>Order #{{ bundle["order"]["id"] }}</h2>
+              <p>{{ bundle["order"]["customer_name"] }} | ends {{ bundle["order"]["phone_last4"] }}</p>
+            </div>
+            <div class="order-meta">
+              <p>{{ bundle["order"]["pickup_label"] }}</p>
+              <p>EUR {{ "%.2f"|format(bundle["order"]["total_amount"]) }}</p>
+            </div>
+          </div>
+          <p><strong>Payment:</strong> {{ bundle["order"]["payment_method"] }}</p>
+          <ul>
+            {% for item in bundle["items"] %}
+              <li>
+                {{ item["quantity"] }} x {{ item["name"] }}
+                <span class="menu-item-description">({{ item["preparation_style"].replace('_', ' ').title() }})</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <p>No orders yet.</p>
+  {% endif %}
+{% endblock %}

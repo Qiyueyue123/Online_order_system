@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">Ikuyo matcha latte scene two</title>
+  <desc id="desc">A stylized close-up of a thick matcha latte swirl.</desc>
+  <rect width="800" height="600" fill="#eef3e7"/>
+  <circle cx="400" cy="300" r="190" fill="#fff9f0"/>
+  <circle cx="400" cy="300" r="165" fill="#6d9559"/>
+  <path d="M260 295c46-52 106-76 180-74 74 2 122 30 133 79 13 54-32 114-102 131-64 16-152-14-189-72-20-33-26-44-22-64z" fill="#9ac180"/>
+  <path d="M311 276c26-28 64-43 111-42 51 1 93 19 112 53 21 37 7 77-35 101-49 28-122 22-166-16-41-36-49-67-22-96z" fill="#bddba8"/>
+  <text x="400" y="535" text-anchor="middle" fill="#2a3a2f" font-family="Avenir Next, sans-serif" font-size="38" font-weight="700">Frothy Finish</text>
+</svg>

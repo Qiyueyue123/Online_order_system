@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">Ikuyo matcha latte scene one</title>
+  <desc id="desc">A stylized green matcha latte cup on a cream background.</desc>
+  <rect width="800" height="600" fill="#f4eee3"/>
+  <circle cx="120" cy="110" r="90" fill="#dce8d8"/>
+  <circle cx="700" cy="500" r="110" fill="#e8ddcb"/>
+  <rect x="240" y="175" width="320" height="285" rx="34" fill="#fbf8f1"/>
+  <rect x="265" y="140" width="270" height="60" rx="28" fill="#ffffff"/>
+  <ellipse cx="400" cy="250" rx="120" ry="50" fill="#7aa268"/>
+  <ellipse cx="400" cy="260" rx="105" ry="36" fill="#9bc283"/>
+  <path d="M558 228c54 0 80 62 34 102h-28v-28c21-11 19-46-6-46h-18v-28h18z" fill="#fbf8f1"/>
+  <text x="400" y="525" text-anchor="middle" fill="#2a3a2f" font-family="Avenir Next, sans-serif" font-size="38" font-weight="700">Ikuyo Matcha Latte</text>
+</svg>

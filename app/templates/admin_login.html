@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login | Matcha Home Cafe{% endblock %}
+
+{% block content %}
+  <section class="section-heading narrow">
+    <p class="eyebrow">Admin</p>
+    <h1>Login</h1>
+  </section>
+
+  <form class="card login-card" method="post">
+    <label>
+      Username
+      <input autofocus name="username" required type="text">
+    </label>
+    <label>
+      Password
+      <input name="password" required type="password">
+    </label>
+    <button class="button" type="submit">Sign in</button>
+  </form>
+{% endblock %}

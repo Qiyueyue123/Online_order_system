@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">Sayaka latte scene two</title>
+  <desc id="desc">A stylized whisk and premium matcha powder composition.</desc>
+  <rect width="800" height="600" fill="#eef1e5"/>
+  <circle cx="280" cy="300" r="135" fill="#fffaf4"/>
+  <circle cx="280" cy="300" r="95" fill="#708f5c"/>
+  <path d="M490 180l120 240" stroke="#b28a58" stroke-width="24" stroke-linecap="round"/>
+  <path d="M440 225c53 45 70 70 98 149" fill="none" stroke="#c99c63" stroke-width="14" stroke-linecap="round"/>
+  <path d="M410 250c57 35 86 74 110 138" fill="none" stroke="#c99c63" stroke-width="14" stroke-linecap="round"/>
+  <path d="M380 278c57 29 96 86 109 131" fill="none" stroke="#c99c63" stroke-width="14" stroke-linecap="round"/>
+  <text x="400" y="525" text-anchor="middle" fill="#304029" font-family="Avenir Next, sans-serif" font-size="34" font-weight="700">Premium Sayaka Detail</text>
+</svg>

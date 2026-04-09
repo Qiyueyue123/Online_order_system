@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout | Matcha Home Cafe{% endblock %}
+
+{% block content %}
+  <section class="section-heading">
+    <p class="eyebrow">Order form</p>
+    <h1>Place a pickup order</h1>
+  </section>
+
+  <form class="order-form" method="post">
+    <section class="card">
+      <h2>1. Drinks</h2>
+      <div class="form-grid">
+        {% for item in menu_items %}
+          <div class="menu-line">
+            <div>
+              <label class="menu-item-title" for="quantity_{{ item['id'] }}">{{ item["name"] }}</label>
+              <p class="menu-item-description">{{ item["description"] }}</p>
+              <p class="stock-caption">
+                EUR {{ "%.2f"|format(item["price_eur"]) }} | {{ item["stock_pool_name"] }} stock:
+                {{ item["servings_available"] }} servings left
+              </p>
+              <label class="style-label" for="preparation_style_{{ item['id'] }}">Drink style</label>
+              <select id="preparation_style_{{ item['id'] }}" name="preparation_style_{{ item['id'] }}">
+                {% for style_value, style_label in preparation_styles.items() %}
+                  <option
+                    value="{{ style_value }}"
+                    {% if request.form.get('preparation_style_' ~ item['id'], 'type_1') == style_value %}selected{% endif %}
+                  >
+                    {{ style_label }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <input
+              id="quantity_{{ item['id'] }}"
+              min="0"
+              max="{{ item['servings_available'] }}"
+              name="quantity_{{ item['id'] }}"
+              type="number"
+              {% if item["servings_available"] == 0 %}disabled{% endif %}
+              value="{{ request.form.get('quantity_' ~ item['id'], '0') }}"
+            >
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. Pickup details</h2>
+      <div class="form-grid two-column">
+        <label>
+          Name
+          <input name="customer_name" required type="text" value="{{ request.form.get('customer_name', '') }}">
+        </label>
+        <label>
+          Last 4 phone digits
+          <input
+            inputmode="numeric"
+            maxlength="4"
+            name="phone_last4"
+            pattern="[0-9]{4}"
+            placeholder="1234"
+            required
+            type="text"
+            value="{{ request.form.get('phone_last4', '') }}"
+          >
+        </label>
+        <label>
+          Pickup time
+          <select name="pickup_at" required>
+            <option value="">Select a pickup time</option>
+            {% for slot in pickup_slots %}
+              <option value="{{ slot['value'] }}" {% if request.form.get('pickup_at', '') == slot['value'] %}selected{% endif %}>
+                {{ slot["label"] }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Payment method
+          <select name="payment_method">
+            <option value="cash" {% if request.form.get('payment_method', 'cash') == 'cash' %}selected{% endif %}>Cash on pickup</option>
+            <option value="manual_tikkie" {% if request.form.get('payment_method') == 'manual_tikkie' %}selected{% endif %}>Manual Tikkie on pickup</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        Notes
+        <textarea name="notes" rows="4" placeholder="Optional requests or allergy notes">{{ request.form.get('notes', '') }}</textarea>
+      </label>
+    </section>
+
+    <button class="button" type="submit">Place order</button>
+  </form>
+{% endblock %}

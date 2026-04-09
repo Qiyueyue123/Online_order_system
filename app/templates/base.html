@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}QY & YX 's' Cafe{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script defer src="{{ url_for('static', filename='carousel.js') }}"></script>
+  </head>
+  <body data-path="{{ request.path }}">
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="{{ url_for('main.home') }}">QY & YX's Cafe</a>
+        <nav class="nav">
+          <a href="{{ url_for('main.home') }}">Menu</a>
+          <a href="{{ url_for('main.checkout') }}">Checkout</a>
+          {% if session.get("admin_authenticated") %}
+            <a href="{{ url_for('main.admin') }}">Admin</a>
+            <form action="{{ url_for('main.admin_logout') }}" class="inline-form" method="post">
+              <button class="link-button" type="submit">Logout</button>
+            </form>
+          {% else %}
+            <a href="{{ url_for('main.admin_login') }}">Admin Login</a>
+          {% endif %}
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <section class="flash-list" data-toast-list>
+            {% for message in messages %}
+              <p class="flash" data-toast>{{ message }}</p>
+            {% endfor %}
+          </section>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <dialog class="lightbox" data-lightbox>
+      <div class="lightbox-shell">
+        <button aria-label="Close image viewer" class="lightbox-close" data-lightbox-close type="button">Close</button>
+        <img alt="" class="lightbox-image" data-lightbox-image src="">
+        <p class="lightbox-caption menu-item-description" data-lightbox-caption></p>
+      </div>
+    </dialog>
+  </body>
+</html>

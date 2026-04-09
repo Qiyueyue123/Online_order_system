@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">Strawberry Ikuyo latte scene one</title>
+  <desc id="desc">A stylized layered strawberry matcha latte.</desc>
+  <rect width="800" height="600" fill="#f8efe8"/>
+  <circle cx="655" cy="125" r="92" fill="#f2d3d2"/>
+  <rect x="280" y="130" width="240" height="330" rx="28" fill="#fff8f2"/>
+  <rect x="300" y="180" width="200" height="90" rx="18" fill="#f4b4ba"/>
+  <rect x="300" y="270" width="200" height="95" rx="18" fill="#f7efe8"/>
+  <rect x="300" y="365" width="200" height="70" rx="18" fill="#90b875"/>
+  <circle cx="360" cy="165" r="14" fill="#df5f74"/>
+  <circle cx="400" cy="150" r="14" fill="#df5f74"/>
+  <circle cx="440" cy="165" r="14" fill="#df5f74"/>
+  <text x="400" y="525" text-anchor="middle" fill="#4a2430" font-family="Avenir Next, sans-serif" font-size="36" font-weight="700">Strawberry Ikuyo</text>
+</svg>

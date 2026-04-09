@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Menu | QY&YX's Cafe{% endblock %}
+
+{% block content %}
+  {% if homepage_alert %}
+    <section class="card site-alert">
+      <p class="eyebrow">Cafe alert</p>
+      <p class="site-alert-copy">{{ homepage_alert }}</p>
+    </section>
+  {% endif %}
+
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Home cafe</p>
+      <h1>Matcha pickup menu</h1>
+      <p> Every order is Hand whisked!</p>
+      <p> Do allow for 5-10 minutes of wait time upon arrival</p>
+      <a class="button" href="{{ url_for('main.checkout') }}">Start an order</a>
+    </div>
+    <div class="card highlight menu-note">
+      <p>Pickup only at Haarweg 333 Block C 053</p>
+      <p>Pay on collection</p>
+    </div>
+  </section>
+
+  <section class="section-heading">
+    <p class="eyebrow">Menu</p>
+    <h2>Current drinks</h2>
+  </section>
+
+  <section class="grid">
+    {% for item in menu_items %}
+      <article class="card">
+        {% if item["images"] %}
+          <div class="carousel card-carousel" data-carousel>
+            <div class="carousel-viewport">
+              <div class="carousel-track" data-carousel-track>
+                {% for image in item["images"] %}
+                  <figure class="carousel-slide{% if loop.first %} is-active{% endif %}" data-carousel-slide>
+                    <button
+                      aria-label="Open full image of {{ item['name'] }}"
+                      class="image-open-button"
+                      data-lightbox-trigger
+                      data-lightbox-alt="{{ image['alt_text'] }}"
+                      data-lightbox-caption="{{ item['name'] }} | {{ image['alt_text'] }}"
+                      data-lightbox-src="{{ image['image_path'] }}"
+                      type="button"
+                    >
+                      <img alt="{{ image['alt_text'] }}" class="menu-item-image" src="{{ image['image_path'] }}">
+                    </button>
+                  </figure>
+                {% endfor %}
+              </div>
+              {% if item["images"]|length > 1 %}
+                <div class="card-carousel-nav">
+                  <button
+                    aria-label="Show previous photo for {{ item['name'] }}"
+                    class="carousel-arrow"
+                    data-carousel-prev
+                    type="button"
+                  >
+                    <
+                  </button>
+                  <button
+                    aria-label="Show next photo for {{ item['name'] }}"
+                    class="carousel-arrow"
+                    data-carousel-next
+                    type="button"
+                  >
+                    >
+                  </button>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="menu-item-image placeholder">Photo coming soon</div>
+        {% endif %}
+        <p class="price">EUR {{ "%.2f"|format(item["price_eur"]) }}</p>
+        <h3 class="menu-item-title">
+          <a class="card-link" href="{{ url_for('main.drink_detail', product_id=item['id']) }}">{{ item["name"] }}</a>
+        </h3>
+        <p class="menu-item-description">{{ item["description"] }}</p>
+        <p class="stock-caption">
+          {{ item["stock_pool_name"] }} stock: {{ item["servings_available"] }} servings left
+        </p>
+        <a class="text-link" href="{{ url_for('main.drink_detail', product_id=item['id']) }}">Open full drink page</a>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

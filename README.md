@@ -237,6 +237,109 @@ In this project:
 - [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) keeps local secrets, the virtual environment, the SQLite database, and uploaded images out of the image build
 - the app reads `PORT`, `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, and `DATABASE_PATH` from environment variables
 
+## Docker learning notes
+
+This project uses Docker in the same basic way many small deployable web apps do: the application code is packaged into an image, then run as a container with configuration injected from the outside.
+
+Important terms:
+- `Image`: the packaged application template built from the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile)
+- `Container`: a running instance of that image
+- `Build`: the process of turning source code and dependencies into an image
+- `Port`: the network entry point used to reach the app from a browser
+- `Volume`: persistent storage mounted into the container so runtime data survives restarts
+- `Environment variable`: configuration passed into the container without hardcoding secrets in the code
+
+How the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile) works:
+1. It starts from `python:3.12-slim`, which gives the app a clean Python runtime.
+2. It sets `/app` as the working directory inside the container.
+3. It installs production dependencies from [requirements.txt](/Users/qy/Documents/GitHub/Matcha_Online_sys/requirements.txt).
+4. It copies the application code into the image.
+5. It starts the app using `gunicorn`, which is more suitable for deployment than Flask's development server.
+6. It binds to `${PORT:-8000}`, so local Docker can use port `8000` while deployment platforms can provide their own `PORT`.
+7. It includes a health check that calls `/healthz`.
+
+How [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml) helps locally:
+- it builds the image from the current folder
+- it maps your browser's `localhost:8000` to the container's port `8000`
+- it passes environment variables from `.env`
+- it mounts `./instance` on your laptop to `/app/instance` inside the container
+
+Why the mounted volume matters:
+- SQLite stores orders in `/app/instance/matcha.db`
+- admin uploads store images under `/app/instance/uploads/`
+- containers are replaceable, so data written only inside the container can disappear
+- mounting `./instance:/app/instance` keeps order data and uploaded images outside the disposable container
+
+Why `.env` is not committed:
+- `.env` contains real secrets such as `SECRET_KEY` and `ADMIN_PASSWORD_HASH`
+- secrets should be configured separately on each machine or deployment platform
+- [.env.example](/Users/qy/Documents/GitHub/Matcha_Online_sys/.env.example) documents the required variables without exposing real values
+
+Why [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) exists:
+- it prevents `.env` from being copied into the image
+- it prevents `.venv` from making the image large and machine-specific
+- it prevents local SQLite databases and uploaded images from being baked into the app image
+- the image should contain code and dependencies, not private runtime data
+
+Useful Docker commands for this project:
+
+```bash
+docker compose up --build
+```
+
+Build the image and start the app.
+
+```bash
+docker compose up -d
+```
+
+Start the app in the background.
+
+```bash
+docker compose ps
+```
+
+Show running containers for this project.
+
+```bash
+docker compose logs -f
+```
+
+Follow application logs.
+
+```bash
+docker compose down
+```
+
+Stop the running containers. This does not delete the mounted `instance/` folder.
+
+```bash
+docker compose build --no-cache
+```
+
+Rebuild from scratch if dependency or image-layer caching causes confusion.
+
+What Docker proves for this project:
+- the app can run outside the local Python virtual environment
+- production startup uses `gunicorn`
+- configuration is externalized through environment variables
+- runtime data is separated from application code
+- the same image structure can be used later by a real deployment platform
+
+What Docker does not solve by itself:
+- it does not automatically give a public URL
+- it does not automatically provide HTTPS
+- it does not replace backups
+- it does not make SQLite suitable for high traffic
+- it does not remove the need for secure secrets and admin credentials
+
+How this maps to deployment later:
+- local `docker compose` becomes a platform web service
+- local `.env` becomes platform environment variables
+- local `./instance:/app/instance` becomes a platform persistent disk or volume
+- local `localhost:8000` becomes a public domain
+- local logs become platform deployment/runtime logs
+
 ## How to run with Docker
 
 ### Option A: use Docker Compose
@@ -380,6 +483,7 @@ Follow this order:
 - Made the Docker container use the platform-provided `PORT`
 - Added `.dockerignore` so local secrets, database files, uploads, and the virtual environment are not copied into Docker images
 - Documented the path from local Docker testing to deployment on a real URL
+- Added Docker learning notes explaining images, containers, Compose, environment variables, volumes, persistence, and deployment mapping
 
 ## Notes
 

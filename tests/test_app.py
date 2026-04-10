@@ -1,7 +1,7 @@
 from io import BytesIO
 
 from app import create_app
-from app.db import get_homepage_alert, get_menu_items, get_product_with_images, init_db, list_stock_pools
+from app.db import get_db, get_homepage_alert, get_menu_items, get_order, get_product_with_images, get_site_settings, init_db, list_pickup_days, list_stock_pools
 from app.routes import build_pickup_slot_choices
 from werkzeug.security import generate_password_hash
 
@@ -22,6 +22,11 @@ def build_test_app(tmp_path):
     return app
 
 
+def first_pickup_value(app):
+    with app.app_context():
+        return build_pickup_slot_choices()[0]["value"]
+
+
 def test_home_page_loads(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -30,7 +35,9 @@ def test_home_page_loads(tmp_path):
 
     assert response.status_code == 200
     assert b"Matcha pickup menu" in response.data
+    assert b"Please understand we whisk each order upon arrival" in response.data
     assert b"Open full drink page" in response.data
+    assert b"Whatsapp/Telegram for any query" in response.data
     assert b"data-carousel" in response.data
     assert b"data-lightbox-trigger" in response.data
     assert b"Show previous photo for Ikuyo Matcha Latte" in response.data
@@ -48,16 +55,27 @@ def test_drink_detail_page_loads(tmp_path):
     assert b"Click the drink image to open the full uncropped photo." in response.data
 
 
+def test_checkout_uses_circular_quantity_choices(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    response = client.get("/checkout")
+
+    assert response.status_code == 200
+    assert b"class=\"quantity-picker\"" in response.data
+    assert b"value=\"3\"" in response.data
+
+
 def test_checkout_creates_an_order(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
-    pickup_value = build_pickup_slot_choices()[0]["value"]
+    pickup_value = first_pickup_value(app)
 
     response = client.post(
         "/checkout",
         data={
             "customer_name": "Qy",
-            "phone_last4": "5678",
+            "customer_contact": "+65 12345678",
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "2",
@@ -69,7 +87,12 @@ def test_checkout_creates_an_order(tmp_path):
     assert response.status_code == 200
     assert b"Order #1 received" in response.data
     assert b"Type 2" in response.data
-    assert b"Phone ending:" in response.data
+    assert b"Contact:" in response.data
+    assert b"+65 12345678" in response.data
+    assert b"Save this link for cancellation" in response.data
+    assert b"Cancellation link" in response.data
+    assert b"/orders/1/manage/" in response.data
+    assert b"Manage or cancel order" in response.data
 
 
 def test_admin_login_required(tmp_path):
@@ -199,6 +222,111 @@ def test_admin_can_update_homepage_alert(tmp_path):
     assert b"Collections paused after 8pm." in home_response.data
 
 
+def test_admin_can_update_site_contact(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/site-contact",
+        data={
+            "contact_line": "Whatsapp or Telegram: +65 90000000",
+            "contact_phone": "+6590000000",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Contact details updated." in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        assert settings["contact_line"] == "Whatsapp or Telegram: +65 90000000"
+        assert settings["contact_phone"] == "+6590000000"
+
+    home_response = client.get("/")
+    assert b"Whatsapp or Telegram: +65 90000000" in home_response.data
+
+
+def test_admin_can_update_pickup_availability(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    with app.app_context():
+        pickup_day = list_pickup_days(days=1)[0]
+
+    response = client.post(
+        f"/admin/pickup-days/{pickup_day['id']}",
+        data={
+            "start_time": "18:00",
+            "end_time": "20:00",
+            "slot_capacity": "1",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Pickup availability updated." in response.data
+
+    with app.app_context():
+        updated_day = list_pickup_days(days=1)[0]
+        assert updated_day["is_available"] == 0
+        assert updated_day["start_time"] == "18:00"
+        assert updated_day["end_time"] == "20:00"
+        assert updated_day["slot_capacity"] == 1
+
+        assert all(
+            not slot["value"].startswith(updated_day["pickup_date"])
+            for slot in build_pickup_slot_choices()
+        )
+
+
+def test_admin_can_cancel_order(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "2",
+            "preparation_style_1": "type_2",
+        },
+    )
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/orders/1/cancel",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Order cancelled and stock restored." in response.data
+
+    with app.app_context():
+        order_bundle = get_order(1)
+        assert order_bundle["order"]["status"] == "cancelled"
+        stock_pools = list_stock_pools()
+        assert stock_pools[0]["servings_available"] == 25
+
+
 def test_admin_can_delete_product_image(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -298,7 +426,7 @@ def test_shared_stock_pool_prevents_oversell(tmp_path):
 
             create_order(
                 name="Qy",
-                phone_last4="5678",
+                customer_contact="+65 12345678",
                 pickup_at=build_pickup_slot_choices()[0]["value"],
                 payment_method="cash",
                 notes="",
@@ -313,6 +441,69 @@ def test_shared_stock_pool_prevents_oversell(tmp_path):
             raise AssertionError("Expected InventoryError for overselling shared stock.")
 
 
+def test_customer_can_cancel_order_with_private_link(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    response = client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "+65 12345678",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "2",
+            "preparation_style_1": "type_2",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    confirmation_url = response.headers["Location"]
+    assert "token=" in confirmation_url
+    token = confirmation_url.split("token=", 1)[1]
+
+    manage_response = client.get(f"/orders/1/manage/{token}")
+    assert manage_response.status_code == 200
+    assert b"Cancel order" in manage_response.data
+
+    cancel_response = client.post(
+        f"/orders/1/cancel/{token}",
+        follow_redirects=True,
+    )
+
+    assert cancel_response.status_code == 200
+    assert b"Order cancelled" in cancel_response.data
+
+    with app.app_context():
+        order_bundle = get_order(1)
+        assert order_bundle["order"]["status"] == "cancelled"
+        stock_pools = list_stock_pools()
+        assert stock_pools[0]["servings_available"] == 25
+
+
+def test_customer_cannot_manage_order_with_wrong_token(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": first_pickup_value(app),
+            "payment_method": "cash",
+            "quantity_1": "1",
+            "preparation_style_1": "type_1",
+        },
+    )
+
+    response = client.get("/orders/1/manage/wrong-token")
+
+    assert response.status_code == 404
+
+
 def test_hash_password_cli_command_outputs_a_hash(tmp_path):
     app = build_test_app(tmp_path)
     runner = app.test_cli_runner()
@@ -321,3 +512,82 @@ def test_hash_password_cli_command_outputs_a_hash(tmp_path):
 
     assert result.exit_code == 0
     assert result.output.strip().startswith("scrypt:")
+
+
+def test_init_db_migrates_existing_site_settings_table(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "DATABASE": str(tmp_path / "legacy.db"),
+            "SECRET_KEY": "test-secret-key",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD_HASH": generate_password_hash("test-admin-password"),
+            "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+        }
+    )
+
+    with app.app_context():
+        db = get_db()
+        db.execute("DROP TABLE IF EXISTS site_settings")
+        db.execute(
+            """
+            CREATE TABLE site_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                homepage_alert TEXT,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        db.execute(
+            """
+            INSERT INTO site_settings (id, homepage_alert)
+            VALUES (1, 'Legacy alert')
+            """
+        )
+        db.commit()
+
+        init_db()
+
+        columns = {
+            row["name"]
+            for row in db.execute("PRAGMA table_info(site_settings)").fetchall()
+        }
+        settings = get_site_settings()
+
+        assert "contact_line" in columns
+        assert "contact_phone" in columns
+        assert settings["homepage_alert"] == "Legacy alert"
+
+
+def test_seed_inventory_handles_legacy_site_settings_table(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "DATABASE": str(tmp_path / "legacy-seed.db"),
+            "SECRET_KEY": "test-secret-key",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD_HASH": generate_password_hash("test-admin-password"),
+            "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+        }
+    )
+
+    with app.app_context():
+        db = get_db()
+        db.execute("DROP TABLE IF EXISTS site_settings")
+        db.execute(
+            """
+            CREATE TABLE site_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                homepage_alert TEXT,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        db.commit()
+
+        from app.db import _seed_inventory
+
+        _seed_inventory(db)
+
+        row = db.execute("SELECT id, homepage_alert FROM site_settings WHERE id = 1").fetchone()
+        assert row["id"] == 1

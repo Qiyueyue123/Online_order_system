@@ -40,6 +40,15 @@
       {% block content %}{% endblock %}
     </main>
 
+    <footer class="site-footer">
+      <div class="wrap site-footer-inner">
+        <p class="footer-contact">
+          {{ cafe_contact_line }}
+          <a class="footer-contact-link" href="tel:{{ cafe_contact_phone }}">{{ cafe_contact_phone }}</a>
+        </p>
+      </div>
+    </footer>
+
     <dialog class="lightbox" data-lightbox>
       <div class="lightbox-shell">
         <button aria-label="Close image viewer" class="lightbox-close" data-lightbox-close type="button">Close</button>

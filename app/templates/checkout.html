@@ -15,7 +15,7 @@
         {% for item in menu_items %}
           <div class="menu-line">
             <div>
-              <label class="menu-item-title" for="quantity_{{ item['id'] }}">{{ item["name"] }}</label>
+              <p class="menu-item-title">{{ item["name"] }}</p>
               <p class="menu-item-description">{{ item["description"] }}</p>
               <p class="stock-caption">
                 EUR {{ "%.2f"|format(item["price_eur"]) }} | {{ item["stock_pool_name"] }} stock:
@@ -33,15 +33,23 @@
                 {% endfor %}
               </select>
             </div>
-            <input
-              id="quantity_{{ item['id'] }}"
-              min="0"
-              max="{{ item['servings_available'] }}"
-              name="quantity_{{ item['id'] }}"
-              type="number"
-              {% if item["servings_available"] == 0 %}disabled{% endif %}
-              value="{{ request.form.get('quantity_' ~ item['id'], '0') }}"
-            >
+            <fieldset class="quantity-picker" aria-label="Quantity for {{ item['name'] }}">
+              <legend>Quantity</legend>
+              {% set selected_quantity = request.form.get('quantity_' ~ item['id'], '0')|int %}
+              {% for quantity in quantity_choices %}
+                {% set is_disabled = quantity > item["servings_available"] %}
+                <label class="quantity-choice{% if is_disabled %} is-disabled{% endif %}">
+                  <input
+                    name="quantity_{{ item['id'] }}"
+                    type="radio"
+                    value="{{ quantity }}"
+                    {% if selected_quantity == quantity %}checked{% endif %}
+                    {% if is_disabled %}disabled{% endif %}
+                  >
+                  <span>{{ quantity }}</span>
+                </label>
+              {% endfor %}
+            </fieldset>
           </div>
         {% endfor %}
       </div>
@@ -55,16 +63,13 @@
           <input name="customer_name" required type="text" value="{{ request.form.get('customer_name', '') }}">
         </label>
         <label>
-          Last 4 phone digits
+          WhatsApp number or Telegram handle
           <input
-            inputmode="numeric"
-            maxlength="4"
-            name="phone_last4"
-            pattern="[0-9]{4}"
-            placeholder="1234"
+            name="customer_contact"
+            placeholder="+65 97888146 or @telegramhandle"
             required
             type="text"
-            value="{{ request.form.get('phone_last4', '') }}"
+            value="{{ request.form.get('customer_contact', '') }}"
           >
         </label>
         <label>
@@ -73,7 +78,7 @@
             <option value="">Select a pickup time</option>
             {% for slot in pickup_slots %}
               <option value="{{ slot['value'] }}" {% if request.form.get('pickup_at', '') == slot['value'] %}selected{% endif %}>
-                {{ slot["label"] }}
+                {{ slot["label"] }} | {{ slot["remaining_capacity"] }} left
               </option>
             {% endfor %}
           </select>

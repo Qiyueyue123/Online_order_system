@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
 CREATE TABLE IF NOT EXISTS site_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     homepage_alert TEXT,
+    contact_line TEXT,
+    contact_phone TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -37,15 +39,27 @@ CREATE TABLE IF NOT EXISTS product_images (
     FOREIGN KEY (product_id) REFERENCES products (id)
 );
 
+CREATE TABLE IF NOT EXISTS pickup_days (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pickup_date TEXT NOT NULL UNIQUE,
+    is_available INTEGER NOT NULL DEFAULT 1,
+    start_time TEXT NOT NULL DEFAULT '16:00',
+    end_time TEXT NOT NULL DEFAULT '21:00',
+    slot_capacity INTEGER NOT NULL DEFAULT 2,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_name TEXT NOT NULL,
+    customer_contact TEXT NOT NULL,
     phone_last4 TEXT NOT NULL,
     pickup_at TEXT NOT NULL,
     payment_method TEXT NOT NULL,
     notes TEXT,
     total_amount REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'new',
+    cancel_token_hash TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

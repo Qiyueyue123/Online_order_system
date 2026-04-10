@@ -1,6 +1,7 @@
+import secrets
 import sqlite3
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import click
 from flask import current_app, g
@@ -99,6 +100,7 @@ def init_db():
     db = get_db()
     schema_path = Path(__file__).with_name("schema.sql")
     db.executescript(schema_path.read_text())
+    _migrate_schema(db)
     _seed_inventory(db)
     _seed_menu(db)
     db.commit()
@@ -167,13 +169,177 @@ def reset_db():
     init_db()
 
 
-def _seed_inventory(db):
-    db.execute(
+def _table_columns(db, table_name):
+    rows = db.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {row["name"] for row in rows}
+
+
+def _migrate_schema(db):
+    site_settings_columns = _table_columns(db, "site_settings")
+    if "contact_line" not in site_settings_columns:
+        db.execute("ALTER TABLE site_settings ADD COLUMN contact_line TEXT")
+    if "contact_phone" not in site_settings_columns:
+        db.execute("ALTER TABLE site_settings ADD COLUMN contact_phone TEXT")
+
+    order_columns = _table_columns(db, "orders")
+    if "customer_contact" not in order_columns:
+        db.execute("ALTER TABLE orders ADD COLUMN customer_contact TEXT")
+        if "phone_number" in order_columns:
+            db.execute(
+                """
+                UPDATE orders
+                SET customer_contact = phone_number
+                WHERE customer_contact IS NULL
+                """
+            )
+        elif "phone_last4" in order_columns:
+            db.execute(
+                """
+                UPDATE orders
+                SET customer_contact = 'Phone ending ' || phone_last4
+                WHERE customer_contact IS NULL
+                """
+            )
+    if "phone_last4" not in order_columns:
+        db.execute("ALTER TABLE orders ADD COLUMN phone_last4 TEXT")
+        if "phone_number" in order_columns:
+            db.execute(
+                """
+                UPDATE orders
+                SET phone_last4 = substr(phone_number, -4)
+                WHERE phone_last4 IS NULL
+                """
+            )
+    if "pickup_at" not in order_columns:
+        db.execute("ALTER TABLE orders ADD COLUMN pickup_at TEXT")
+        if "created_at" in order_columns:
+            db.execute(
+                """
+                UPDATE orders
+                SET pickup_at = strftime('%Y-%m-%dT%H:%M', created_at)
+                WHERE pickup_at IS NULL
+                """
+            )
+    if "cancel_token_hash" not in order_columns:
+        db.execute("ALTER TABLE orders ADD COLUMN cancel_token_hash TEXT")
+
+
+def ensure_pickup_days(reference_date=None, days=7):
+    if reference_date is None:
+        reference_date = date.today()
+
+    db = get_db()
+    for day_offset in range(days):
+        pickup_date = reference_date + timedelta(days=day_offset)
+        db.execute(
+            """
+            INSERT OR IGNORE INTO pickup_days (
+                pickup_date,
+                is_available,
+                start_time,
+                end_time,
+                slot_capacity
+            )
+            VALUES (?, 1, '16:00', '21:00', 2)
+            """,
+            (pickup_date.isoformat(),),
+        )
+    db.commit()
+
+
+def list_pickup_days(reference_date=None, days=7):
+    if reference_date is None:
+        reference_date = date.today()
+    ensure_pickup_days(reference_date=reference_date, days=days)
+
+    db = get_db()
+    start_date = reference_date.isoformat()
+    end_date = (reference_date + timedelta(days=days - 1)).isoformat()
+    return db.execute(
         """
-        INSERT OR IGNORE INTO site_settings (id, homepage_alert)
-        VALUES (1, NULL)
+        SELECT id, pickup_date, is_available, start_time, end_time, slot_capacity
+        FROM pickup_days
+        WHERE pickup_date BETWEEN ? AND ?
+        ORDER BY pickup_date
+        """,
+        (start_date, end_date),
+    ).fetchall()
+
+
+def update_pickup_day(pickup_day_id, is_available, start_time, end_time, slot_capacity):
+    if start_time >= end_time:
+        raise ValueError("Start time must be before end time.")
+    if slot_capacity < 1:
+        raise ValueError("Slot capacity must be at least 1.")
+
+    db = get_db()
+    cursor = db.execute(
         """
+        UPDATE pickup_days
+        SET
+            is_available = ?,
+            start_time = ?,
+            end_time = ?,
+            slot_capacity = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (
+            1 if is_available else 0,
+            start_time,
+            end_time,
+            slot_capacity,
+            pickup_day_id,
+        ),
     )
+    if cursor.rowcount == 0:
+        raise ValueError("Pickup day not found.")
+    db.commit()
+
+
+def get_active_order_counts_by_pickup_at():
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT pickup_at, COUNT(*) AS order_count
+        FROM orders
+        WHERE status != 'cancelled'
+        GROUP BY pickup_at
+        """
+    ).fetchall()
+    return {row["pickup_at"]: row["order_count"] for row in rows}
+
+
+def extract_contact_suffix(contact):
+    digits = "".join(char for char in contact if char.isdigit())
+    if len(digits) >= 4:
+        return digits[-4:]
+    cleaned = contact.strip()
+    if len(cleaned) >= 4:
+        return cleaned[-4:]
+    return cleaned or "----"
+
+
+def _seed_inventory(db):
+    site_settings_columns = _table_columns(db, "site_settings")
+    if {"contact_line", "contact_phone"}.issubset(site_settings_columns):
+        db.execute(
+            """
+            INSERT OR IGNORE INTO site_settings (id, homepage_alert, contact_line, contact_phone)
+            VALUES (1, NULL, ?, ?)
+            """,
+            (
+                current_app.config.get("CAFE_CONTACT_LINE"),
+                current_app.config.get("CAFE_CONTACT_PHONE"),
+            ),
+        )
+    else:
+        db.execute(
+            """
+            INSERT OR IGNORE INTO site_settings (id, homepage_alert)
+            VALUES (1, NULL)
+            """
+        )
 
     existing_count = db.execute("SELECT COUNT(*) FROM stock_pools").fetchone()[0]
     if existing_count:
@@ -265,31 +431,80 @@ def get_preparation_style_choices():
     return PREPARATION_STYLES
 
 
-def get_homepage_alert():
+def get_site_settings():
     db = get_db()
     row = db.execute(
         """
-        SELECT homepage_alert
+        SELECT homepage_alert, contact_line, contact_phone
         FROM site_settings
         WHERE id = 1
         """
     ).fetchone()
+    defaults = {
+        "homepage_alert": None,
+        "contact_line": current_app.config.get("CAFE_CONTACT_LINE"),
+        "contact_phone": current_app.config.get("CAFE_CONTACT_PHONE"),
+    }
     if row is None:
-        return None
-    return row["homepage_alert"]
+        return defaults
+
+    settings = dict(row)
+    settings["contact_line"] = settings["contact_line"] or defaults["contact_line"]
+    settings["contact_phone"] = settings["contact_phone"] or defaults["contact_phone"]
+    return settings
+
+
+def get_homepage_alert():
+    return get_site_settings()["homepage_alert"]
 
 
 def update_homepage_alert(message):
     db = get_db()
     db.execute(
         """
-        INSERT INTO site_settings (id, homepage_alert, updated_at)
-        VALUES (1, ?, CURRENT_TIMESTAMP)
+        INSERT INTO site_settings (id, homepage_alert, contact_line, contact_phone, updated_at)
+        VALUES (
+            1,
+            ?,
+            ?,
+            ?,
+            CURRENT_TIMESTAMP
+        )
         ON CONFLICT(id) DO UPDATE SET
             homepage_alert = excluded.homepage_alert,
             updated_at = CURRENT_TIMESTAMP
         """,
-        (message or None,),
+        (
+            message or None,
+            current_app.config.get("CAFE_CONTACT_LINE"),
+            current_app.config.get("CAFE_CONTACT_PHONE"),
+        ),
+    )
+    db.commit()
+
+
+def update_site_contact(contact_line, contact_phone):
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO site_settings (id, homepage_alert, contact_line, contact_phone, updated_at)
+        VALUES (
+            1,
+            ?,
+            ?,
+            ?,
+            CURRENT_TIMESTAMP
+        )
+        ON CONFLICT(id) DO UPDATE SET
+            contact_line = excluded.contact_line,
+            contact_phone = excluded.contact_phone,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            get_homepage_alert(),
+            contact_line or None,
+            contact_phone or None,
+        ),
     )
     db.commit()
 
@@ -567,15 +782,18 @@ def _load_products_for_items(db, items):
     return products
 
 
-def create_order(name, phone_last4, pickup_at, payment_method, notes, items):
+def create_order(name, customer_contact, pickup_at, payment_method, notes, items):
     db = get_db()
+    cancel_token = secrets.token_urlsafe(32)
+    cancel_token_hash = generate_password_hash(cancel_token)
+    phone_last4 = extract_contact_suffix(customer_contact)
     selected_items = []
     total_amount = 0.0
     requested_per_stock_pool = {}
     products = _load_products_for_items(db, items)
 
-    if len(phone_last4) != 4 or not phone_last4.isdigit():
-        raise ValueError("Enter the last 4 digits of your phone number.")
+    if not customer_contact.strip():
+        raise ValueError("Enter your WhatsApp number or Telegram handle.")
 
     try:
         datetime.strptime(pickup_at, "%Y-%m-%dT%H:%M")
@@ -633,16 +851,28 @@ def create_order(name, phone_last4, pickup_at, payment_method, notes, items):
             """
             INSERT INTO orders (
                 customer_name,
+                customer_contact,
                 phone_last4,
                 pickup_at,
                 payment_method,
                 notes,
                 total_amount,
-                status
+                status,
+                cancel_token_hash
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (name, phone_last4, pickup_at, payment_method, notes, total_amount, "new"),
+            (
+                name,
+                customer_contact.strip(),
+                phone_last4,
+                pickup_at,
+                payment_method,
+                notes,
+                total_amount,
+                "new",
+                cancel_token_hash,
+            ),
         )
         order_id = cursor.lastrowid
 
@@ -683,7 +913,7 @@ def create_order(name, phone_last4, pickup_at, payment_method, notes, items):
         raise
 
     db.commit()
-    return order_id
+    return {"order_id": order_id, "cancel_token": cancel_token}
 
 
 def get_order(order_id):
@@ -693,12 +923,14 @@ def get_order(order_id):
         SELECT
             id,
             customer_name,
+            customer_contact,
             phone_last4,
             pickup_at,
             payment_method,
             notes,
             total_amount,
             status,
+            cancel_token_hash,
             created_at
         FROM orders
         WHERE id = ?
@@ -734,11 +966,13 @@ def list_orders():
         SELECT
             id,
             customer_name,
+            customer_contact,
             phone_last4,
             pickup_at,
             payment_method,
             total_amount,
             status,
+            cancel_token_hash,
             created_at
         FROM orders
         ORDER BY created_at DESC, id DESC
@@ -763,6 +997,130 @@ def list_orders():
         ).fetchall()
         grouped.append({"order": order, "items": items})
     return grouped
+
+
+def get_order_for_management(order_id, cancel_token):
+    order_bundle = get_order(order_id)
+    if order_bundle is None:
+        return None
+
+    token_hash = order_bundle["order"]["cancel_token_hash"]
+    if not token_hash or not check_password_hash(token_hash, cancel_token):
+        return None
+
+    return order_bundle
+
+
+def can_cancel_order(order, now=None):
+    if now is None:
+        now = datetime.now()
+    if order["status"] != "new":
+        return False
+    try:
+        pickup_at = datetime.strptime(order["pickup_at"], "%Y-%m-%dT%H:%M")
+    except (TypeError, ValueError):
+        return False
+    return now < pickup_at
+
+
+def _restore_stock_and_cancel_order(db, order_id):
+    items = db.execute(
+        """
+        SELECT oi.quantity, p.stock_pool_id
+        FROM order_items oi
+        JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = ?
+        """,
+        (order_id,),
+    ).fetchall()
+
+    restored_by_stock_pool = {}
+    for item in items:
+        restored_by_stock_pool[item["stock_pool_id"]] = (
+            restored_by_stock_pool.get(item["stock_pool_id"], 0)
+            + item["quantity"]
+        )
+
+    for stock_pool_id, quantity in restored_by_stock_pool.items():
+        db.execute(
+            """
+            UPDATE stock_pools
+            SET servings_available = servings_available + ?
+            WHERE id = ?
+            """,
+            (quantity, stock_pool_id),
+        )
+
+    db.execute(
+        """
+        UPDATE orders
+        SET status = 'cancelled'
+        WHERE id = ?
+        """,
+        (order_id,),
+    )
+
+
+def cancel_order(order_id, cancel_token, now=None):
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        order = db.execute(
+            """
+            SELECT id, status, pickup_at, cancel_token_hash
+            FROM orders
+            WHERE id = ?
+            """,
+            (order_id,),
+        ).fetchone()
+        if order is None:
+            db.rollback()
+            return "not_found"
+        if not order["cancel_token_hash"] or not check_password_hash(
+            order["cancel_token_hash"],
+            cancel_token,
+        ):
+            db.rollback()
+            return "not_found"
+        if not can_cancel_order(order, now=now):
+            db.rollback()
+            return "not_allowed"
+
+        _restore_stock_and_cancel_order(db, order_id)
+    except Exception:
+        db.rollback()
+        raise
+
+    db.commit()
+    return "cancelled"
+
+
+def cancel_order_by_admin(order_id):
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        order = db.execute(
+            """
+            SELECT id, status
+            FROM orders
+            WHERE id = ?
+            """,
+            (order_id,),
+        ).fetchone()
+        if order is None:
+            db.rollback()
+            return "not_found"
+        if order["status"] != "new":
+            db.rollback()
+            return "not_allowed"
+
+        _restore_stock_and_cancel_order(db, order_id)
+    except Exception:
+        db.rollback()
+        raise
+
+    db.commit()
+    return "cancelled"
 
 
 def list_stock_pools():

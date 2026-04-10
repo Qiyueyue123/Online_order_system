@@ -2,7 +2,7 @@ import os
 
 from flask import Flask
 
-from .db import init_app, init_db, sync_admin_user_from_config
+from .db import get_site_settings, init_app, init_db, sync_admin_user_from_config
 
 
 def create_app(test_config=None):
@@ -24,6 +24,11 @@ def create_app(test_config=None):
         ADMIN_USERNAME=os.environ.get("ADMIN_USERNAME", "admin"),
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", default_admin_password),
         ADMIN_PASSWORD_HASH=os.environ.get("ADMIN_PASSWORD_HASH"),
+        CAFE_CONTACT_LINE=os.environ.get(
+            "CAFE_CONTACT_LINE",
+            "Whatsapp/Telegram for any query: +65 97888146",
+        ),
+        CAFE_CONTACT_PHONE=os.environ.get("CAFE_CONTACT_PHONE", "+6597888146"),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "0") == "1",
@@ -40,6 +45,14 @@ def create_app(test_config=None):
     with app.app_context():
         init_db()
         sync_admin_user_from_config()
+
+    @app.context_processor
+    def inject_site_contact():
+        settings = get_site_settings()
+        return {
+            "cafe_contact_line": settings["contact_line"],
+            "cafe_contact_phone": settings["contact_phone"],
+        }
 
     from .routes import bp
 

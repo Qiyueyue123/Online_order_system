@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Order | Matcha Home Cafe{% endblock %}
+
+{% block content %}
+  <section class="section-heading">
+    <p class="eyebrow">Manage order</p>
+    <h1>Order #{{ order_bundle["order"]["id"] }}</h1>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <h2>Pickup summary</h2>
+      <p><strong>Name:</strong> {{ order_bundle["order"]["customer_name"] }}</p>
+      <p><strong>Contact:</strong> {{ order_bundle["order"]["customer_contact"] }}</p>
+      <p><strong>Pickup time:</strong> {{ order_bundle["order"]["pickup_label"] }}</p>
+      <p><strong>Status:</strong> {{ order_bundle["order"]["status"].replace('_', ' ').title() }}</p>
+      <p><strong>Total:</strong> EUR {{ "%.2f"|format(order_bundle["order"]["total_amount"]) }}</p>
+    </article>
+
+    <article class="card">
+      <h2>Items</h2>
+      <ul>
+        {% for item in order_bundle["items"] %}
+          <li>
+            {{ item["quantity"] }} x {{ item["name"] }}
+            <br>
+            <span class="menu-item-description">{{ item["preparation_style"].replace('_', ' ').title() }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </article>
+  </section>
+
+  <section class="card cancellation-card">
+    <h2>Cancellation</h2>
+    {% if order_bundle["order"]["status"] == "cancelled" %}
+      <p class="menu-item-description">This order has already been cancelled.</p>
+    {% elif order_bundle["order"]["can_cancel"] %}
+      <p class="menu-item-description">You can cancel before your pickup time. Please inform us in advance if your plans change.</p>
+      <form action="{{ url_for('main.cancel_order_route', order_id=order_bundle['order']['id'], token=order_bundle['cancel_token']) }}" method="post">
+        <button class="button danger-button" type="submit">Cancel order</button>
+      </form>
+    {% else %}
+      <p class="menu-item-description">This order can no longer be cancelled online. Please WhatsApp/Telegram us if you need help.</p>
+    {% endif %}
+  </section>
+{% endblock %}

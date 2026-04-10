@@ -6,13 +6,18 @@
   <section class="section-heading">
     <p class="eyebrow">Confirmation</p>
     <h1>Order #{{ order_bundle["order"]["id"] }} received</h1>
+    {% if order_bundle["cancel_token"] %}
+      <p class="lead">
+        Save this link for cancellation, and please inform us in advance if your plans change.
+      </p>
+    {% endif %}
   </section>
 
   <section class="grid">
     <article class="card">
       <h2>Pickup summary</h2>
       <p><strong>Name:</strong> {{ order_bundle["order"]["customer_name"] }}</p>
-      <p><strong>Phone ending:</strong> {{ order_bundle["order"]["phone_last4"] }}</p>
+      <p><strong>Contact:</strong> {{ order_bundle["order"]["customer_contact"] }}</p>
       <p><strong>Pickup time:</strong> {{ order_bundle["order"]["pickup_label"] }}</p>
       <p><strong>Payment:</strong> {{ order_bundle["order"]["payment_method"] }}</p>
       <p><strong>Total:</strong> EUR {{ "%.2f"|format(order_bundle["order"]["total_amount"]) }}</p>
@@ -31,4 +36,27 @@
       </ul>
     </article>
   </section>
+
+  {% if order_bundle["cancel_token"] %}
+    <section class="card cancellation-card">
+      <h2>Need to cancel?</h2>
+      <p class="menu-item-description">
+        Save this private link. Anyone with this link can view and cancel this order before the pickup time.
+      </p>
+      <label class="copy-link-label">
+        Cancellation link
+        <input
+          readonly
+          type="text"
+          value="{{ url_for('main.manage_order', order_id=order_bundle['order']['id'], token=order_bundle['cancel_token'], _external=True) }}"
+        >
+      </label>
+      <a
+        class="button secondary-button"
+        href="{{ url_for('main.manage_order', order_id=order_bundle['order']['id'], token=order_bundle['cancel_token']) }}"
+      >
+        Manage or cancel order
+      </a>
+    </section>
+  {% endif %}
 {% endblock %}

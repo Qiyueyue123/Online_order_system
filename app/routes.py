@@ -10,6 +10,9 @@ from werkzeug.utils import secure_filename
 from .db import (
     InventoryError,
     add_product_image,
+    can_cancel_order,
+    cancel_order,
+    cancel_order_by_admin,
     create_product,
     create_order,
     delete_product,
@@ -18,11 +21,17 @@ from .db import (
     get_homepage_alert,
     get_menu_items,
     get_order,
+    get_order_for_management,
     get_preparation_style_choices,
     get_product_with_images,
+    get_site_settings,
+    get_active_order_counts_by_pickup_at,
+    list_pickup_days,
     list_orders,
     list_stock_pools,
+    update_site_contact,
     update_homepage_alert,
+    update_pickup_day,
     update_product,
     update_product_image_order,
     update_stock_pool,
@@ -35,6 +44,7 @@ PICKUP_WINDOW_DAYS = 5
 PICKUP_START_HOUR = 16
 PICKUP_END_HOUR = 21
 PICKUP_INTERVAL_MINUTES = 30
+MAX_QUANTITY_PER_DRINK = 3
 
 
 def admin_required(view):
@@ -59,17 +69,36 @@ def build_pickup_slot_choices(reference=None):
         current = current.replace(minute=rounded_minute)
 
     slots = []
-    for day_offset in range(PICKUP_WINDOW_DAYS):
-        day = (reference + timedelta(days=day_offset)).date()
-        day_start = datetime.combine(day, datetime.min.time()).replace(hour=PICKUP_START_HOUR)
-        day_end = datetime.combine(day, datetime.min.time()).replace(hour=PICKUP_END_HOUR)
+    pickup_days = list_pickup_days(
+        reference_date=reference.date(),
+        days=PICKUP_WINDOW_DAYS,
+    )
+    active_order_counts = get_active_order_counts_by_pickup_at()
+    for pickup_day in pickup_days:
+        if not pickup_day["is_available"]:
+            continue
+
+        day = datetime.strptime(pickup_day["pickup_date"], "%Y-%m-%d").date()
+        start_hour, start_minute = [int(part) for part in pickup_day["start_time"].split(":")]
+        end_hour, end_minute = [int(part) for part in pickup_day["end_time"].split(":")]
+        day_start = datetime.combine(day, datetime.min.time()).replace(
+            hour=start_hour,
+            minute=start_minute,
+        )
+        day_end = datetime.combine(day, datetime.min.time()).replace(
+            hour=end_hour,
+            minute=end_minute,
+        )
         candidate = day_start
         while candidate < day_end:
-            if candidate >= current:
+            value = candidate.strftime("%Y-%m-%dT%H:%M")
+            remaining_capacity = pickup_day["slot_capacity"] - active_order_counts.get(value, 0)
+            if candidate >= current and remaining_capacity > 0:
                 slots.append(
                     {
-                        "value": candidate.strftime("%Y-%m-%dT%H:%M"),
+                        "value": value,
                         "label": candidate.strftime("%a %d %b, %H:%M"),
+                        "remaining_capacity": remaining_capacity,
                     }
                 )
             candidate += timedelta(minutes=PICKUP_INTERVAL_MINUTES)
@@ -77,14 +106,21 @@ def build_pickup_slot_choices(reference=None):
 
 
 def format_pickup_at(value):
+    if not value:
+        return "Pickup time unavailable"
     pickup_at = datetime.strptime(value, "%Y-%m-%dT%H:%M")
     return pickup_at.strftime("%a %d %b, %H:%M")
 
 
-def enrich_order_bundle(order_bundle):
+def enrich_order_bundle(order_bundle, cancel_token=None):
     order = dict(order_bundle["order"])
     order["pickup_label"] = format_pickup_at(order["pickup_at"])
-    return {"order": order, "items": order_bundle["items"]}
+    order["can_cancel"] = can_cancel_order(order)
+    return {
+        "order": order,
+        "items": order_bundle["items"],
+        "cancel_token": cancel_token,
+    }
 
 
 @bp.route("/")
@@ -112,7 +148,7 @@ def checkout():
 
     if request.method == "POST":
         name = request.form.get("customer_name", "").strip()
-        phone_last4 = request.form.get("phone_last4", "").strip()
+        customer_contact = request.form.get("customer_contact", "").strip()
         pickup_at = request.form.get("pickup_at", "").strip()
         payment_method = request.form.get("payment_method", "cash")
         notes = request.form.get("notes", "").strip()
@@ -136,15 +172,15 @@ def checkout():
 
         valid_pickup_values = {slot["value"] for slot in pickup_slots}
 
-        if not name or not phone_last4 or not pickup_at:
-            flash("Name, last 4 phone digits, and pickup time are required.")
+        if not name or not customer_contact or not pickup_at:
+            flash("Name, contact, and pickup time are required.")
         elif pickup_at not in valid_pickup_values:
             flash("Choose one of the available pickup times.")
         else:
             try:
-                order_id = create_order(
+                order_access = create_order(
                     name=name,
-                    phone_last4=phone_last4,
+                    customer_contact=customer_contact,
                     pickup_at=pickup_at,
                     payment_method=payment_method,
                     notes=notes,
@@ -155,22 +191,57 @@ def checkout():
             except ValueError as exc:
                 flash(str(exc) if str(exc) else "Select at least one drink before placing the order.")
             else:
-                return redirect(url_for("main.confirmation", order_id=order_id))
+                return redirect(
+                    url_for(
+                        "main.confirmation",
+                        order_id=order_access["order_id"],
+                        token=order_access["cancel_token"],
+                    )
+                )
 
     return render_template(
         "checkout.html",
         menu_items=menu_items,
         preparation_styles=preparation_styles,
         pickup_slots=pickup_slots,
+        quantity_choices=range(0, MAX_QUANTITY_PER_DRINK + 1),
+        max_quantity_per_drink=MAX_QUANTITY_PER_DRINK,
     )
 
 
 @bp.route("/orders/<int:order_id>/confirmation")
 def confirmation(order_id):
+    cancel_token = request.args.get("token", "")
     order_bundle = get_order(order_id)
     if order_bundle is None:
         abort(404)
-    return render_template("confirmation.html", order_bundle=enrich_order_bundle(order_bundle))
+    return render_template(
+        "confirmation.html",
+        order_bundle=enrich_order_bundle(order_bundle, cancel_token=cancel_token),
+    )
+
+
+@bp.route("/orders/<int:order_id>/manage/<token>")
+def manage_order(order_id, token):
+    order_bundle = get_order_for_management(order_id, token)
+    if order_bundle is None:
+        abort(404)
+    return render_template(
+        "manage_order.html",
+        order_bundle=enrich_order_bundle(order_bundle, cancel_token=token),
+    )
+
+
+@bp.route("/orders/<int:order_id>/cancel/<token>", methods=["POST"])
+def cancel_order_route(order_id, token):
+    result = cancel_order(order_id, token)
+    if result == "not_found":
+        abort(404)
+    if result == "not_allowed":
+        flash("This order can no longer be cancelled online. Please inform us by WhatsApp/Telegram.")
+    else:
+        flash("Order cancelled. Thank you for informing us in advance.")
+    return redirect(url_for("main.manage_order", order_id=order_id, token=token))
 
 
 @bp.route("/admin")
@@ -180,8 +251,10 @@ def admin():
         "admin.html",
         orders=[enrich_order_bundle(bundle) for bundle in list_orders()],
         stock_pools=list_stock_pools(),
+        pickup_days=list_pickup_days(days=PICKUP_WINDOW_DAYS),
         menu_items=get_menu_items(),
         homepage_alert=get_homepage_alert(),
+        site_settings=get_site_settings(),
     )
 
 
@@ -224,6 +297,51 @@ def update_site_alert():
     message = request.form.get("homepage_alert", "").strip()
     update_homepage_alert(message)
     flash("Homepage alert updated." if message else "Homepage alert cleared.")
+    return redirect(url_for("main.admin"))
+
+
+@bp.route("/admin/site-contact", methods=["POST"])
+@admin_required
+def update_admin_site_contact():
+    contact_line = request.form.get("contact_line", "").strip()
+    contact_phone = request.form.get("contact_phone", "").strip()
+    update_site_contact(contact_line, contact_phone)
+    flash("Contact details updated.")
+    return redirect(url_for("main.admin"))
+
+
+@bp.route("/admin/pickup-days/<int:pickup_day_id>", methods=["POST"])
+@admin_required
+def update_admin_pickup_day(pickup_day_id):
+    is_available = request.form.get("is_available") == "on"
+    start_time = request.form.get("start_time", "").strip()
+    end_time = request.form.get("end_time", "").strip()
+    try:
+        slot_capacity = int(request.form.get("slot_capacity", "2"))
+        update_pickup_day(
+            pickup_day_id=pickup_day_id,
+            is_available=is_available,
+            start_time=start_time,
+            end_time=end_time,
+            slot_capacity=slot_capacity,
+        )
+    except ValueError as exc:
+        flash(str(exc))
+    else:
+        flash("Pickup availability updated.")
+    return redirect(url_for("main.admin"))
+
+
+@bp.route("/admin/orders/<int:order_id>/cancel", methods=["POST"])
+@admin_required
+def cancel_order_admin(order_id):
+    result = cancel_order_by_admin(order_id)
+    if result == "not_found":
+        abort(404)
+    if result == "not_allowed":
+        flash("Only new orders can be cancelled.")
+    else:
+        flash("Order cancelled and stock restored.")
     return redirect(url_for("main.admin"))
 
 

@@ -14,5 +14,7 @@ RUN chmod +x docker-entrypoint.sh && mkdir -p instance
 
 EXPOSE 8000
 
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('PORT', '8000'), timeout=2)"
+
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "run:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} run:app"]

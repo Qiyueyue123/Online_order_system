@@ -54,6 +54,8 @@ Current assumptions:
 The starter app includes:
 - menu page
 - admin-managed homepage alert banner
+- shared contact line in the site footer
+- admin-editable footer contact details
 - multi-image galleries visible directly on the home page
 - dedicated drink detail pages
 - multi-image drink galleries
@@ -62,12 +64,17 @@ The starter app includes:
 - admin image deletion controls
 - admin stock editing
 - admin product create/update/delete
+- admin order cancellation with stock restoration
+- compact admin dashboard with collapsible sections
 - checkout form
 - two preparation style options for each drink
 - selectable pickup datetime slots
-- phone entry limited to the last 4 digits
+- admin-managed pickup availability by day
+- WhatsApp number or Telegram handle collected for order contact
 - payment method selection
 - order confirmation page
+- private cancellation links without account creation
+- visible cancellation URL on the confirmation page
 - real admin user login with session-based authentication
 - health check endpoint at `/healthz`
 - SQLite database initialization command
@@ -201,6 +208,14 @@ python -m flask --app run hash-password "your-strong-password"
 
 Then paste the generated hash into `.env` as `ADMIN_PASSWORD_HASH`.
 
+Keep the hash wrapped in single quotes:
+
+```env
+ADMIN_PASSWORD_HASH='scrypt:...$...$...'
+```
+
+Copy the whole generated line after the command output. A valid Werkzeug hash usually starts with something like `scrypt:` or `pbkdf2:`. This matters because Werkzeug password hashes contain `$`, and Docker Compose treats unquoted `$...` text as environment-variable interpolation.
+
 Admin-uploaded images are stored in the instance upload folder and served by the app:
 - local folder: `instance/uploads/`
 - public URL pattern: `/uploads/<filename>`
@@ -216,9 +231,17 @@ You still learn both because a real deployable project usually has:
 - a local developer workflow
 - a deployment workflow
 
+In this project:
+- [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile) defines the production container image
+- [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml) is mainly for local Docker testing
+- [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) keeps local secrets, the virtual environment, the SQLite database, and uploaded images out of the image build
+- the app reads `PORT`, `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, and `DATABASE_PATH` from environment variables
+
 ## How to run with Docker
 
 ### Option A: use Docker Compose
+
+First make sure Docker Desktop is open and running. On macOS, `docker compose` talks to the Docker daemon through Docker Desktop, so the command will fail if Docker Desktop is closed.
 
 ```bash
 docker compose up --build
@@ -256,6 +279,8 @@ Why the volume matters:
 
 Docker Compose now reads secrets from your local `.env` file or shell environment instead of hardcoding them in [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml).
 
+If you see a warning like `The "..." variable is not set`, check your `.env` file. The most common cause is an unquoted `ADMIN_PASSWORD_HASH`. Regenerate the hash if needed and store the full value in single quotes.
+
 ## How this becomes a deployable website
 
 This project is now close to a basic deployment shape:
@@ -264,13 +289,33 @@ This project is now close to a basic deployment shape:
 - the app exposes one port
 - there is a health endpoint
 - Docker can package the app for deployment
+- the container respects a platform-provided `PORT`
+- local secrets and uploaded files are excluded from Docker image builds
 
 What you would improve next for a stronger showcase:
-- replace free-text pickup slot input with selectable time slots
-- add create/update views for products and images
 - add a proper migration workflow
 - move from SQLite to PostgreSQL when traffic or features grow
 - deploy to a platform such as Render, Railway, Fly.io, or a VPS
+
+## Path to a real URL
+
+Recommended beginner path:
+1. Push the project to GitHub
+2. Create a web service on a deployment platform from the GitHub repository
+3. Choose Dockerfile-based deployment
+4. Set environment variables on the platform, not in Git:
+   - `SECRET_KEY`
+   - `ADMIN_USERNAME`
+   - `ADMIN_PASSWORD_HASH`
+   - `DATABASE_PATH=/app/instance/matcha.db`
+5. Attach persistent storage mounted at `/app/instance`
+6. Point the platform health check at `/healthz`
+7. Generate the platform-provided domain
+8. Test home page, admin login, image upload persistence, order persistence, and cancellation links
+
+For this project, persistent storage is required because both the SQLite database and uploaded images live under `/app/instance`. If the host does not persist that folder, orders and uploaded images can disappear after a redeploy.
+
+Docker Compose is not usually what gets deployed directly. Most platforms read your [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile), build an image, inject environment variables, attach storage, and provide a public URL.
 
 ## Suggested learning path
 
@@ -322,7 +367,19 @@ Follow this order:
 - Upgraded the drink galleries to animate with a sliding transition instead of instant image swaps
 - Added admin-controlled homepage alerts that display on the menu page
 - Replaced free-text pickup entry with selectable datetime slots
-- Simplified customer identification to the last 4 phone digits
+- Switched order contact from last 4 phone digits to full WhatsApp or Telegram contact details
+- Added a shared WhatsApp/Telegram contact line in the site footer
+- Made footer contact details editable from the admin dashboard
+- Added private order management links so customers can cancel before pickup without an account
+- Displayed the full cancellation URL on the confirmation page for copying or screenshots
+- Replaced quantity number inputs with circular quantity choices
+- Added admin controls for pickup-day availability, hours, and orders per slot
+- Added admin order cancellation with automatic stock restoration
+- Refactored the admin dashboard into compact collapsible control panels
+- Added a Docker `.env.example` and documented why password hashes need single quotes in Docker Compose
+- Made the Docker container use the platform-provided `PORT`
+- Added `.dockerignore` so local secrets, database files, uploads, and the virtual environment are not copied into Docker images
+- Documented the path from local Docker testing to deployment on a real URL
 
 ## Notes
 

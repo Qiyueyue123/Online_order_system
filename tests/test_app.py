@@ -1,7 +1,8 @@
 from io import BytesIO
+from pathlib import Path
 
 from app import create_app
-from app.db import get_db, get_homepage_alert, get_menu_items, get_order, get_product_with_images, get_site_settings, init_db, list_pickup_days, list_stock_pools
+from app.db import get_db, get_homepage_alert, get_menu_items, get_order, get_product_with_images, get_site_settings, hash_admin_password, init_db, list_pickup_days, list_stock_pools
 from app.routes import build_pickup_slot_choices
 from werkzeug.security import generate_password_hash
 
@@ -13,7 +14,7 @@ def build_test_app(tmp_path):
             "DATABASE": str(tmp_path / "test.db"),
             "SECRET_KEY": "test-secret-key",
             "ADMIN_USERNAME": "admin",
-            "ADMIN_PASSWORD_HASH": generate_password_hash("test-admin-password"),
+            "ADMIN_PASSWORD_HASH": hash_admin_password("test-admin-password"),
             "UPLOAD_FOLDER": str(tmp_path / "uploads"),
         }
     )
@@ -34,12 +35,18 @@ def test_home_page_loads(tmp_path):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b"Matcha pickup menu" in response.data
-    assert b"Please understand we whisk each order upon arrival" in response.data
-    assert b"Open full drink page" in response.data
+    assert b"Authentic Japanese matcha, whisked fresh for pickup." in response.data
+    assert b"Hello! We are Qiyue and Yuxun from Singapore" in response.data
+    assert b"2nd June - 15 June 2026" in response.data
+    assert b"Details" in response.data
     assert b"Whatsapp/Telegram for any query" in response.data
+    assert b"class=\"home-shell\"" in response.data
+    assert b"/static/images/homepage-matcha-used.jpg" in response.data
+    assert b"class=\"home-showcase-image\"" in response.data
     assert b"data-carousel" in response.data
     assert b"data-lightbox-trigger" in response.data
+    assert b"data-lightbox-prev" in response.data
+    assert b"data-lightbox-next" in response.data
     assert b"Show previous photo for Ikuyo Matcha Latte" in response.data
 
 
@@ -64,6 +71,8 @@ def test_checkout_uses_circular_quantity_choices(tmp_path):
     assert response.status_code == 200
     assert b"class=\"quantity-picker\"" in response.data
     assert b"value=\"3\"" in response.data
+    assert b"Tikkie payment request" in response.data
+    assert b"we manually send a payment request link" in response.data
 
 
 def test_checkout_creates_an_order(tmp_path):
@@ -95,6 +104,33 @@ def test_checkout_creates_an_order(tmp_path):
     assert b"Manage or cancel order" in response.data
 
 
+def test_checkout_can_use_tikkie_payment_request(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    response = client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": pickup_value,
+            "payment_method": "manual_tikkie",
+            "quantity_1": "1",
+            "preparation_style_1": "type_1",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Tikkie payment request" in response.data
+    assert b"We will send a Tikkie payment request link" in response.data
+
+    with app.app_context():
+        order_bundle = get_order(1)
+        assert order_bundle["order"]["payment_method"] == "manual_tikkie"
+
+
 def test_admin_login_required(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -107,6 +143,31 @@ def test_admin_login_required(tmp_path):
 
 def test_admin_login_works(tmp_path):
     app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Incoming orders" in response.data
+    assert b"Current live orders" in response.data
+    assert b"Cancelled and past records" in response.data
+
+
+def test_admin_login_accepts_legacy_werkzeug_hashes(tmp_path):
+    app = create_app(
+        {
+            "TESTING": True,
+            "DATABASE": str(tmp_path / "legacy-admin.db"),
+            "SECRET_KEY": "test-secret-key",
+            "ADMIN_USERNAME": "admin",
+            "ADMIN_PASSWORD_HASH": generate_password_hash("test-admin-password"),
+            "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+        }
+    )
     client = app.test_client()
 
     response = client.post(
@@ -250,6 +311,157 @@ def test_admin_can_update_site_contact(tmp_path):
 
     home_response = client.get("/")
     assert b"Whatsapp or Telegram: +65 90000000" in home_response.data
+    assert b"href=\"tel:+6590000000\"" in home_response.data
+
+
+def test_admin_can_upload_homepage_image(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Custom homepage matcha photo",
+            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage.svg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Homepage image updated." in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        assert settings["homepage_image_path"].startswith("/uploads/")
+        assert settings["homepage_image_alt"] == "Custom homepage matcha photo"
+        saved_name = Path(settings["homepage_image_path"]).name
+        assert (Path(app.config["UPLOAD_FOLDER"]) / saved_name).exists()
+
+    home_response = client.get("/")
+    assert b"Custom homepage matcha photo" in home_response.data
+    assert b"/uploads/" in home_response.data
+
+
+def test_admin_rejects_heif_homepage_upload_disguised_as_jpg(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    heif_like_bytes = b"\x00\x00\x00\x18ftypheic" + (b"0" * 64)
+    response = client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Broken disguised upload",
+            "image_file": (BytesIO(heif_like_bytes), "homepage.jpg"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"HEIC or HEIF images must be converted" in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        assert settings["homepage_image_path"] is None
+
+
+def test_admin_can_reset_homepage_image_to_default(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+    client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Temporary homepage image",
+            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage.svg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    with app.app_context():
+        settings = get_site_settings()
+        saved_name = Path(settings["homepage_image_path"]).name
+
+    response = client.post(
+        "/admin/site-homepage-image/clear",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Homepage image reset to default." in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        assert settings["homepage_image_path"] is None
+
+    assert not (Path(app.config["UPLOAD_FOLDER"]) / saved_name).exists()
+
+    home_response = client.get("/")
+    assert b"/static/images/homepage-matcha-used.jpg" in home_response.data
+
+
+def test_footer_telegram_handle_is_clickable(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/site-contact",
+        data={
+            "contact_line": "Telegram:",
+            "contact_phone": "@matchaorders",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+
+    home_response = client.get("/")
+    assert b"@matchaorders" in home_response.data
+    assert b"href=\"https://t.me/matchaorders\"" in home_response.data
+
+
+def test_footer_telegram_url_is_clickable(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/site-contact",
+        data={
+            "contact_line": "Telegram:",
+            "contact_phone": "t.me/matchaorders",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+
+    home_response = client.get("/")
+    assert b"href=\"https://t.me/matchaorders\"" in home_response.data
 
 
 def test_admin_can_update_pickup_availability(tmp_path):
@@ -325,6 +537,122 @@ def test_admin_can_cancel_order(tmp_path):
         assert order_bundle["order"]["status"] == "cancelled"
         stock_pools = list_stock_pools()
         assert stock_pools[0]["servings_available"] == 25
+
+
+def test_admin_can_delete_cancelled_order_record(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "1",
+            "preparation_style_1": "type_2",
+        },
+    )
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+    client.post("/admin/orders/1/cancel")
+
+    response = client.post(
+        "/admin/orders/1/delete",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Order record deleted." in response.data
+
+    with app.app_context():
+        assert get_order(1) is None
+        stock_pools = list_stock_pools()
+        assert stock_pools[0]["servings_available"] == 25
+
+
+def test_admin_cannot_delete_live_order_record(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "1",
+            "preparation_style_1": "type_2",
+        },
+    )
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/orders/1/delete",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Only cancelled or past orders can be deleted." in response.data
+
+    with app.app_context():
+        assert get_order(1) is not None
+        stock_pools = list_stock_pools()
+        assert stock_pools[0]["servings_available"] == 24
+
+
+def test_admin_can_delete_past_order_record_without_restoring_stock(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "1",
+            "preparation_style_1": "type_2",
+        },
+    )
+
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            "UPDATE orders SET pickup_at = '2000-01-01T12:00' WHERE id = 1"
+        )
+        db.commit()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/orders/1/delete",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Order record deleted." in response.data
+
+    with app.app_context():
+        assert get_order(1) is None
+        stock_pools = list_stock_pools()
+        assert stock_pools[0]["servings_available"] == 24
 
 
 def test_admin_can_delete_product_image(tmp_path):
@@ -511,7 +839,7 @@ def test_hash_password_cli_command_outputs_a_hash(tmp_path):
     result = runner.invoke(args=["hash-password", "fresh-password"])
 
     assert result.exit_code == 0
-    assert result.output.strip().startswith("scrypt:")
+    assert result.output.strip().startswith("$argon2id$")
 
 
 def test_init_db_migrates_existing_site_settings_table(tmp_path):
@@ -556,6 +884,8 @@ def test_init_db_migrates_existing_site_settings_table(tmp_path):
 
         assert "contact_line" in columns
         assert "contact_phone" in columns
+        assert "homepage_image_path" in columns
+        assert "homepage_image_alt" in columns
         assert settings["homepage_alert"] == "Legacy alert"
 
 

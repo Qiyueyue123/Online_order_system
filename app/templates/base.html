@@ -44,7 +44,11 @@
       <div class="wrap site-footer-inner">
         <p class="footer-contact">
           {{ cafe_contact_line }}
-          <a class="footer-contact-link" href="tel:{{ cafe_contact_phone }}">{{ cafe_contact_phone }}</a>
+          {% if cafe_contact_link %}
+            <a class="footer-contact-link" href="{{ cafe_contact_link }}" rel="noopener" target="_blank">{{ cafe_contact_phone }}</a>
+          {% else %}
+            <span class="footer-contact-link">{{ cafe_contact_phone }}</span>
+          {% endif %}
         </p>
       </div>
     </footer>
@@ -52,7 +56,9 @@
     <dialog class="lightbox" data-lightbox>
       <div class="lightbox-shell">
         <button aria-label="Close image viewer" class="lightbox-close" data-lightbox-close type="button">Close</button>
+        <button aria-label="Show previous photo" class="lightbox-nav lightbox-nav-prev" data-lightbox-prev type="button"><</button>
         <img alt="" class="lightbox-image" data-lightbox-image src="">
+        <button aria-label="Show next photo" class="lightbox-nav lightbox-nav-next" data-lightbox-next type="button">></button>
         <p class="lightbox-caption menu-item-description" data-lightbox-caption></p>
       </div>
     </dialog>

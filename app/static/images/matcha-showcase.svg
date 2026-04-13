@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 900" role="img" aria-labelledby="title desc">
+  <title id="title">Matcha showcase illustration</title>
+  <desc id="desc">A compact illustration of ceremonial matcha tins, powder, a bamboo whisk, and a bowl of whisked matcha.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#eef5e6"/>
+      <stop offset="100%" stop-color="#f7ecdc"/>
+    </linearGradient>
+    <linearGradient id="shadow" x1="0%" x2="0%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#2f4d34" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#2f4d34" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="tinDark" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#335a3e"/>
+      <stop offset="100%" stop-color="#203626"/>
+    </linearGradient>
+    <linearGradient id="tinLight" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#7aa169"/>
+      <stop offset="100%" stop-color="#456a48"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="900" fill="url(#bg)" rx="52"/>
+  <circle cx="212" cy="182" r="132" fill="#dfeccc"/>
+  <circle cx="738" cy="742" r="164" fill="#f1e1c3"/>
+  <ellipse cx="450" cy="770" rx="308" ry="58" fill="url(#shadow)"/>
+
+  <g transform="translate(88 120)">
+    <rect x="0" y="86" width="228" height="292" rx="28" fill="url(#tinDark)"/>
+    <rect x="18" y="0" width="192" height="112" rx="28" fill="#1c2c1f"/>
+    <rect x="44" y="154" width="140" height="140" rx="70" fill="#f4f0e6" opacity="0.94"/>
+    <circle cx="114" cy="224" r="54" fill="#88a95d"/>
+    <path d="M112 188c28 0 46 13 46 35 0 20-18 35-46 35-27 0-45-15-45-35 0-22 18-35 45-35Zm-24 37c0 11 10 19 24 19 15 0 25-8 25-19 0-13-10-20-25-20-14 0-24 7-24 20Z" fill="#f4f0e6"/>
+    <text x="114" y="338" fill="#f4f0e6" font-family="Avenir Next, Segoe UI, sans-serif" font-size="34" font-weight="700" text-anchor="middle">IKUYO</text>
+  </g>
+
+  <g transform="translate(584 168)">
+    <rect x="0" y="72" width="180" height="240" rx="28" fill="url(#tinLight)"/>
+    <rect x="16" y="0" width="148" height="94" rx="24" fill="#6f905d"/>
+    <rect x="32" y="122" width="116" height="116" rx="58" fill="#f5f0e4" opacity="0.94"/>
+    <circle cx="90" cy="180" r="42" fill="#4f7947"/>
+    <text x="90" y="280" fill="#f5f0e4" font-family="Avenir Next, Segoe UI, sans-serif" font-size="28" font-weight="700" text-anchor="middle">SAYAKA</text>
+  </g>
+
+  <g transform="translate(270 248)">
+    <ellipse cx="150" cy="212" rx="120" ry="34" fill="#c5b79b"/>
+    <path d="M42 86c0-50 48-86 108-86s108 36 108 86v126c0 48-44 72-108 72s-108-24-108-72Z" fill="#f1ecde"/>
+    <path d="M62 94c0-38 38-64 88-64s88 26 88 64c0 36-40 54-88 54s-88-18-88-54Z" fill="#6a8d43"/>
+    <path d="M96 95c10-18 31-28 54-28 29 0 54 15 67 40-17-12-38-18-63-18-21 0-41 3-58 6Z" fill="#a8c66f" opacity="0.82"/>
+    <path d="M150 44c-46 0-72 22-72 50 0 13 6 23 17 31 12-7 33-13 57-13 29 0 53 8 72 20 9-8 15-17 15-31 0-28-35-57-89-57Z" fill="#8bb063" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(238 602) rotate(-16)">
+    <rect x="0" y="0" width="234" height="20" rx="10" fill="#b98f5d"/>
+    <path d="M20 18h12v56c0 18-7 30-18 42-11-12-18-24-18-42V18h12v53c0 10 2 17 6 23 4-6 6-13 6-23Z" fill="#caa06f"/>
+    <path d="M56 18h12v66c0 15-6 27-16 37-10-10-16-22-16-37V18h12v62c0 8 1 14 4 19 3-5 4-11 4-19Z" fill="#caa06f"/>
+    <path d="M92 18h12v70c0 12-5 23-14 32-9-9-14-20-14-32V18h12v66c0 7 1 12 2 17 2-5 2-10 2-17Z" fill="#caa06f"/>
+    <path d="M128 18h12v66c0 15-6 27-16 37-10-10-16-22-16-37V18h12v62c0 8 1 14 4 19 3-5 4-11 4-19Z" fill="#caa06f"/>
+    <path d="M164 18h12v56c0 18-7 30-18 42-11-12-18-24-18-42V18h12v53c0 10 2 17 6 23 4-6 6-13 6-23Z" fill="#caa06f"/>
+  </g>
+
+  <g transform="translate(528 510)">
+    <path d="M0 88c18-34 55-56 102-56 57 0 104 32 124 78-28-18-65-28-108-28-43 0-82 8-118 22Z" fill="#89ab5c" opacity="0.95"/>
+    <path d="M34 106c22-19 53-31 86-31 33 0 67 10 95 29-19 10-49 22-89 22-38 0-70-8-92-20Z" fill="#73954a"/>
+    <circle cx="116" cy="98" r="18" fill="#adc97e"/>
+  </g>
+</svg>

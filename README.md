@@ -23,8 +23,8 @@ Current assumptions:
 - Max around 50 users
 - Main use case is online ordering with pickup time slots
 - Focus on simple operations, not a full restaurant platform
-- Version 1 uses `cash on pickup`
-- Optional manual `Tikkie on pickup` can exist as a low-automation fallback
+- Version 1 supports `cash on pickup`
+- Version 1 supports manual `Tikkie payment request` as a low-automation option
 - No full payment gateway in version 1
 - Use a relational database design for orders, products, and pickup data
 - Inventory is tracked by shared matcha stock pools
@@ -190,7 +190,7 @@ If you prefer to provide a precomputed password hash instead of a raw password:
 ```bash
 python -m flask --app run hash-password "your-strong-password"
 export ADMIN_USERNAME=your-admin-name
-export ADMIN_PASSWORD_HASH='paste-a-werkzeug-password-hash-here'
+export ADMIN_PASSWORD_HASH='paste-an-argon2-password-hash-here'
 ```
 
 Recommended secure setup:
@@ -211,10 +211,12 @@ Then paste the generated hash into `.env` as `ADMIN_PASSWORD_HASH`.
 Keep the hash wrapped in single quotes:
 
 ```env
-ADMIN_PASSWORD_HASH='scrypt:...$...$...'
+ADMIN_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=4$...$...'
 ```
 
-Copy the whole generated line after the command output. A valid Werkzeug hash usually starts with something like `scrypt:` or `pbkdf2:`. This matters because Werkzeug password hashes contain `$`, and Docker Compose treats unquoted `$...` text as environment-variable interpolation.
+Copy the whole generated line after the command output. A valid Argon2 hash usually starts with `$argon2id$`. The single quotes still matter because Argon2 hashes contain `$`, and Docker Compose treats unquoted `$...` text as environment-variable interpolation.
+
+Existing Werkzeug admin password hashes are still accepted during login so older local databases can keep working while you switch to Argon2.
 
 Admin-uploaded images are stored in the instance upload folder and served by the app:
 - local folder: `instance/uploads/`
@@ -484,6 +486,11 @@ Follow this order:
 - Added `.dockerignore` so local secrets, database files, uploads, and the virtual environment are not copied into Docker images
 - Documented the path from local Docker testing to deployment on a real URL
 - Added Docker learning notes explaining images, containers, Compose, environment variables, volumes, persistence, and deployment mapping
+- Split admin orders into current live orders and cancelled/past records
+- Added guarded admin deletion for cancelled or past order records without changing stock
+- Made footer contact targets clickable for phone numbers, Telegram handles, Telegram URLs, and WhatsApp links
+- Redesigned the home page into a compact menu-first layout with improved photo lightbox controls and outside-photo closing
+- Added manual Tikkie payment-request guidance on home, checkout, confirmation, and admin-facing order labels
 
 ## Notes
 

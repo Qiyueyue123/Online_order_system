@@ -4,6 +4,8 @@ from pathlib import Path
 from datetime import date, datetime, timedelta
 
 import click
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
 from flask import current_app, g
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -78,9 +80,41 @@ PREPARATION_STYLES = {
     "type_2": "Type 2: whisk with oat or regular milk for a frothier, thicker drink",
 }
 
+ADMIN_PASSWORD_HASHER = PasswordHasher()
+
 
 class InventoryError(ValueError):
     pass
+
+
+def hash_admin_password(password):
+    return ADMIN_PASSWORD_HASHER.hash(password)
+
+
+def _is_argon2_hash(password_hash):
+    return bool(password_hash) and password_hash.startswith("$argon2")
+
+
+def verify_admin_password_hash(password_hash, password):
+    if not password_hash:
+        return False
+    if _is_argon2_hash(password_hash):
+        try:
+            return ADMIN_PASSWORD_HASHER.verify(password_hash, password)
+        except (InvalidHashError, VerificationError):
+            return False
+    return check_password_hash(password_hash, password)
+
+
+def admin_password_hash_needs_upgrade(password_hash):
+    if not password_hash:
+        return False
+    if not _is_argon2_hash(password_hash):
+        return True
+    try:
+        return ADMIN_PASSWORD_HASHER.check_needs_rehash(password_hash)
+    except InvalidHashError:
+        return True
 
 
 def get_db():
@@ -132,8 +166,12 @@ def sync_admin_user_from_config():
             resolved_password_hash = password_hash
             should_update_password = True
     elif raw_password:
-        if admin_user is None or not check_password_hash(admin_user["password_hash"], raw_password):
-            resolved_password_hash = generate_password_hash(raw_password)
+        if (
+            admin_user is None
+            or not verify_admin_password_hash(admin_user["password_hash"], raw_password)
+            or admin_password_hash_needs_upgrade(admin_user["password_hash"])
+        ):
+            resolved_password_hash = hash_admin_password(raw_password)
             should_update_password = True
 
     if admin_user is None:
@@ -180,6 +218,10 @@ def _migrate_schema(db):
         db.execute("ALTER TABLE site_settings ADD COLUMN contact_line TEXT")
     if "contact_phone" not in site_settings_columns:
         db.execute("ALTER TABLE site_settings ADD COLUMN contact_phone TEXT")
+    if "homepage_image_path" not in site_settings_columns:
+        db.execute("ALTER TABLE site_settings ADD COLUMN homepage_image_path TEXT")
+    if "homepage_image_alt" not in site_settings_columns:
+        db.execute("ALTER TABLE site_settings ADD COLUMN homepage_image_alt TEXT")
 
     order_columns = _table_columns(db, "orders")
     if "customer_contact" not in order_columns:
@@ -322,11 +364,23 @@ def extract_contact_suffix(contact):
 
 def _seed_inventory(db):
     site_settings_columns = _table_columns(db, "site_settings")
-    if {"contact_line", "contact_phone"}.issubset(site_settings_columns):
+    if {
+        "contact_line",
+        "contact_phone",
+        "homepage_image_path",
+        "homepage_image_alt",
+    }.issubset(site_settings_columns):
         db.execute(
             """
-            INSERT OR IGNORE INTO site_settings (id, homepage_alert, contact_line, contact_phone)
-            VALUES (1, NULL, ?, ?)
+            INSERT OR IGNORE INTO site_settings (
+                id,
+                homepage_alert,
+                homepage_image_path,
+                homepage_image_alt,
+                contact_line,
+                contact_phone
+            )
+            VALUES (1, NULL, NULL, NULL, ?, ?)
             """,
             (
                 current_app.config.get("CAFE_CONTACT_LINE"),
@@ -435,13 +489,15 @@ def get_site_settings():
     db = get_db()
     row = db.execute(
         """
-        SELECT homepage_alert, contact_line, contact_phone
+        SELECT homepage_alert, homepage_image_path, homepage_image_alt, contact_line, contact_phone
         FROM site_settings
         WHERE id = 1
         """
     ).fetchone()
     defaults = {
         "homepage_alert": None,
+        "homepage_image_path": None,
+        "homepage_image_alt": "Photo of the ceremonial matcha used for this cafe run",
         "contact_line": current_app.config.get("CAFE_CONTACT_LINE"),
         "contact_phone": current_app.config.get("CAFE_CONTACT_PHONE"),
     }
@@ -449,6 +505,8 @@ def get_site_settings():
         return defaults
 
     settings = dict(row)
+    settings["homepage_image_path"] = settings["homepage_image_path"] or defaults["homepage_image_path"]
+    settings["homepage_image_alt"] = settings["homepage_image_alt"] or defaults["homepage_image_alt"]
     settings["contact_line"] = settings["contact_line"] or defaults["contact_line"]
     settings["contact_phone"] = settings["contact_phone"] or defaults["contact_phone"]
     return settings
@@ -504,6 +562,45 @@ def update_site_contact(contact_line, contact_phone):
             get_homepage_alert(),
             contact_line or None,
             contact_phone or None,
+        ),
+    )
+    db.commit()
+
+
+def update_homepage_image(image_path, alt_text):
+    db = get_db()
+    settings = get_site_settings()
+    db.execute(
+        """
+        INSERT INTO site_settings (
+            id,
+            homepage_alert,
+            homepage_image_path,
+            homepage_image_alt,
+            contact_line,
+            contact_phone,
+            updated_at
+        )
+        VALUES (
+            1,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            CURRENT_TIMESTAMP
+        )
+        ON CONFLICT(id) DO UPDATE SET
+            homepage_image_path = excluded.homepage_image_path,
+            homepage_image_alt = excluded.homepage_image_alt,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            settings["homepage_alert"],
+            image_path,
+            alt_text or None,
+            settings["contact_line"],
+            settings["contact_phone"],
         ),
     )
     db.commit()
@@ -757,6 +854,19 @@ def get_admin_user_by_username(username):
         """,
         (username,),
     ).fetchone()
+
+
+def refresh_admin_user_password_hash(admin_user_id, password):
+    db = get_db()
+    db.execute(
+        """
+        UPDATE admin_users
+        SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (hash_admin_password(password), admin_user_id),
+    )
+    db.commit()
 
 
 def _load_products_for_items(db, items):
@@ -1123,6 +1233,59 @@ def cancel_order_by_admin(order_id):
     return "cancelled"
 
 
+def delete_order_record(order_id, now=None):
+    if now is None:
+        now = datetime.now()
+
+    db = get_db()
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        order = db.execute(
+            """
+            SELECT id, status, pickup_at
+            FROM orders
+            WHERE id = ?
+            """,
+            (order_id,),
+        ).fetchone()
+        if order is None:
+            db.rollback()
+            return "not_found"
+
+        is_cancelled = order["status"] == "cancelled"
+        is_past_pickup = False
+        try:
+            pickup_at = datetime.strptime(order["pickup_at"], "%Y-%m-%dT%H:%M")
+            is_past_pickup = pickup_at < now
+        except (TypeError, ValueError):
+            pass
+
+        if not is_cancelled and not is_past_pickup:
+            db.rollback()
+            return "not_allowed"
+
+        db.execute(
+            """
+            DELETE FROM order_items
+            WHERE order_id = ?
+            """,
+            (order_id,),
+        )
+        db.execute(
+            """
+            DELETE FROM orders
+            WHERE id = ?
+            """,
+            (order_id,),
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+    db.commit()
+    return "deleted"
+
+
 def list_stock_pools():
     db = get_db()
     return db.execute(
@@ -1151,7 +1314,7 @@ def reset_db_command():
 @click.command("hash-password")
 @click.argument("password")
 def hash_password_command(password):
-    click.echo(generate_password_hash(password))
+    click.echo(hash_admin_password(password))
 
 
 def init_app(app):

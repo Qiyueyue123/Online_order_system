@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const lightboxImage = lightbox?.querySelector("[data-lightbox-image]");
   const lightboxCaption = lightbox?.querySelector("[data-lightbox-caption]");
   const lightboxClose = lightbox?.querySelector("[data-lightbox-close]");
+  const lightboxPrev = lightbox?.querySelector("[data-lightbox-prev]");
+  const lightboxNext = lightbox?.querySelector("[data-lightbox-next]");
   const toastList = document.querySelector("[data-toast-list]");
   const adminScrollKey = "admin-scroll-y";
 
@@ -19,6 +21,9 @@ document.addEventListener("DOMContentLoaded", () => {
     lightboxImage.src = trigger.dataset.lightboxSrc || "";
     lightboxImage.alt = trigger.dataset.lightboxAlt || "";
     lightboxCaption.textContent = trigger.dataset.lightboxCaption || "";
+    const hasMultipleItems = activeLightboxItems.length > 1;
+    lightboxPrev?.toggleAttribute("hidden", !hasMultipleItems);
+    lightboxNext?.toggleAttribute("hidden", !hasMultipleItems);
   };
 
   const closeLightbox = () => {
@@ -95,9 +100,40 @@ document.addEventListener("DOMContentLoaded", () => {
     closeLightbox();
   });
 
+  const showPreviousLightboxImage = () => {
+    if (!activeLightboxItems.length) {
+      return;
+    }
+    activeLightboxIndex =
+      (activeLightboxIndex - 1 + activeLightboxItems.length) %
+      activeLightboxItems.length;
+    updateLightbox();
+  };
+
+  const showNextLightboxImage = () => {
+    if (!activeLightboxItems.length) {
+      return;
+    }
+    activeLightboxIndex = (activeLightboxIndex + 1) % activeLightboxItems.length;
+    updateLightbox();
+  };
+
+  lightboxPrev?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    showPreviousLightboxImage();
+  });
+
+  lightboxNext?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    showNextLightboxImage();
+  });
+
   lightbox?.addEventListener("click", (event) => {
-    const shell = lightbox.querySelector(".lightbox-shell");
-    if (shell && !shell.contains(event.target)) {
+    const clickedImage = event.target.closest("[data-lightbox-image]");
+    const clickedControl = event.target.closest(
+      "[data-lightbox-close], [data-lightbox-prev], [data-lightbox-next]",
+    );
+    if (!clickedImage && !clickedControl) {
       closeLightbox();
     }
   });
@@ -119,16 +155,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (event.key === "ArrowRight") {
       event.preventDefault();
-      activeLightboxIndex = (activeLightboxIndex + 1) % activeLightboxItems.length;
-      updateLightbox();
+      showNextLightboxImage();
     }
 
     if (event.key === "ArrowLeft") {
       event.preventDefault();
-      activeLightboxIndex =
-        (activeLightboxIndex - 1 + activeLightboxItems.length) %
-        activeLightboxItems.length;
-      updateLightbox();
+      showPreviousLightboxImage();
     }
   });
 

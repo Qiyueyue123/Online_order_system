@@ -19,8 +19,13 @@
       <p><strong>Name:</strong> {{ order_bundle["order"]["customer_name"] }}</p>
       <p><strong>Contact:</strong> {{ order_bundle["order"]["customer_contact"] }}</p>
       <p><strong>Pickup time:</strong> {{ order_bundle["order"]["pickup_label"] }}</p>
-      <p><strong>Payment:</strong> {{ order_bundle["order"]["payment_method"] }}</p>
+      <p><strong>Payment:</strong> {{ order_bundle["order"]["payment_label"] }}</p>
       <p><strong>Total:</strong> EUR {{ "%.2f"|format(order_bundle["order"]["total_amount"]) }}</p>
+      {% if order_bundle["order"]["payment_method"] == "manual_tikkie" %}
+        <p class="payment-help-inline">
+          We will send a Tikkie payment request link to your WhatsApp/Telegram for this exact total.
+        </p>
+      {% endif %}
     </article>
 
     <article class="card">

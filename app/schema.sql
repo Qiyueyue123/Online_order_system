@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
 CREATE TABLE IF NOT EXISTS site_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     homepage_alert TEXT,
+    homepage_image_path TEXT,
+    homepage_image_alt TEXT,
     contact_line TEXT,
     contact_phone TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

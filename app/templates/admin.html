@@ -2,6 +2,50 @@
 
 {% block title %}Admin | Matcha Home Cafe{% endblock %}
 
+{% macro order_card(bundle, show_delete=False) %}
+  <article class="order-card{% if bundle['order']['status'] == 'cancelled' or show_delete %} is-muted{% endif %}">
+    <div class="order-card-main">
+      <div>
+        <p class="eyebrow">Order #{{ bundle["order"]["id"] }}</p>
+        <h3>{{ bundle["order"]["customer_name"] }}</h3>
+        <p class="menu-item-description">{{ bundle["order"]["customer_contact"] }}</p>
+      </div>
+      <div class="order-meta">
+        <p>{{ bundle["order"]["pickup_label"] }}</p>
+        <p>EUR {{ "%.2f"|format(bundle["order"]["total_amount"]) }}</p>
+      </div>
+    </div>
+    <div class="order-card-footer">
+      <span class="status-pill">{{ bundle["order"]["status"].replace('_', ' ').title() }}</span>
+      <span class="menu-item-description">{{ bundle["order"]["payment_label"] }}</span>
+    </div>
+    <ul class="compact-list">
+      {% for item in bundle["items"] %}
+        <li>
+          {{ item["quantity"] }} x {{ item["name"] }}
+          <span class="menu-item-description">({{ item["preparation_style"].replace('_', ' ').title() }})</span>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if bundle["order"]["status"] == "new" and not show_delete %}
+      <form action="{{ url_for('main.cancel_order_admin', order_id=bundle['order']['id']) }}" method="post">
+        <button class="button danger-button compact-action" type="submit">Cancel order</button>
+      </form>
+    {% endif %}
+    {% if show_delete %}
+      <form action="{{ url_for('main.delete_order_admin', order_id=bundle['order']['id']) }}" method="post">
+        <button
+          class="button danger-button compact-action"
+          onclick="return confirm('Delete this order record permanently? This cannot be undone.')"
+          type="submit"
+        >
+          Delete record
+        </button>
+      </form>
+    {% endif %}
+  </article>
+{% endmacro %}
+
 {% block content %}
   <section class="admin-hero">
     <div>
@@ -10,7 +54,8 @@
       <p class="lead">A compact control room for orders, pickup windows, stock, menu, and site copy.</p>
     </div>
     <div class="admin-metrics">
-      <span class="metric-pill">{{ orders|length }} orders</span>
+      <span class="metric-pill">{{ live_orders|length }} live</span>
+      <span class="metric-pill">{{ history_orders|length }} history</span>
       <span class="metric-pill">{{ menu_items|length }} drinks</span>
       <span class="metric-pill">{{ pickup_days|length }} pickup days</span>
     </div>
@@ -19,46 +64,34 @@
   <section class="admin-console">
     <details class="admin-panel" open>
       <summary>
-        <span>Orders</span>
-        <small>{{ orders|length }} total</small>
+        <span>Current live orders</span>
+        <small>{{ live_orders|length }} active</small>
       </summary>
-      {% if orders %}
+      {% if live_orders %}
         <div class="order-list">
-          {% for bundle in orders %}
-            <article class="order-card{% if bundle['order']['status'] == 'cancelled' %} is-muted{% endif %}">
-              <div class="order-card-main">
-                <div>
-                  <p class="eyebrow">Order #{{ bundle["order"]["id"] }}</p>
-                  <h3>{{ bundle["order"]["customer_name"] }}</h3>
-                  <p class="menu-item-description">{{ bundle["order"]["customer_contact"] }}</p>
-                </div>
-                <div class="order-meta">
-                  <p>{{ bundle["order"]["pickup_label"] }}</p>
-                  <p>EUR {{ "%.2f"|format(bundle["order"]["total_amount"]) }}</p>
-                </div>
-              </div>
-              <div class="order-card-footer">
-                <span class="status-pill">{{ bundle["order"]["status"].replace('_', ' ').title() }}</span>
-                <span class="menu-item-description">{{ bundle["order"]["payment_method"] }}</span>
-              </div>
-              <ul class="compact-list">
-                {% for item in bundle["items"] %}
-                  <li>
-                    {{ item["quantity"] }} x {{ item["name"] }}
-                    <span class="menu-item-description">({{ item["preparation_style"].replace('_', ' ').title() }})</span>
-                  </li>
-                {% endfor %}
-              </ul>
-              {% if bundle["order"]["status"] == "new" %}
-                <form action="{{ url_for('main.cancel_order_admin', order_id=bundle['order']['id']) }}" method="post">
-                  <button class="button danger-button compact-action" type="submit">Cancel order</button>
-                </form>
-              {% endif %}
-            </article>
+          {% for bundle in live_orders %}
+            {{ order_card(bundle) }}
           {% endfor %}
         </div>
       {% else %}
-        <p class="menu-item-description">No orders yet.</p>
+        <p class="panel-empty">No current live orders.</p>
+      {% endif %}
+    </details>
+
+    <details class="admin-panel">
+      <summary>
+        <span>Cancelled and past records</span>
+        <small>{{ history_orders|length }} stored</small>
+      </summary>
+      <p class="panel-note">These records are no longer live. Deleting a record only removes the admin history entry; it does not change stock.</p>
+      {% if history_orders %}
+        <div class="order-list">
+          {% for bundle in history_orders %}
+            {{ order_card(bundle, show_delete=True) }}
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="panel-empty">No cancelled or past records.</p>
       {% endif %}
     </details>
 
@@ -213,9 +246,40 @@
         <form action="{{ url_for('main.update_admin_site_contact') }}" class="mini-card stacked-form" method="post">
           <h3>Contact</h3>
           <label>Footer line <input name="contact_line" type="text" value="{{ site_settings['contact_line'] or '' }}"></label>
-          <label>Phone link <input name="contact_phone" type="text" value="{{ site_settings['contact_phone'] or '' }}"></label>
+          <label>Clickable contact <input name="contact_phone" placeholder="+6597888146, @telegramhandle, or https://t.me/telegramhandle" type="text" value="{{ site_settings['contact_phone'] or '' }}"></label>
           <button class="button secondary-button compact-action" type="submit">Save</button>
         </form>
+
+        <div class="mini-card stacked-form">
+          <h3>Homepage image</h3>
+          <img
+            alt="{{ site_settings['homepage_image_alt'] }}"
+            class="admin-thumbnail admin-thumbnail-wide"
+            src="{{ site_settings['homepage_image_path'] or url_for('static', filename='images/homepage-matcha-used.jpg') }}"
+          >
+          <p class="menu-item-description">
+            {% if site_settings['homepage_image_path'] %}
+              Custom homepage image is active.
+            {% else %}
+              Built-in homepage illustration is active.
+            {% endif %}
+          </p>
+          <form
+            action="{{ url_for('main.update_admin_homepage_image') }}"
+            class="stacked-form"
+            enctype="multipart/form-data"
+            method="post"
+          >
+            <label>Image <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/*" name="image_file" required type="file"></label>
+            <label>Alt text <input name="alt_text" placeholder="Describe the homepage image" type="text" value="{{ site_settings['homepage_image_alt'] or '' }}"></label>
+            <button class="button secondary-button compact-action" type="submit">Upload</button>
+          </form>
+          {% if site_settings['homepage_image_path'] %}
+            <form action="{{ url_for('main.clear_admin_homepage_image') }}" method="post">
+              <button class="button danger-button compact-action" type="submit">Use default image</button>
+            </form>
+          {% endif %}
+        </div>
       </div>
     </details>
   </section>

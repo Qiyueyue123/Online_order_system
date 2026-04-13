@@ -86,10 +86,17 @@
         <label>
           Payment method
           <select name="payment_method">
-            <option value="cash" {% if request.form.get('payment_method', 'cash') == 'cash' %}selected{% endif %}>Cash on pickup</option>
-            <option value="manual_tikkie" {% if request.form.get('payment_method') == 'manual_tikkie' %}selected{% endif %}>Manual Tikkie on pickup</option>
+            {% for method_value, method_label in payment_methods.items() %}
+              <option value="{{ method_value }}" {% if request.form.get('payment_method', 'cash') == method_value %}selected{% endif %}>
+                {{ method_label }}
+              </option>
+            {% endfor %}
           </select>
         </label>
+      </div>
+      <div class="payment-help">
+        <p><strong>Cash:</strong> pay when you collect your drink.</p>
+        <p><strong>Tikkie:</strong> we manually send a payment request link to your WhatsApp/Telegram for the order total. Please pay through that link before or when collecting.</p>
       </div>
       <label>
         Notes

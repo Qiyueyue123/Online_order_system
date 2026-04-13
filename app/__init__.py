@@ -1,8 +1,36 @@
 import os
+import re
+from urllib.parse import quote
 
 from flask import Flask
 
 from .db import get_site_settings, init_app, init_db, sync_admin_user_from_config
+
+
+def build_contact_link_target(value):
+    if not value:
+        return None
+
+    contact = value.strip()
+    lowered = contact.lower()
+    if lowered.startswith(("http://", "https://", "tel:", "mailto:")):
+        return contact
+    if lowered.startswith("t.me/"):
+        return f"https://{contact}"
+    if lowered.startswith("@") and len(contact) > 1:
+        return f"https://t.me/{quote(contact[1:])}"
+    if lowered.startswith("telegram:"):
+        handle = contact.split(":", 1)[1].strip().lstrip("@")
+        return f"https://t.me/{quote(handle)}" if handle else None
+    if lowered.startswith("whatsapp:"):
+        phone = re.sub(r"\D", "", contact.split(":", 1)[1])
+        return f"https://wa.me/{phone}" if phone else None
+
+    digits = re.sub(r"\D", "", contact)
+    if digits:
+        phone_href = contact if contact.startswith("+") else f"+{digits}"
+        return f"tel:{phone_href}"
+    return None
 
 
 def create_app(test_config=None):
@@ -52,6 +80,7 @@ def create_app(test_config=None):
         return {
             "cafe_contact_line": settings["contact_line"],
             "cafe_contact_phone": settings["contact_phone"],
+            "cafe_contact_link": build_contact_link_target(settings["contact_phone"]),
         }
 
     from .routes import bp

@@ -157,9 +157,9 @@ main.wrap {
 
 .home-spotlight {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.75fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(220px, 360px);
   gap: 1rem;
-  align-items: center;
+  align-items: start;
   padding: 0.95rem;
 }
 
@@ -197,45 +197,37 @@ main.wrap {
 
 .home-showcase {
   display: grid;
-  gap: 0.55rem;
   margin: 0;
-  padding: 0.75rem;
+  padding: 0.7rem;
   border-radius: 22px;
-  background:
-    radial-gradient(circle at top left, rgba(140, 173, 117, 0.24), transparent 35%),
-    linear-gradient(180deg, rgba(236, 245, 229, 0.95), rgba(250, 244, 233, 0.95));
-  border: 1px solid rgba(63, 109, 76, 0.14);
+  background: #fcfaf5;
+  border: 1px solid rgba(63, 109, 76, 0.1);
 }
 
 .home-showcase-frame {
-  display: grid;
-  place-items: center;
-  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 380px;
+  height: 100%;
+  max-height: 560px;
   padding: 0.7rem;
   border-radius: 18px;
-  border: 1px solid rgba(63, 109, 76, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(249, 243, 233, 0.9));
+  border: 1px solid rgba(63, 109, 76, 0.08);
+  background: #ffffff;
   overflow: hidden;
 }
 
 .home-showcase-image {
   display: block;
   width: auto;
-  max-width: 100%;
+  max-width: min(100%, 340px);
   height: auto;
-  max-height: min(42vw, 420px);
+  max-height: min(68vh, 520px);
   object-fit: contain;
   border-radius: 16px;
-  box-shadow: 0 18px 34px rgba(31, 42, 34, 0.12);
-  background: #eff0e4;
-}
-
-.home-showcase-caption {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.88rem;
-  line-height: 1.45;
+  box-shadow: none;
+  background: transparent;
 }
 
 .payment-help p,
@@ -791,7 +783,7 @@ h1 {
   border-radius: 18px;
   object-fit: contain;
   padding: 0.35rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(246, 241, 232, 0.92));
+  background: #ffffff;
 }
 
 .form-grid {
@@ -1113,12 +1105,14 @@ input[type="number"] {
   }
 
   .home-showcase-frame {
-    min-height: 240px;
+    min-height: 260px;
+    max-height: none;
     padding: 0.5rem;
   }
 
   .home-showcase-image {
-    max-height: 320px;
+    max-width: 100%;
+    max-height: 420px;
   }
 
   .menu-grid-compact {

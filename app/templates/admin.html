@@ -251,19 +251,15 @@
         </form>
 
         <div class="mini-card stacked-form">
-          <h3>Homepage image</h3>
-          <img
-            alt="{{ site_settings['homepage_image_alt'] }}"
-            class="admin-thumbnail admin-thumbnail-wide"
-            src="{{ site_settings['homepage_image_path'] or url_for('static', filename='images/homepage-matcha-used.jpg') }}"
-          >
-          <p class="menu-item-description">
-            {% if site_settings['homepage_image_path'] %}
-              Custom homepage image is active.
-            {% else %}
-              Built-in homepage illustration is active.
-            {% endif %}
-          </p>
+          <h3>Homepage gallery</h3>
+          {% if site_settings['homepage_images']|length == 1 and not site_settings['homepage_images'][0]['id'] %}
+            <img
+              alt="{{ site_settings['homepage_images'][0]['alt_text'] }}"
+              class="admin-thumbnail admin-thumbnail-wide"
+              src="{{ site_settings['homepage_images'][0]['image_path'] }}"
+            >
+            <p class="menu-item-description">Default homepage photo is active.</p>
+          {% endif %}
           <form
             action="{{ url_for('main.update_admin_homepage_image') }}"
             class="stacked-form"
@@ -271,10 +267,27 @@
             method="post"
           >
             <label>Image <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/*" name="image_file" required type="file"></label>
-            <label>Alt text <input name="alt_text" placeholder="Describe the homepage image" type="text" value="{{ site_settings['homepage_image_alt'] or '' }}"></label>
-            <button class="button secondary-button compact-action" type="submit">Upload</button>
+            <label>Alt text <input name="alt_text" placeholder="Describe the homepage image" type="text"></label>
+            <button class="button secondary-button compact-action" type="submit">Add image</button>
           </form>
-          {% if site_settings['homepage_image_path'] %}
+          {% if site_settings['homepage_images'] and site_settings['homepage_images'][0]['id'] %}
+            <form action="{{ url_for('main.reorder_admin_homepage_images') }}" class="image-order-form" method="post">
+              <h4>Images</h4>
+              {% for image in site_settings['homepage_images'] %}
+                <div class="image-order-row">
+                  <img alt="{{ image['alt_text'] }}" class="admin-thumbnail" src="{{ image['image_path'] }}">
+                  <div class="image-order-copy">
+                    <p class="menu-item-description">{{ image["alt_text"] }}</p>
+                    <label>
+                      Position
+                      <input min="1" name="sort_order_{{ image['id'] }}" type="number" value="{{ loop.index }}">
+                    </label>
+                    <button class="button danger-button compact-action" formaction="{{ url_for('main.delete_admin_homepage_image', image_id=image['id']) }}" formmethod="post" type="submit">Delete</button>
+                  </div>
+                </div>
+              {% endfor %}
+              <button class="button secondary-button compact-action" type="submit">Save order</button>
+            </form>
             <form action="{{ url_for('main.clear_admin_homepage_image') }}" method="post">
               <button class="button danger-button compact-action" type="submit">Use default image</button>
             </form>

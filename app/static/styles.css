@@ -47,6 +47,7 @@ main.wrap {
   background: rgba(251, 247, 239, 0.85);
   position: sticky;
   top: 0;
+  z-index: 40;
 }
 
 .site-header .wrap {
@@ -204,10 +205,13 @@ main.wrap {
   border: 1px solid rgba(63, 109, 76, 0.1);
 }
 
+.home-showcase-carousel {
+  display: grid;
+  gap: 0.7rem;
+}
+
 .home-showcase-frame {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   min-height: 380px;
   height: 100%;
   max-height: 560px;
@@ -216,6 +220,26 @@ main.wrap {
   border: 1px solid rgba(63, 109, 76, 0.08);
   background: #ffffff;
   overflow: hidden;
+}
+
+.home-showcase-frame .carousel-track {
+  height: 100%;
+  width: 100%;
+}
+
+.home-showcase-frame .carousel-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.home-showcase-frame .image-open-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .home-showcase-image {
@@ -228,6 +252,14 @@ main.wrap {
   border-radius: 16px;
   box-shadow: none;
   background: transparent;
+}
+
+.home-showcase-nav {
+  padding: 0 0.45rem;
+}
+
+.home-showcase-dots {
+  margin-top: 0;
 }
 
 .payment-help p,
@@ -477,27 +509,36 @@ h1 {
 }
 
 .carousel-arrow {
-  width: 50px;
-  height: 50px;
-  border: 0;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(31, 42, 34, 0.78), rgba(31, 42, 34, 0.58));
+  background: rgba(31, 42, 34, 0.32);
   color: white;
-  font-size: 1.55rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
   line-height: 1;
   cursor: pointer;
   pointer-events: auto;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 12px 28px rgba(31, 42, 34, 0.22);
-  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 24px rgba(31, 42, 34, 0.14);
+  opacity: 0.92;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
-.carousel-arrow:hover,
-.carousel-arrow:focus-visible {
-  background: linear-gradient(180deg, rgba(31, 42, 34, 0.92), rgba(31, 42, 34, 0.72));
-  box-shadow: 0 16px 32px rgba(31, 42, 34, 0.28);
+.carousel-arrow:hover {
+  background: rgba(31, 42, 34, 0.48);
+  box-shadow: 0 14px 28px rgba(31, 42, 34, 0.18);
+  opacity: 1;
   transform: scale(1.05);
+}
+
+.carousel-arrow:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+  background: rgba(31, 42, 34, 0.48);
+  opacity: 1;
 }
 
 .card-link,
@@ -1032,21 +1073,32 @@ input[type="number"] {
   width: clamp(44px, 6vw, 64px);
   height: clamp(44px, 6vw, 64px);
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
-  background: rgba(20, 26, 22, 0.42);
+  background: rgba(20, 26, 22, 0.32);
   color: white;
   cursor: pointer;
   font-size: clamp(1.4rem, 4vw, 2.2rem);
   font-weight: 800;
   line-height: 1;
   transform: translateY(-50%);
-  transition: background 0.16s ease, transform 0.16s ease;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+  opacity: 0.92;
 }
 
 .lightbox-nav:hover {
-  background: rgba(20, 26, 22, 0.68);
+  background: rgba(20, 26, 22, 0.48);
+  opacity: 1;
   transform: translateY(-50%) scale(1.04);
+}
+
+.lightbox-nav:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+  background: rgba(20, 26, 22, 0.48);
+  opacity: 1;
 }
 
 .lightbox-nav-prev {

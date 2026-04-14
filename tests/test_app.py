@@ -334,13 +334,14 @@ def test_admin_can_upload_homepage_image(tmp_path):
     )
 
     assert response.status_code == 200
-    assert b"Homepage image updated." in response.data
+    assert b"Homepage image added." in response.data
 
     with app.app_context():
         settings = get_site_settings()
-        assert settings["homepage_image_path"].startswith("/uploads/")
-        assert settings["homepage_image_alt"] == "Custom homepage matcha photo"
-        saved_name = Path(settings["homepage_image_path"]).name
+        homepage_image = settings["homepage_images"][0]
+        assert homepage_image["image_path"].startswith("/uploads/")
+        assert homepage_image["alt_text"] == "Custom homepage matcha photo"
+        saved_name = Path(homepage_image["image_path"]).name
         assert (Path(app.config["UPLOAD_FOLDER"]) / saved_name).exists()
 
     home_response = client.get("/")
@@ -373,7 +374,55 @@ def test_admin_rejects_heif_homepage_upload_disguised_as_jpg(tmp_path):
 
     with app.app_context():
         settings = get_site_settings()
-        assert settings["homepage_image_path"] is None
+        assert len(settings["homepage_images"]) == 1
+        assert settings["homepage_images"][0]["id"] is None
+
+
+def test_admin_can_reorder_homepage_images(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+    client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Homepage photo 1",
+            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage-1.svg"),
+        },
+        content_type="multipart/form-data",
+    )
+    client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Homepage photo 2",
+            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage-2.svg"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    with app.app_context():
+        settings = get_site_settings()
+        first_image_id = settings["homepage_images"][0]["id"]
+        second_image_id = settings["homepage_images"][1]["id"]
+
+    response = client.post(
+        "/admin/site-homepage-images/order",
+        data={
+            f"sort_order_{first_image_id}": "2",
+            f"sort_order_{second_image_id}": "1",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Homepage image order updated." in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        assert settings["homepage_images"][0]["id"] == second_image_id
 
 
 def test_admin_can_reset_homepage_image_to_default(tmp_path):
@@ -395,19 +444,20 @@ def test_admin_can_reset_homepage_image_to_default(tmp_path):
 
     with app.app_context():
         settings = get_site_settings()
-        saved_name = Path(settings["homepage_image_path"]).name
+        saved_name = Path(settings["homepage_images"][0]["image_path"]).name
 
     response = client.post(
-        "/admin/site-homepage-image/clear",
+        "/admin/site-homepage-images/clear",
         follow_redirects=True,
     )
 
     assert response.status_code == 200
-    assert b"Homepage image reset to default." in response.data
+    assert b"Homepage images reset to default." in response.data
 
     with app.app_context():
         settings = get_site_settings()
-        assert settings["homepage_image_path"] is None
+        assert len(settings["homepage_images"]) == 1
+        assert settings["homepage_images"][0]["id"] is None
 
     assert not (Path(app.config["UPLOAD_FOLDER"]) / saved_name).exists()
 
@@ -880,12 +930,20 @@ def test_init_db_migrates_existing_site_settings_table(tmp_path):
             row["name"]
             for row in db.execute("PRAGMA table_info(site_settings)").fetchall()
         }
+        homepage_images_table = db.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'homepage_images'
+            """
+        ).fetchone()
         settings = get_site_settings()
 
         assert "contact_line" in columns
         assert "contact_phone" in columns
         assert "homepage_image_path" in columns
         assert "homepage_image_alt" in columns
+        assert homepage_images_table is not None
         assert settings["homepage_alert"] == "Legacy alert"
 
 

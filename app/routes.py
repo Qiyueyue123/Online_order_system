@@ -9,12 +9,15 @@ from werkzeug.utils import secure_filename
 from .db import (
     InventoryError,
     add_product_image,
+    add_homepage_image,
     admin_password_hash_needs_upgrade,
     can_cancel_order,
     cancel_order,
     cancel_order_by_admin,
+    clear_homepage_images,
     create_product,
     create_order,
+    delete_homepage_image,
     delete_order_record,
     delete_product,
     delete_product_image,
@@ -31,9 +34,9 @@ from .db import (
     list_orders,
     list_stock_pools,
     refresh_admin_user_password_hash,
-    update_homepage_image,
     update_site_contact,
     update_homepage_alert,
+    update_homepage_image_order,
     update_pickup_day,
     update_product,
     update_product_image_order,
@@ -385,7 +388,6 @@ def update_admin_site_contact():
 def update_admin_homepage_image():
     file = request.files.get("image_file")
     alt_text = request.form.get("alt_text", "").strip()
-    existing_image_path = get_site_settings()["homepage_image_path"]
 
     if file is None or file.filename == "":
         flash("Choose an image file to upload.")
@@ -408,19 +410,54 @@ def update_admin_homepage_image():
     file.save(destination)
 
     image_path = url_for("main.uploaded_file", filename=saved_name)
-    update_homepage_image(image_path=image_path, alt_text=alt_text)
-    _delete_uploaded_file_if_local(existing_image_path)
-    flash("Homepage image updated.")
+    add_homepage_image(image_path=image_path, alt_text=alt_text)
+    flash("Homepage image added.")
     return redirect(url_for("main.admin"))
 
 
-@bp.route("/admin/site-homepage-image/clear", methods=["POST"])
+@bp.route("/admin/site-homepage-images/order", methods=["POST"])
+@admin_required
+def reorder_admin_homepage_images():
+    image_sort_orders = {}
+    for key, value in request.form.items():
+        if not key.startswith("sort_order_"):
+            continue
+        try:
+            image_id = int(key.removeprefix("sort_order_"))
+            sort_order = int(value)
+        except ValueError:
+            continue
+        image_sort_orders[image_id] = sort_order
+
+    if not image_sort_orders:
+        flash("No homepage image order changes were submitted.")
+        return redirect(url_for("main.admin"))
+
+    update_homepage_image_order(image_sort_orders=image_sort_orders)
+    flash("Homepage image order updated.")
+    return redirect(url_for("main.admin"))
+
+
+@bp.route("/admin/site-homepage-images/<int:image_id>/delete", methods=["POST"])
+@admin_required
+def delete_admin_homepage_image(image_id):
+    try:
+        image = delete_homepage_image(image_id)
+    except ValueError as exc:
+        flash(str(exc))
+    else:
+        _delete_uploaded_file_if_local(image["image_path"])
+        flash("Homepage image deleted.")
+    return redirect(url_for("main.admin"))
+
+
+@bp.route("/admin/site-homepage-images/clear", methods=["POST"])
 @admin_required
 def clear_admin_homepage_image():
-    existing_image_path = get_site_settings()["homepage_image_path"]
-    update_homepage_image(image_path=None, alt_text=None)
-    _delete_uploaded_file_if_local(existing_image_path)
-    flash("Homepage image reset to default.")
+    deleted_image_paths = clear_homepage_images()
+    for image_path in deleted_image_paths:
+        _delete_uploaded_file_if_local(image_path)
+    flash("Homepage images reset to default.")
     return redirect(url_for("main.admin"))
 
 

@@ -222,6 +222,49 @@ def _migrate_schema(db):
         db.execute("ALTER TABLE site_settings ADD COLUMN homepage_image_path TEXT")
     if "homepage_image_alt" not in site_settings_columns:
         db.execute("ALTER TABLE site_settings ADD COLUMN homepage_image_alt TEXT")
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS homepage_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_path TEXT NOT NULL,
+            alt_text TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    legacy_homepage_image = db.execute(
+        """
+        SELECT homepage_image_path, homepage_image_alt
+        FROM site_settings
+        WHERE id = 1
+        """
+    ).fetchone()
+    existing_homepage_image_count = db.execute(
+        "SELECT COUNT(*) FROM homepage_images"
+    ).fetchone()[0]
+    if (
+        legacy_homepage_image is not None
+        and legacy_homepage_image["homepage_image_path"]
+        and existing_homepage_image_count == 0
+    ):
+        db.execute(
+            """
+            INSERT INTO homepage_images (image_path, alt_text, sort_order)
+            VALUES (?, ?, 1)
+            """,
+            (
+                legacy_homepage_image["homepage_image_path"],
+                legacy_homepage_image["homepage_image_alt"]
+                or "Homepage matcha showcase image",
+            ),
+        )
+        db.execute(
+            """
+            UPDATE site_settings
+            SET homepage_image_path = NULL, homepage_image_alt = NULL
+            WHERE id = 1
+            """
+        )
 
     order_columns = _table_columns(db, "orders")
     if "customer_contact" not in order_columns:
@@ -509,6 +552,7 @@ def get_site_settings():
     settings["homepage_image_alt"] = settings["homepage_image_alt"] or defaults["homepage_image_alt"]
     settings["contact_line"] = settings["contact_line"] or defaults["contact_line"]
     settings["contact_phone"] = settings["contact_phone"] or defaults["contact_phone"]
+    settings["homepage_images"] = get_homepage_images()
     return settings
 
 
@@ -604,6 +648,134 @@ def update_homepage_image(image_path, alt_text):
         ),
     )
     db.commit()
+
+
+def get_homepage_images():
+    db = get_db()
+    images = db.execute(
+        """
+        SELECT id, image_path, alt_text, sort_order
+        FROM homepage_images
+        ORDER BY sort_order, id
+        """
+    ).fetchall()
+    if images:
+        return [dict(image) for image in images]
+    return [
+        {
+            "id": None,
+            "image_path": "/static/images/homepage-matcha-used.jpg",
+            "alt_text": "Photo of the ceremonial matcha used for this cafe run",
+            "sort_order": 1,
+        }
+    ]
+
+
+def add_homepage_image(image_path, alt_text):
+    db = get_db()
+    next_sort_order = db.execute(
+        """
+        SELECT COALESCE(MAX(sort_order), 0) + 1
+        FROM homepage_images
+        """
+    ).fetchone()[0]
+    db.execute(
+        """
+        INSERT INTO homepage_images (image_path, alt_text, sort_order)
+        VALUES (?, ?, ?)
+        """,
+        (image_path, alt_text, next_sort_order),
+    )
+    db.execute(
+        """
+        UPDATE site_settings
+        SET homepage_image_path = NULL, homepage_image_alt = NULL
+        WHERE id = 1
+        """
+    )
+    db.commit()
+
+
+def update_homepage_image_order(image_sort_orders):
+    db = get_db()
+    existing_images = db.execute(
+        """
+        SELECT id
+        FROM homepage_images
+        """
+    ).fetchall()
+    existing_image_ids = {row["id"] for row in existing_images}
+
+    normalized_pairs = []
+    for image_id, sort_order in image_sort_orders.items():
+        if image_id not in existing_image_ids:
+            continue
+        normalized_pairs.append((image_id, max(1, int(sort_order))))
+
+    normalized_pairs.sort(key=lambda pair: (pair[1], pair[0]))
+
+    for index, (image_id, _sort_order) in enumerate(normalized_pairs, start=1):
+        db.execute(
+            """
+            UPDATE homepage_images
+            SET sort_order = ?
+            WHERE id = ?
+            """,
+            (index, image_id),
+        )
+    db.commit()
+
+
+def delete_homepage_image(image_id):
+    db = get_db()
+    image = db.execute(
+        """
+        SELECT id, image_path
+        FROM homepage_images
+        WHERE id = ?
+        """,
+        (image_id,),
+    ).fetchone()
+    if image is None:
+        raise ValueError("Homepage image not found.")
+
+    db.execute(
+        "DELETE FROM homepage_images WHERE id = ?",
+        (image_id,),
+    )
+
+    remaining_images = db.execute(
+        """
+        SELECT id
+        FROM homepage_images
+        ORDER BY sort_order, id
+        """
+    ).fetchall()
+
+    for index, row in enumerate(remaining_images, start=1):
+        db.execute(
+            """
+            UPDATE homepage_images
+            SET sort_order = ?
+            WHERE id = ?
+            """,
+            (index, row["id"]),
+        )
+    db.commit()
+    return dict(image)
+
+
+def clear_homepage_images():
+    db = get_db()
+    images = db.execute(
+        """
+        SELECT image_path
+        FROM homepage_images
+        """
+    ).fetchall()
+    db.execute("DELETE FROM homepage_images")
+    db.commit()
+    return [row["image_path"] for row in images]
 
 
 def get_product_with_images(product_id):

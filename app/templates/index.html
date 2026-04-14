@@ -29,12 +29,63 @@
         </div>
       </div>
       <figure class="home-showcase home-showcase-portrait-ready">
-        <div class="home-showcase-frame home-showcase-frame-portrait">
-          <img
-            alt="{{ site_settings['homepage_image_alt'] }}"
-            class="home-showcase-image"
-            src="{{ site_settings['homepage_image_path'] or url_for('static', filename='images/homepage-matcha-used.jpg') }}"
-          >
+        <div class="carousel home-showcase-carousel" data-carousel>
+          <div class="carousel-viewport home-showcase-frame home-showcase-frame-portrait">
+            <div class="carousel-track" data-carousel-track>
+              {% for image in site_settings["homepage_images"] %}
+                <figure class="carousel-slide{% if loop.first %} is-active{% endif %}" data-carousel-slide>
+                  <button
+                    aria-label="Open homepage photo {{ loop.index }}"
+                    class="image-open-button"
+                    data-lightbox-trigger
+                    data-lightbox-alt="{{ image['alt_text'] }}"
+                    data-lightbox-caption="{{ image['alt_text'] }}"
+                    data-lightbox-src="{{ image['image_path'] }}"
+                    type="button"
+                  >
+                    <img
+                      alt="{{ image['alt_text'] }}"
+                      class="home-showcase-image"
+                      src="{{ image['image_path'] }}"
+                    >
+                  </button>
+                </figure>
+              {% endfor %}
+            </div>
+            {% if site_settings["homepage_images"]|length > 1 %}
+              <div class="card-carousel-nav home-showcase-nav">
+                <button
+                  aria-label="Show previous homepage photo"
+                  class="carousel-arrow"
+                  data-carousel-prev
+                  type="button"
+                >
+                  <
+                </button>
+                <button
+                  aria-label="Show next homepage photo"
+                  class="carousel-arrow"
+                  data-carousel-next
+                  type="button"
+                >
+                  >
+                </button>
+              </div>
+            {% endif %}
+          </div>
+          {% if site_settings["homepage_images"]|length > 1 %}
+            <div class="carousel-dots home-showcase-dots">
+              {% for image in site_settings["homepage_images"] %}
+                <button
+                  aria-label="Go to homepage photo {{ loop.index }}"
+                  class="carousel-dot{% if loop.first %} is-active{% endif %}"
+                  data-carousel-dot
+                  data-carousel-index="{{ loop.index0 }}"
+                  type="button"
+                ></button>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
       </figure>
     </section>

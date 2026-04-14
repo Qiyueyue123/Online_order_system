@@ -266,9 +266,9 @@
             enctype="multipart/form-data"
             method="post"
           >
-            <label>Image <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/*" name="image_file" required type="file"></label>
-            <label>Alt text <input name="alt_text" placeholder="Describe the homepage image" type="text"></label>
-            <button class="button secondary-button compact-action" type="submit">Add image</button>
+            <label>Image, GIF, or MP4 <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,image/*,video/mp4" name="image_file" required type="file"></label>
+            <label>Alt text <input name="alt_text" placeholder="Describe the homepage image, GIF, or video" type="text"></label>
+            <button class="button secondary-button compact-action" type="submit">Add media</button>
           </form>
           {% if site_settings['homepage_images'] and site_settings['homepage_images'][0]['id'] %}
             <form action="{{ url_for('main.reorder_admin_homepage_images') }}" class="image-order-form" method="post">

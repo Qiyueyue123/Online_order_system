@@ -38,12 +38,32 @@ document.addEventListener("DOMContentLoaded", () => {
     const dots = Array.from(carousel.querySelectorAll("[data-carousel-dot]"));
     const prevButton = carousel.querySelector("[data-carousel-prev]");
     const nextButton = carousel.querySelector("[data-carousel-next]");
+    const autoplayDelay = Number(carousel.dataset.carouselAutoplay || 0);
 
     if (slides.length <= 1) {
       continue;
     }
 
     let currentIndex = 0;
+    let autoplayTimer = null;
+
+    const syncSlideMedia = () => {
+      slides.forEach((slide, index) => {
+        const videos = slide.querySelectorAll("[data-carousel-video]");
+        videos.forEach((video) => {
+          if (index === currentIndex) {
+            video.muted = true;
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.catch === "function") {
+              playPromise.catch(() => {});
+            }
+          } else {
+            video.pause();
+            video.currentTime = 0;
+          }
+        });
+      });
+    };
 
     const render = () => {
       if (track) {
@@ -56,6 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
       dots.forEach((dot, index) => {
         dot.classList.toggle("is-active", index === currentIndex);
       });
+      syncSlideMedia();
     };
 
     prevButton?.addEventListener("click", () => {
@@ -75,7 +96,40 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
+    const stopAutoplay = () => {
+      if (autoplayTimer) {
+        window.clearInterval(autoplayTimer);
+        autoplayTimer = null;
+      }
+    };
+
+    const startAutoplay = () => {
+      if (autoplayDelay < 1) {
+        return;
+      }
+      stopAutoplay();
+      autoplayTimer = window.setInterval(() => {
+        currentIndex = (currentIndex + 1) % slides.length;
+        render();
+      }, autoplayDelay);
+    };
+
+    if (autoplayDelay > 0) {
+      carousel.addEventListener("mouseenter", stopAutoplay);
+      carousel.addEventListener("mouseleave", startAutoplay);
+      carousel.addEventListener("focusin", stopAutoplay);
+      carousel.addEventListener("focusout", startAutoplay);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          stopAutoplay();
+        } else {
+          startAutoplay();
+        }
+      });
+    }
+
     render();
+    startAutoplay();
   }
 
   const lightboxTriggers = document.querySelectorAll("[data-lightbox-trigger]");

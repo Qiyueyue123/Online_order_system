@@ -349,6 +349,79 @@ def test_admin_can_upload_homepage_image(tmp_path):
     assert b"/uploads/" in home_response.data
 
 
+def test_admin_can_upload_homepage_gif(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    gif_bytes = (
+        b"GIF89a\x01\x00\x01\x00\x80\x00\x00"
+        b"\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,"
+        b"\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;"
+    )
+    response = client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Homepage matcha GIF",
+            "image_file": (BytesIO(gif_bytes), "homepage.gif"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Homepage image added." in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        homepage_image = settings["homepage_images"][0]
+        assert homepage_image["image_path"].endswith(".gif")
+        assert homepage_image["alt_text"] == "Homepage matcha GIF"
+
+    home_response = client.get("/")
+    assert b"Homepage matcha GIF" in home_response.data
+    assert b".gif" in home_response.data
+
+
+def test_admin_can_upload_homepage_mp4(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    response = client.post(
+        "/admin/site-homepage-image",
+        data={
+            "alt_text": "Homepage matcha video",
+            "image_file": (BytesIO(b"fake mp4 bytes"), "homepage.mp4"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Homepage image added." in response.data
+
+    with app.app_context():
+        settings = get_site_settings()
+        homepage_image = settings["homepage_images"][0]
+        assert homepage_image["image_path"].endswith(".mp4")
+        assert homepage_image["alt_text"] == "Homepage matcha video"
+
+    home_response = client.get("/")
+    assert b"Homepage matcha video" in home_response.data
+    assert b"<video" in home_response.data
+    assert b"data-carousel-video" in home_response.data
+    assert b".mp4" in home_response.data
+
+
 def test_admin_rejects_heif_homepage_upload_disguised_as_jpg(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()

@@ -29,26 +29,42 @@
         </div>
       </div>
       <figure class="home-showcase home-showcase-portrait-ready">
-        <div class="carousel home-showcase-carousel" data-carousel>
+        <div class="carousel home-showcase-carousel" data-carousel data-carousel-autoplay="2500">
           <div class="carousel-viewport home-showcase-frame home-showcase-frame-portrait">
             <div class="carousel-track" data-carousel-track>
               {% for image in site_settings["homepage_images"] %}
                 <figure class="carousel-slide{% if loop.first %} is-active{% endif %}" data-carousel-slide>
-                  <button
-                    aria-label="Open homepage photo {{ loop.index }}"
-                    class="image-open-button"
-                    data-lightbox-trigger
-                    data-lightbox-alt="{{ image['alt_text'] }}"
-                    data-lightbox-caption="{{ image['alt_text'] }}"
-                    data-lightbox-src="{{ image['image_path'] }}"
-                    type="button"
-                  >
-                    <img
-                      alt="{{ image['alt_text'] }}"
-                      class="home-showcase-image"
-                      src="{{ image['image_path'] }}"
+                  {% if image['image_path'].lower().endswith('.mp4') %}
+                    <div class="home-showcase-media">
+                      <video
+                        aria-label="{{ image['alt_text'] }}"
+                        class="home-showcase-image home-showcase-video"
+                        data-carousel-video
+                        loop
+                        muted
+                        playsinline
+                        preload="metadata"
+                      >
+                        <source src="{{ image['image_path'] }}" type="video/mp4">
+                      </video>
+                    </div>
+                  {% else %}
+                    <button
+                      aria-label="Open homepage photo {{ loop.index }}"
+                      class="image-open-button"
+                      data-lightbox-trigger
+                      data-lightbox-alt="{{ image['alt_text'] }}"
+                      data-lightbox-caption="{{ image['alt_text'] }}"
+                      data-lightbox-src="{{ image['image_path'] }}"
+                      type="button"
                     >
-                  </button>
+                      <img
+                        alt="{{ image['alt_text'] }}"
+                        class="home-showcase-image"
+                        src="{{ image['image_path'] }}"
+                      >
+                    </button>
+                  {% endif %}
                 </figure>
               {% endfor %}
             </div>

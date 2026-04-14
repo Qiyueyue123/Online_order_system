@@ -47,6 +47,7 @@ from .db import (
 
 bp = Blueprint("main", __name__)
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+ALLOWED_HOMEPAGE_MEDIA_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | {".mp4"}
 PICKUP_WINDOW_DAYS = 5
 PICKUP_START_HOUR = 16
 PICKUP_END_HOUR = 21
@@ -395,10 +396,10 @@ def update_admin_homepage_image():
 
     original_name = secure_filename(file.filename)
     extension = Path(original_name).suffix.lower()
-    if extension not in ALLOWED_IMAGE_EXTENSIONS:
-        flash("Only image files such as JPG, PNG, WEBP, GIF, or SVG are allowed.")
+    if extension not in ALLOWED_HOMEPAGE_MEDIA_EXTENSIONS:
+        flash("Only JPG, PNG, WEBP, GIF, SVG, or MP4 files are allowed for the homepage carousel.")
         return redirect(url_for("main.admin"))
-    if is_heif_upload(file):
+    if extension in ALLOWED_IMAGE_EXTENSIONS and is_heif_upload(file):
         flash("HEIC or HEIF images must be converted to JPG, PNG, WEBP, GIF, or SVG before upload.")
         return redirect(url_for("main.admin"))
 

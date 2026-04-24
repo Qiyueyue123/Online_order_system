@@ -8,6 +8,7 @@ services:
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
       ADMIN_PASSWORD_HASH: "${ADMIN_PASSWORD_HASH}"
       DATABASE_PATH: "/app/instance/matcha.db"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-0}"
       PORT: "8000"
     volumes:
       - ./instance:/app/instance

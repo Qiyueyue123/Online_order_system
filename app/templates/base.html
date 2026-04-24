@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}QY & YX 's' Cafe{% endblock %}</title>
+    <title>{% block title %}QY & YX's Cafe{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script defer src="{{ url_for('static', filename='carousel.js') }}"></script>
   </head>
@@ -17,6 +17,7 @@
           {% if session.get("admin_authenticated") %}
             <a href="{{ url_for('main.admin') }}">Admin</a>
             <form action="{{ url_for('main.admin_logout') }}" class="inline-form" method="post">
+              {{ csrf_field() }}
               <button class="link-button" type="submit">Logout</button>
             </form>
           {% else %}
@@ -26,7 +27,7 @@
       </div>
     </header>
 
-    <main class="wrap">
+    <main class="wrap page-content">
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           <section class="flash-list" data-toast-list>

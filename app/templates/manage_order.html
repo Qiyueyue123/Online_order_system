@@ -45,6 +45,7 @@
     {% elif order_bundle["order"]["can_cancel"] %}
       <p class="menu-item-description">You can cancel before your pickup time. Please inform us in advance if your plans change.</p>
       <form action="{{ url_for('main.cancel_order_route', order_id=order_bundle['order']['id'], token=order_bundle['cancel_token']) }}" method="post">
+        {{ csrf_field() }}
         <button class="button danger-button" type="submit">Cancel order</button>
       </form>
     {% else %}

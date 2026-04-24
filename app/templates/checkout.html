@@ -1,62 +1,85 @@
 {% extends "base.html" %}
 
-{% block title %}Checkout | Matcha Home Cafe{% endblock %}
+{% block title %}Checkout | QY&YX's Cafe{% endblock %}
 
 {% block content %}
-  <section class="section-heading">
+  <section class="section-heading checkout-heading">
     <p class="eyebrow">Order form</p>
     <h1>Place a pickup order</h1>
+    <p class="lead">Choose your drinks first, then lock in a pickup time. Quantities are capped at 3 per drink so stock stays fair.</p>
   </section>
 
   <form class="order-form" method="post">
-    <section class="card">
-      <h2>1. Drinks</h2>
-      <div class="form-grid">
+    {{ csrf_field() }}
+    <section class="card checkout-section">
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow">Step 1</p>
+          <h2>Choose drinks</h2>
+        </div>
+        <span class="metric-pill">Max 3 per drink</span>
+      </div>
+      <div class="drink-choice-grid">
         {% for item in menu_items %}
-          <div class="menu-line">
-            <div>
-              <p class="menu-item-title">{{ item["name"] }}</p>
-              <p class="menu-item-description">{{ item["description"] }}</p>
-              <p class="stock-caption">
-                EUR {{ "%.2f"|format(item["price_eur"]) }} | {{ item["stock_pool_name"] }} stock:
-                {{ item["servings_available"] }} servings left
-              </p>
-              <label class="style-label" for="preparation_style_{{ item['id'] }}">Drink style</label>
-              <select id="preparation_style_{{ item['id'] }}" name="preparation_style_{{ item['id'] }}">
-                {% for style_value, style_label in preparation_styles.items() %}
-                  <option
-                    value="{{ style_value }}"
-                    {% if request.form.get('preparation_style_' ~ item['id'], 'type_1') == style_value %}selected{% endif %}
-                  >
-                    {{ style_label }}
-                  </option>
-                {% endfor %}
-              </select>
+          <article class="drink-choice-card">
+            <div class="drink-choice-main">
+              <div class="drink-choice-header">
+                <div>
+                  <p class="menu-item-title">{{ item["name"] }}</p>
+                  <p class="menu-item-description">{{ item["description"] }}</p>
+                </div>
+                <p class="price">EUR {{ "%.2f"|format(item["price_eur"]) }}</p>
+              </div>
+              <div class="choice-meta-row" aria-label="Stock details">
+                <span class="metric-pill">{{ item["servings_available"] }} left</span>
+                <span class="metric-pill">{{ item["stock_pool_name"] }} stock</span>
+              </div>
             </div>
-            <fieldset class="quantity-picker" aria-label="Quantity for {{ item['name'] }}">
-              <legend>Quantity</legend>
-              {% set selected_quantity = request.form.get('quantity_' ~ item['id'], '0')|int %}
-              {% for quantity in quantity_choices %}
-                {% set is_disabled = quantity > item["servings_available"] %}
-                <label class="quantity-choice{% if is_disabled %} is-disabled{% endif %}">
-                  <input
-                    name="quantity_{{ item['id'] }}"
-                    type="radio"
-                    value="{{ quantity }}"
-                    {% if selected_quantity == quantity %}checked{% endif %}
-                    {% if is_disabled %}disabled{% endif %}
-                  >
-                  <span>{{ quantity }}</span>
-                </label>
-              {% endfor %}
-            </fieldset>
-          </div>
+
+            <div class="drink-choice-controls">
+              <label class="style-label" for="preparation_style_{{ item['id'] }}">
+                Drink style
+                <select id="preparation_style_{{ item['id'] }}" name="preparation_style_{{ item['id'] }}">
+                  {% for style_value, style_label in preparation_styles.items() %}
+                    <option
+                      value="{{ style_value }}"
+                      {% if request.form.get('preparation_style_' ~ item['id'], 'type_1') == style_value %}selected{% endif %}
+                    >
+                      {{ style_label }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </label>
+              <fieldset class="quantity-picker" aria-label="Quantity for {{ item['name'] }}">
+                <legend>Quantity</legend>
+                {% set selected_quantity = request.form.get('quantity_' ~ item['id'], '0')|int %}
+                {% for quantity in quantity_choices %}
+                  {% set is_disabled = quantity > item["servings_available"] %}
+                  <label class="quantity-choice{% if is_disabled %} is-disabled{% endif %}">
+                    <input
+                      name="quantity_{{ item['id'] }}"
+                      type="radio"
+                      value="{{ quantity }}"
+                      {% if selected_quantity == quantity %}checked{% endif %}
+                      {% if is_disabled %}disabled{% endif %}
+                    >
+                    <span>{{ quantity }}</span>
+                  </label>
+                {% endfor %}
+              </fieldset>
+            </div>
+          </article>
         {% endfor %}
       </div>
     </section>
 
-    <section class="card">
-      <h2>2. Pickup details</h2>
+    <section class="card checkout-section">
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow">Step 2</p>
+          <h2>Pickup details</h2>
+        </div>
+      </div>
       <div class="form-grid two-column">
         <label>
           Name
@@ -104,6 +127,9 @@
       </label>
     </section>
 
-    <button class="button" type="submit">Place order</button>
+    <div class="checkout-submit-row">
+      <button class="button checkout-submit" type="submit">Place order</button>
+      <p class="menu-item-description">You will get a private cancellation link after placing the order.</p>
+    </div>
   </form>
 {% endblock %}

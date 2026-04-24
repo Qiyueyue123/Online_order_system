@@ -29,11 +29,13 @@
     </ul>
     {% if bundle["order"]["status"] == "new" and not show_delete %}
       <form action="{{ url_for('main.cancel_order_admin', order_id=bundle['order']['id']) }}" method="post">
+        {{ csrf_field() }}
         <button class="button danger-button compact-action" type="submit">Cancel order</button>
       </form>
     {% endif %}
     {% if show_delete %}
       <form action="{{ url_for('main.delete_order_admin', order_id=bundle['order']['id']) }}" method="post">
+        {{ csrf_field() }}
         <button
           class="button danger-button compact-action"
           onclick="return confirm('Delete this order record permanently? This cannot be undone.')"
@@ -103,6 +105,7 @@
       <div class="compact-admin-grid">
         {% for pickup_day in pickup_days %}
           <form action="{{ url_for('main.update_admin_pickup_day', pickup_day_id=pickup_day['id']) }}" class="mini-card stacked-form" method="post">
+            {{ csrf_field() }}
             <div class="mini-card-header">
               <h3>{{ pickup_day["pickup_date"] }}</h3>
               <label class="switch-row">
@@ -129,6 +132,7 @@
       <div class="compact-admin-grid">
         {% for stock_pool in stock_pools %}
           <form action="{{ url_for('main.update_stock', stock_pool_id=stock_pool['id']) }}" class="mini-card stacked-form" method="post">
+            {{ csrf_field() }}
             <div class="mini-card-header">
               <h3>{{ stock_pool["name"] }}</h3>
               <span class="status-pill">{{ stock_pool["servings_available"] }} left</span>
@@ -149,6 +153,7 @@
         <small>{{ menu_items|length }} drinks</small>
       </summary>
       <form action="{{ url_for('main.create_product_admin') }}" class="mini-card stacked-form" method="post">
+        {{ csrf_field() }}
         <h3>Create drink</h3>
         <div class="form-grid two-column">
           <label>Name <input name="name" required type="text"></label>
@@ -169,6 +174,7 @@
         {% for item in menu_items %}
           <article class="mini-card upload-card">
             <form action="{{ url_for('main.update_product_admin', product_id=item['id']) }}" class="stacked-form" method="post">
+              {{ csrf_field() }}
               <div class="mini-card-header">
                 <h3>{{ item["name"] }}</h3>
                 <span class="status-pill">EUR {{ "%.2f"|format(item["price_eur"]) }}</span>
@@ -193,13 +199,15 @@
               enctype="multipart/form-data"
               method="post"
             >
-              <label>Image <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/*" name="image_file" required type="file"></label>
+              {{ csrf_field() }}
+              <label>Image <input accept=".jpg,.jpeg,.png,.webp,.gif,image/*" name="image_file" required type="file"></label>
               <label>Alt text <input name="alt_text" placeholder="Describe the drink photo" type="text"></label>
               <button class="button compact-action" type="submit">Upload</button>
             </form>
 
             {% if item["images"] %}
               <form action="{{ url_for('main.reorder_product_images', product_id=item['id']) }}" class="image-order-form" method="post">
+                {{ csrf_field() }}
                 <h4>Images</h4>
                 {% for image in item["images"] %}
                   <div class="image-order-row">
@@ -219,6 +227,7 @@
             {% endif %}
 
             <form action="{{ url_for('main.delete_product_admin', product_id=item['id']) }}" method="post">
+              {{ csrf_field() }}
               <button class="button danger-button compact-action" type="submit">Delete drink</button>
             </form>
           </article>
@@ -233,6 +242,7 @@
       </summary>
       <div class="compact-admin-grid">
         <form action="{{ url_for('main.update_site_alert') }}" class="mini-card stacked-form" method="post">
+          {{ csrf_field() }}
           <h3>Homepage alert</h3>
           <textarea name="homepage_alert" rows="3">{{ homepage_alert or '' }}</textarea>
           <div class="button-row">
@@ -244,6 +254,7 @@
         </form>
 
         <form action="{{ url_for('main.update_admin_site_contact') }}" class="mini-card stacked-form" method="post">
+          {{ csrf_field() }}
           <h3>Contact</h3>
           <label>Footer line <input name="contact_line" type="text" value="{{ site_settings['contact_line'] or '' }}"></label>
           <label>Clickable contact <input name="contact_phone" placeholder="+6597888146, @telegramhandle, or https://t.me/telegramhandle" type="text" value="{{ site_settings['contact_phone'] or '' }}"></label>
@@ -266,12 +277,14 @@
             enctype="multipart/form-data"
             method="post"
           >
-            <label>Image, GIF, or MP4 <input accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,image/*,video/mp4" name="image_file" required type="file"></label>
+            {{ csrf_field() }}
+            <label>Image, GIF, or MP4 <input accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,image/*,video/mp4" name="image_file" required type="file"></label>
             <label>Alt text <input name="alt_text" placeholder="Describe the homepage image, GIF, or video" type="text"></label>
             <button class="button secondary-button compact-action" type="submit">Add media</button>
           </form>
           {% if site_settings['homepage_images'] and site_settings['homepage_images'][0]['id'] %}
             <form action="{{ url_for('main.reorder_admin_homepage_images') }}" class="image-order-form" method="post">
+              {{ csrf_field() }}
               <h4>Images</h4>
               {% for image in site_settings['homepage_images'] %}
                 <div class="image-order-row">
@@ -289,6 +302,7 @@
               <button class="button secondary-button compact-action" type="submit">Save order</button>
             </form>
             <form action="{{ url_for('main.clear_admin_homepage_image') }}" method="post">
+              {{ csrf_field() }}
               <button class="button danger-button compact-action" type="submit">Use default image</button>
             </form>
           {% endif %}

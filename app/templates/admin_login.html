@@ -9,6 +9,7 @@
   </section>
 
   <form class="card login-card" method="post">
+    {{ csrf_field() }}
     <label>
       Username
       <input autofocus name="username" required type="text">

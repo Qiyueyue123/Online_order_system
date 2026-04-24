@@ -193,7 +193,7 @@ def test_admin_can_upload_product_image(tmp_path):
         "/admin/products/1/images",
         data={
             "alt_text": "Uploaded Ikuyo image",
-            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "new-image.svg"),
+            "image_file": (BytesIO(b"fake png bytes"), "new-image.png"),
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -327,7 +327,7 @@ def test_admin_can_upload_homepage_image(tmp_path):
         "/admin/site-homepage-image",
         data={
             "alt_text": "Custom homepage matcha photo",
-            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage.svg"),
+            "image_file": (BytesIO(b"fake png bytes"), "homepage.png"),
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -463,7 +463,7 @@ def test_admin_can_reorder_homepage_images(tmp_path):
         "/admin/site-homepage-image",
         data={
             "alt_text": "Homepage photo 1",
-            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage-1.svg"),
+            "image_file": (BytesIO(b"fake png bytes"), "homepage-1.png"),
         },
         content_type="multipart/form-data",
     )
@@ -471,7 +471,7 @@ def test_admin_can_reorder_homepage_images(tmp_path):
         "/admin/site-homepage-image",
         data={
             "alt_text": "Homepage photo 2",
-            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage-2.svg"),
+            "image_file": (BytesIO(b"fake png bytes"), "homepage-2.png"),
         },
         content_type="multipart/form-data",
     )
@@ -510,7 +510,7 @@ def test_admin_can_reset_homepage_image_to_default(tmp_path):
         "/admin/site-homepage-image",
         data={
             "alt_text": "Temporary homepage image",
-            "image_file": (BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"), "homepage.svg"),
+            "image_file": (BytesIO(b"fake png bytes"), "homepage.png"),
         },
         content_type="multipart/form-data",
     )

@@ -1,4 +1,5 @@
 import uuid
+import re
 from pathlib import Path
 from functools import wraps
 from datetime import datetime, timedelta
@@ -46,7 +47,7 @@ from .db import (
 
 
 bp = Blueprint("main", __name__)
-ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_HOMEPAGE_MEDIA_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | {".mp4"}
 PICKUP_WINDOW_DAYS = 5
 PICKUP_START_HOUR = 16
@@ -65,6 +66,11 @@ HEIF_FILE_SIGNATURES = (
     b"ftypmif1",
     b"ftypmsf1",
 )
+TIME_VALUE_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+
+
+def clean_form_text(value, max_length):
+    return (value or "").strip()[:max_length]
 
 
 def admin_required(view):
@@ -213,11 +219,11 @@ def checkout():
     pickup_slots = build_pickup_slot_choices()
 
     if request.method == "POST":
-        name = request.form.get("customer_name", "").strip()
-        customer_contact = request.form.get("customer_contact", "").strip()
+        name = clean_form_text(request.form.get("customer_name"), 80)
+        customer_contact = clean_form_text(request.form.get("customer_contact"), 120)
         pickup_at = request.form.get("pickup_at", "").strip()
         payment_method = request.form.get("payment_method", "cash")
-        notes = request.form.get("notes", "").strip()
+        notes = clean_form_text(request.form.get("notes"), 500)
         if payment_method not in PAYMENT_METHODS:
             payment_method = "cash"
 
@@ -231,6 +237,9 @@ def checkout():
             try:
                 quantity = int(raw_quantity or 0)
             except ValueError:
+                quantity = 0
+            if quantity > MAX_QUANTITY_PER_DRINK:
+                flash(f"Choose at most {MAX_QUANTITY_PER_DRINK} of each drink.")
                 quantity = 0
             if quantity > 0:
                 quantities[item["id"]] = {
@@ -349,6 +358,7 @@ def admin_login():
             if admin_password_hash_needs_upgrade(admin_user["password_hash"]):
                 refresh_admin_user_password_hash(admin_user["id"], password)
             session.clear()
+            session.permanent = True
             session["admin_authenticated"] = True
             session["admin_username"] = admin_user["username"]
             session["admin_user_id"] = admin_user["id"]
@@ -368,7 +378,7 @@ def admin_logout():
 @bp.route("/admin/site-alert", methods=["POST"])
 @admin_required
 def update_site_alert():
-    message = request.form.get("homepage_alert", "").strip()
+    message = clean_form_text(request.form.get("homepage_alert"), 500)
     update_homepage_alert(message)
     flash("Homepage alert updated." if message else "Homepage alert cleared.")
     return redirect(url_for("main.admin"))
@@ -377,8 +387,8 @@ def update_site_alert():
 @bp.route("/admin/site-contact", methods=["POST"])
 @admin_required
 def update_admin_site_contact():
-    contact_line = request.form.get("contact_line", "").strip()
-    contact_phone = request.form.get("contact_phone", "").strip()
+    contact_line = clean_form_text(request.form.get("contact_line"), 160)
+    contact_phone = clean_form_text(request.form.get("contact_phone"), 160)
     update_site_contact(contact_line, contact_phone)
     flash("Contact details updated.")
     return redirect(url_for("main.admin"))
@@ -388,7 +398,7 @@ def update_admin_site_contact():
 @admin_required
 def update_admin_homepage_image():
     file = request.files.get("image_file")
-    alt_text = request.form.get("alt_text", "").strip()
+    alt_text = clean_form_text(request.form.get("alt_text"), 160)
 
     if file is None or file.filename == "":
         flash("Choose an image file to upload.")
@@ -397,7 +407,7 @@ def update_admin_homepage_image():
     original_name = secure_filename(file.filename)
     extension = Path(original_name).suffix.lower()
     if extension not in ALLOWED_HOMEPAGE_MEDIA_EXTENSIONS:
-        flash("Only JPG, PNG, WEBP, GIF, SVG, or MP4 files are allowed for the homepage carousel.")
+        flash("Only JPG, PNG, WEBP, GIF, or MP4 files are allowed for the homepage carousel.")
         return redirect(url_for("main.admin"))
     if extension in ALLOWED_IMAGE_EXTENSIONS and is_heif_upload(file):
         flash("HEIC or HEIF images must be converted to JPG, PNG, WEBP, GIF, or SVG before upload.")
@@ -470,6 +480,8 @@ def update_admin_pickup_day(pickup_day_id):
     end_time = request.form.get("end_time", "").strip()
     try:
         slot_capacity = int(request.form.get("slot_capacity", "2"))
+        if not TIME_VALUE_PATTERN.fullmatch(start_time) or not TIME_VALUE_PATTERN.fullmatch(end_time):
+            raise ValueError("Use valid pickup start and end times.")
         update_pickup_day(
             pickup_day_id=pickup_day_id,
             is_available=is_available,
@@ -531,8 +543,8 @@ def update_stock(stock_pool_id):
 @bp.route("/admin/products", methods=["POST"])
 @admin_required
 def create_product_admin():
-    name = request.form.get("name", "").strip()
-    description = request.form.get("description", "").strip()
+    name = clean_form_text(request.form.get("name"), 100)
+    description = clean_form_text(request.form.get("description"), 500)
     try:
         price_eur = float(request.form.get("price_eur", "0"))
         stock_pool_id = int(request.form.get("stock_pool_id", "0"))
@@ -561,8 +573,8 @@ def create_product_admin():
 @bp.route("/admin/products/<int:product_id>", methods=["POST"])
 @admin_required
 def update_product_admin(product_id):
-    name = request.form.get("name", "").strip()
-    description = request.form.get("description", "").strip()
+    name = clean_form_text(request.form.get("name"), 100)
+    description = clean_form_text(request.form.get("description"), 500)
     try:
         price_eur = float(request.form.get("price_eur", "0"))
         stock_pool_id = int(request.form.get("stock_pool_id", "0"))
@@ -609,7 +621,7 @@ def delete_product_admin(product_id):
 @admin_required
 def upload_product_image(product_id):
     file = request.files.get("image_file")
-    alt_text = request.form.get("alt_text", "").strip()
+    alt_text = clean_form_text(request.form.get("alt_text"), 160)
 
     if file is None or file.filename == "":
         flash("Choose an image file to upload.")
@@ -618,7 +630,7 @@ def upload_product_image(product_id):
     original_name = secure_filename(file.filename)
     extension = Path(original_name).suffix.lower()
     if extension not in ALLOWED_IMAGE_EXTENSIONS:
-        flash("Only image files such as JPG, PNG, WEBP, GIF, or SVG are allowed.")
+        flash("Only JPG, PNG, WEBP, or GIF files are allowed.")
         return redirect(url_for("main.admin"))
     if is_heif_upload(file):
         flash("HEIC or HEIF images must be converted to JPG, PNG, WEBP, GIF, or SVG before upload.")

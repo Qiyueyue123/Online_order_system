@@ -21,6 +21,7 @@
       <p><strong>Pickup time:</strong> {{ order_bundle["order"]["pickup_label"] }}</p>
       <p><strong>Payment:</strong> {{ order_bundle["order"]["payment_label"] }}</p>
       <p><strong>Total:</strong> EUR {{ "%.2f"|format(order_bundle["order"]["total_amount"]) }}</p>
+      <p class="payment-help-inline">EUR 0.20 of each drink price covers the plastic cup and lid. This is not a separate deposit or refundable charge.</p>
       {% if order_bundle["order"]["payment_method"] == "manual_tikkie" %}
         <p class="payment-help-inline">
           We will send a Tikkie payment request link to your WhatsApp/Telegram for this exact total.
@@ -35,7 +36,7 @@
           <li>
             {{ item["quantity"] }} x {{ item["name"] }} at EUR {{ "%.2f"|format(item["unit_price"]) }}
             <br>
-            <span class="menu-item-description">{{ item["preparation_style"].replace('_', ' ').title() }}</span>
+            <span class="menu-item-description">{{ item["preparation_label"] }} | {{ item["syrup_label"] }} | {{ item["milk_volume_label"] }}</span>
           </li>
         {% endfor %}
       </ul>

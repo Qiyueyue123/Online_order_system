@@ -16,15 +16,21 @@
         <p class="eyebrow">Short-run matcha cafe</p>
         <h1>Authentic Japanese matcha, whisked fresh for pickup.</h1>
         <p class="home-summary">
-          Hello! We are Qiyue and Yuxun from Singapore and we want to bring authentic Japanese matcha to everyone! We are here on exchange and we are running a very short run for just 2 weeks, from 2nd June - 15 June 2026. Any updates will be displayed on the top of the website!
+          Hello! We are Qiyue and Yuxun from Singapore, and we are making fresh Japanese matcha lattes for a short pickup run from 2 June to 15 June 2026. Each drink is whisked to order, lightly sweetened with agave, and finished with regular full cream milk.
+        </p>
+        <p class="payment-help-inline">
+          Standard recipe: 4g matcha, 120ml regular full cream milk, and 4g agave syrup. We use a 30ml milk base per 1g of matcha, and you can adjust syrup or milk at checkout.
         </p>
         <div class="home-badges" aria-label="Cafe details">
           <span class="metric-pill">2 Jun - 15 Jun 2026</span>
           <span class="metric-pill">Haarweg 333 Block C 053</span>
           <span class="metric-pill">Cash or Tikkie request</span>
+          <span class="metric-pill">Cup + lid included</span>
+          <span class="metric-pill">Store-bought ice</span>
         </div>
         <div class="home-actions home-actions-inline">
           <a class="button compact-action" href="{{ url_for('main.checkout') }}">Order now</a>
+          <a class="button secondary-button compact-action" href="{{ url_for('main.sale_info') }}">Sale info</a>
           <p class="home-actions-note">Please allow 5-10 minutes per order. Choose Tikkie at checkout if you want us to send a payment request link.</p>
         </div>
       </div>
@@ -162,6 +168,7 @@
             <p class="price">EUR {{ "%.2f"|format(item["price_eur"]) }}</p>
           </div>
           <p class="menu-item-description">{{ item["description"] }}</p>
+          <p class="menu-item-description">Served cold with store-bought ice. EUR 0.20 of the price covers the cup and lid.</p>
           <div class="menu-card-footer">
             <p class="stock-caption">{{ item["servings_available"] }} left</p>
             <a class="text-link" href="{{ url_for('main.drink_detail', product_id=item['id']) }}">Details</a>

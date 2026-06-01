@@ -6,7 +6,7 @@
   <section class="section-heading checkout-heading">
     <p class="eyebrow">Order form</p>
     <h1>Place a pickup order</h1>
-    <p class="lead">Choose your drinks first, then lock in a pickup time. Quantities are capped at 3 per drink so stock stays fair.</p>
+    <p class="lead">Choose your drink, adjust sweetness or milk if you like, then pick a pickup time. Every latte is made fresh and served cold with store-bought ice.</p>
   </section>
 
   <form class="order-form" method="post">
@@ -33,6 +33,7 @@
               <div class="choice-meta-row" aria-label="Stock details">
                 <span class="metric-pill">{{ item["servings_available"] }} left</span>
                 <span class="metric-pill">{{ item["stock_pool_name"] }} stock</span>
+                <span class="metric-pill">Cup + lid included</span>
               </div>
             </div>
 
@@ -43,13 +44,42 @@
                   {% for style_value, style_label in preparation_styles.items() %}
                     <option
                       value="{{ style_value }}"
-                      {% if request.form.get('preparation_style_' ~ item['id'], 'type_1') == style_value %}selected{% endif %}
+                      {% if request.form.get('preparation_style_' ~ item['id'], 'water') == style_value %}selected{% endif %}
                     >
                       {{ style_label }}
                     </option>
                   {% endfor %}
                 </select>
               </label>
+              <div class="recipe-adjust-grid">
+                <label>
+                  Extra agave syrup (g)
+                  <input
+                    inputmode="decimal"
+                    max="{{ recipe_defaults['max_extra_syrup_g'] }}"
+                    min="0"
+                    name="extra_syrup_g_{{ item['id'] }}"
+                    step="0.5"
+                    type="number"
+                    value="{{ request.form.get('extra_syrup_g_' ~ item['id'], '0') }}"
+                  >
+                </label>
+                <label>
+                  Regular milk change (ml)
+                  <input
+                    inputmode="numeric"
+                    max="{{ recipe_defaults['max_milk_adjustment_ml'] }}"
+                    min="{{ recipe_defaults['min_milk_adjustment_ml'] }}"
+                    name="milk_adjustment_ml_{{ item['id'] }}"
+                    step="5"
+                    type="number"
+                    value="{{ request.form.get('milk_adjustment_ml_' ~ item['id'], '0') }}"
+                  >
+                </label>
+              </div>
+              <p class="menu-item-description">
+                Standard drink: 4g matcha, 120ml regular full cream milk, and {{ recipe_defaults['base_agave_syrup_g']|int }}g agave syrup.
+              </p>
               <fieldset class="quantity-picker" aria-label="Quantity for {{ item['name'] }}">
                 <legend>Quantity</legend>
                 {% set selected_quantity = request.form.get('quantity_' ~ item['id'], '0')|int %}
@@ -118,6 +148,9 @@
         </label>
       </div>
       <div class="payment-help">
+        <p><strong>Recipe:</strong> 30ml regular full cream milk per 1g matcha. Standard drink: 4g matcha, 120ml milk, and 4g agave syrup.</p>
+        <p><strong>Ice:</strong> served cold with store-bought ice cubes.</p>
+        <p><strong>Cup and lid:</strong> EUR 0.20 of each drink price covers the plastic cup and lid. This is a pricing note, not a separate deposit or refundable charge.</p>
         <p><strong>Cash:</strong> pay when you collect your drink.</p>
         <p><strong>Tikkie:</strong> we manually send a payment request link to your WhatsApp/Telegram for the order total. Please pay through that link before or when collecting.</p>
       </div>

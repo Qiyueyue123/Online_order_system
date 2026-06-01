@@ -28,6 +28,7 @@ from .db import (
     get_order,
     get_order_for_management,
     get_preparation_style_choices,
+    get_recipe_defaults,
     get_product_with_images,
     get_site_settings,
     get_active_order_counts_by_pickup_at,
@@ -37,6 +38,7 @@ from .db import (
     refresh_admin_user_password_hash,
     update_site_contact,
     update_homepage_alert,
+    update_order_status,
     update_homepage_image_order,
     update_pickup_day,
     update_product,
@@ -47,6 +49,7 @@ from .db import (
 
 
 bp = Blueprint("main", __name__)
+ADMIN_LOGIN_FAILURES = {}
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_HOMEPAGE_MEDIA_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | {".mp4"}
 PICKUP_WINDOW_DAYS = 5
@@ -67,10 +70,42 @@ HEIF_FILE_SIGNATURES = (
     b"ftypmsf1",
 )
 TIME_VALUE_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+ADMIN_LOGIN_LIMIT = 8
+ADMIN_LOGIN_WINDOW_SECONDS = 15 * 60
 
 
 def clean_form_text(value, max_length):
     return (value or "").strip()[:max_length]
+
+
+def get_client_rate_limit_key():
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def is_admin_login_limited(rate_limit_key, now=None):
+    if now is None:
+        now = datetime.now()
+    cutoff = now - timedelta(seconds=ADMIN_LOGIN_WINDOW_SECONDS)
+    failures = [
+        failure_at
+        for failure_at in ADMIN_LOGIN_FAILURES.get(rate_limit_key, [])
+        if failure_at > cutoff
+    ]
+    ADMIN_LOGIN_FAILURES[rate_limit_key] = failures
+    return len(failures) >= ADMIN_LOGIN_LIMIT
+
+
+def record_admin_login_failure(rate_limit_key, now=None):
+    if now is None:
+        now = datetime.now()
+    ADMIN_LOGIN_FAILURES.setdefault(rate_limit_key, []).append(now)
+
+
+def clear_admin_login_failures(rate_limit_key):
+    ADMIN_LOGIN_FAILURES.pop(rate_limit_key, None)
 
 
 def admin_required(view):
@@ -154,9 +189,25 @@ def enrich_order_bundle(order_bundle, cancel_token=None):
         order["payment_method"].replace("_", " ").title(),
     )
     order["can_cancel"] = can_cancel_order(order)
+    preparation_styles = get_preparation_style_choices()
+    recipe_defaults = get_recipe_defaults()
+    items = []
+    for item in order_bundle["items"]:
+        item = dict(item)
+        extra_syrup_g = float(item["extra_syrup_g"] or 0)
+        milk_adjustment_ml = int(item["milk_adjustment_ml"] or 0)
+        total_syrup_g = recipe_defaults["base_agave_syrup_g"] + extra_syrup_g
+        total_milk_ml = recipe_defaults["base_regular_milk_ml"] + milk_adjustment_ml
+        item["preparation_label"] = preparation_styles.get(
+            item["preparation_style"],
+            item["preparation_style"].replace("_", " ").title(),
+        )
+        item["syrup_label"] = f"Agave syrup: {total_syrup_g:g}g"
+        item["milk_volume_label"] = f"Regular milk: {total_milk_ml}ml"
+        items.append(item)
     return {
         "order": order,
-        "items": order_bundle["items"],
+        "items": items,
         "cancel_token": cancel_token,
     }
 
@@ -216,6 +267,7 @@ def drink_detail(product_id):
 def checkout():
     menu_items = get_menu_items()
     preparation_styles = get_preparation_style_choices()
+    recipe_defaults = get_recipe_defaults()
     pickup_slots = build_pickup_slot_choices()
 
     if request.method == "POST":
@@ -232,8 +284,14 @@ def checkout():
             raw_quantity = request.form.get(f"quantity_{item['id']}", "0").strip()
             preparation_style = request.form.get(
                 f"preparation_style_{item['id']}",
-                "type_1",
+                "water",
             )
+            try:
+                extra_syrup_g = float(request.form.get(f"extra_syrup_g_{item['id']}", "0") or 0)
+                milk_adjustment_ml = int(request.form.get(f"milk_adjustment_ml_{item['id']}", "0") or 0)
+            except ValueError:
+                extra_syrup_g = 0
+                milk_adjustment_ml = 0
             try:
                 quantity = int(raw_quantity or 0)
             except ValueError:
@@ -245,6 +303,8 @@ def checkout():
                 quantities[item["id"]] = {
                     "quantity": quantity,
                     "preparation_style": preparation_style,
+                    "extra_syrup_g": extra_syrup_g,
+                    "milk_adjustment_ml": milk_adjustment_ml,
                 }
 
         valid_pickup_values = {slot["value"] for slot in pickup_slots}
@@ -280,11 +340,17 @@ def checkout():
         "checkout.html",
         menu_items=menu_items,
         preparation_styles=preparation_styles,
+        recipe_defaults=recipe_defaults,
         pickup_slots=pickup_slots,
         quantity_choices=range(0, MAX_QUANTITY_PER_DRINK + 1),
         max_quantity_per_drink=MAX_QUANTITY_PER_DRINK,
         payment_methods=PAYMENT_METHODS,
     )
+
+
+@bp.route("/sale-info")
+def sale_info():
+    return render_template("sale_info.html")
 
 
 @bp.route("/orders/<int:order_id>/confirmation")
@@ -345,6 +411,11 @@ def admin_login():
         return redirect(url_for("main.admin"))
 
     if request.method == "POST":
+        rate_limit_key = get_client_rate_limit_key()
+        if is_admin_login_limited(rate_limit_key):
+            flash("Too many failed login attempts. Wait 15 minutes and try again.")
+            return render_template("admin_login.html"), 429
+
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
@@ -362,8 +433,10 @@ def admin_login():
             session["admin_authenticated"] = True
             session["admin_username"] = admin_user["username"]
             session["admin_user_id"] = admin_user["id"]
+            clear_admin_login_failures(rate_limit_key)
             return redirect(url_for("main.admin"))
 
+        record_admin_login_failure(rate_limit_key)
         flash("Invalid login details.")
 
     return render_template("admin_login.html")
@@ -519,6 +592,19 @@ def delete_order_admin(order_id):
         flash("Only cancelled or past orders can be deleted.")
     else:
         flash("Order record deleted.")
+    return redirect(url_for("main.admin"))
+
+
+@bp.route("/admin/orders/<int:order_id>/status", methods=["POST"])
+@admin_required
+def update_order_status_admin(order_id):
+    status = request.form.get("status", "").strip()
+    try:
+        update_order_status(order_id, status)
+    except ValueError as exc:
+        flash(str(exc))
+    else:
+        flash("Order status updated.")
     return redirect(url_for("main.admin"))
 
 

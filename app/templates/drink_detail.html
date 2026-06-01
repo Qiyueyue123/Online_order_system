@@ -59,6 +59,7 @@
       <h1>{{ product_bundle["product"]["name"] }}</h1>
       <p class="price">EUR {{ "%.2f"|format(product_bundle["product"]["price_eur"]) }}</p>
       <p class="menu-item-description">{{ product_bundle["product"]["description"] }}</p>
+      <p class="payment-help-inline">EUR 0.20 of the price covers the plastic cup and lid. This is not a separate deposit or refundable charge.</p>
       <p class="stock-caption">
         {{ product_bundle["product"]["servings_available"] }} servings left |
         {{ product_bundle["product"]["grams_per_serving"] }}g matcha per cup
@@ -66,8 +67,14 @@
 
       <section class="detail-block">
         <h2>Drink styles</h2>
-        <p class="menu-item-description">Type 1: whisk with water, add low-fat milk</p>
-        <p class="menu-item-description">Type 2: whisk with oat or regular milk for a frothier, thicker drink</p>
+        <p class="menu-item-description">Whisk with water (standard), then add regular full cream milk as the base.</p>
+        <p class="menu-item-description">Whisk with oat milk for a frothier drink, then add regular full cream milk as the base.</p>
+      </section>
+
+      <section class="detail-block">
+        <h2>Recipe</h2>
+        <p class="menu-item-description">Base: 30ml regular full cream milk per 1g matcha. Standard drink: 4g matcha, 120ml milk, and 4g agave syrup.</p>
+        <p class="menu-item-description">Served cold with store-bought ice cubes.</p>
       </section>
 
       <p class="menu-item-description">Click the drink image to open the full uncropped photo.</p>

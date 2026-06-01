@@ -3,11 +3,12 @@ from pathlib import Path
 
 from app import create_app
 from app.db import get_db, get_homepage_alert, get_menu_items, get_order, get_product_with_images, get_site_settings, hash_admin_password, init_db, list_pickup_days, list_stock_pools
-from app.routes import build_pickup_slot_choices
+from app.routes import ADMIN_LOGIN_FAILURES, build_pickup_slot_choices
 from werkzeug.security import generate_password_hash
 
 
 def build_test_app(tmp_path):
+    ADMIN_LOGIN_FAILURES.clear()
     app = create_app(
         {
             "TESTING": True,
@@ -37,7 +38,8 @@ def test_home_page_loads(tmp_path):
     assert response.status_code == 200
     assert b"Authentic Japanese matcha, whisked fresh for pickup." in response.data
     assert b"Hello! We are Qiyue and Yuxun from Singapore" in response.data
-    assert b"2nd June - 15 June 2026" in response.data
+    assert b"2 Jun - 15 Jun 2026" in response.data
+    assert b"Standard recipe: 4g matcha" in response.data
     assert b"Details" in response.data
     assert b"Whatsapp/Telegram for any query" in response.data
     assert b"class=\"home-shell\"" in response.data
@@ -75,6 +77,19 @@ def test_checkout_uses_circular_quantity_choices(tmp_path):
     assert b"we manually send a payment request link" in response.data
 
 
+def test_sale_info_page_loads(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    response = client.get("/sale-info")
+
+    assert response.status_code == 200
+    assert b"Sale info" in response.data
+    assert b"Allergens" in response.data
+    assert b"Privacy" in response.data
+    assert b"Haarweg 333 Block C 053" in response.data
+
+
 def test_checkout_creates_an_order(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -88,20 +103,31 @@ def test_checkout_creates_an_order(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "2",
-            "preparation_style_1": "type_2",
+            "preparation_style_1": "oat",
+            "extra_syrup_g_1": "1.5",
+            "milk_adjustment_ml_1": "15",
         },
         follow_redirects=True,
     )
 
     assert response.status_code == 200
     assert b"Order #1 received" in response.data
-    assert b"Type 2" in response.data
+    assert b"Whisk with oat milk" in response.data
+    assert b"Agave syrup: 5.5g" in response.data
+    assert b"Regular milk: 45ml" in response.data
+    assert b"plastic cup and lid" in response.data
     assert b"Contact:" in response.data
     assert b"+65 12345678" in response.data
     assert b"Save this link for cancellation" in response.data
     assert b"Cancellation link" in response.data
     assert b"/orders/1/manage/" in response.data
     assert b"Manage or cancel order" in response.data
+
+    with app.app_context():
+        order_bundle = get_order(1)
+        assert order_bundle["items"][0]["preparation_style"] == "oat"
+        assert order_bundle["items"][0]["extra_syrup_g"] == 1.5
+        assert order_bundle["items"][0]["milk_adjustment_ml"] == 15
 
 
 def test_checkout_can_use_tikkie_payment_request(tmp_path):
@@ -117,7 +143,7 @@ def test_checkout_can_use_tikkie_payment_request(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "manual_tikkie",
             "quantity_1": "1",
-            "preparation_style_1": "type_1",
+            "preparation_style_1": "water",
         },
         follow_redirects=True,
     )
@@ -178,6 +204,26 @@ def test_admin_login_accepts_legacy_werkzeug_hashes(tmp_path):
 
     assert response.status_code == 200
     assert b"Incoming orders" in response.data
+
+
+def test_admin_login_rate_limits_failed_attempts(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    for _index in range(8):
+        response = client.post(
+            "/admin/login",
+            data={"username": "admin", "password": "wrong-password"},
+        )
+        assert response.status_code == 200
+
+    response = client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "wrong-password"},
+    )
+
+    assert response.status_code == 429
+    assert b"Too many failed login attempts" in response.data
 
 
 def test_admin_can_upload_product_image(tmp_path):
@@ -638,7 +684,7 @@ def test_admin_can_cancel_order(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "2",
-            "preparation_style_1": "type_2",
+            "preparation_style_1": "oat",
         },
     )
 
@@ -662,6 +708,50 @@ def test_admin_can_cancel_order(tmp_path):
         assert stock_pools[0]["servings_available"] == 25
 
 
+def test_admin_can_mark_order_paid_and_collected(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "@qy",
+            "pickup_at": pickup_value,
+            "payment_method": "manual_tikkie",
+            "quantity_1": "1",
+            "preparation_style_1": "water",
+        },
+    )
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "test-admin-password"},
+    )
+
+    paid_response = client.post(
+        "/admin/orders/1/status",
+        data={"status": "paid"},
+        follow_redirects=True,
+    )
+
+    assert paid_response.status_code == 200
+    assert b"Paid" in paid_response.data
+
+    collected_response = client.post(
+        "/admin/orders/1/status",
+        data={"status": "collected"},
+        follow_redirects=True,
+    )
+
+    assert collected_response.status_code == 200
+    assert b"Collected" in collected_response.data
+
+    with app.app_context():
+        order_bundle = get_order(1)
+        assert order_bundle["order"]["status"] == "collected"
+
+
 def test_admin_can_delete_cancelled_order_record(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()
@@ -675,7 +765,7 @@ def test_admin_can_delete_cancelled_order_record(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "1",
-            "preparation_style_1": "type_2",
+            "preparation_style_1": "oat",
         },
     )
 
@@ -712,7 +802,7 @@ def test_admin_cannot_delete_live_order_record(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "1",
-            "preparation_style_1": "type_2",
+            "preparation_style_1": "oat",
         },
     )
 
@@ -748,7 +838,7 @@ def test_admin_can_delete_past_order_record_without_restoring_stock(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "1",
-            "preparation_style_1": "type_2",
+            "preparation_style_1": "oat",
         },
     )
 
@@ -882,8 +972,7 @@ def test_shared_stock_pool_prevents_oversell(tmp_path):
                 payment_method="cash",
                 notes="",
                 items={
-                    1: {"quantity": 20, "preparation_style": "type_1"},
-                    2: {"quantity": 6, "preparation_style": "type_2"},
+                    1: {"quantity": 26, "preparation_style": "water"},
                 },
             )
         except InventoryError as exc:
@@ -905,7 +994,7 @@ def test_customer_can_cancel_order_with_private_link(tmp_path):
             "pickup_at": pickup_value,
             "payment_method": "cash",
             "quantity_1": "2",
-            "preparation_style_1": "type_2",
+            "preparation_style_1": "oat",
         },
         follow_redirects=False,
     )
@@ -946,7 +1035,7 @@ def test_customer_cannot_manage_order_with_wrong_token(tmp_path):
             "pickup_at": first_pickup_value(app),
             "payment_method": "cash",
             "quantity_1": "1",
-            "preparation_style_1": "type_1",
+            "preparation_style_1": "water",
         },
     )
 

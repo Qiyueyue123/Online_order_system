@@ -15,26 +15,35 @@ SEED_STOCK_POOLS = [
     ("Sayaka", 5, 4),
 ]
 
+RETIRED_PRODUCT_NAMES = {
+    "Strawberry Ikuyo Matcha Latte",
+}
+
 SEED_MENU = [
     (
         "Ikuyo Matcha Latte",
         4.00,
-        "Ippodo Ikuyo with low-fat milk.",
-        "Ikuyo",
-    ),
-    (
-        "Strawberry Ikuyo Matcha Latte",
-        5.00,
-        "Strawberry puree, low-fat milk, and Ippodo Ikuyo.",
+        "Ippodo Ikuyo with regular full cream milk.",
         "Ikuyo",
     ),
     (
         "Sayaka Matcha Latte",
         5.00,
-        "Ippodo Sayaka with low-fat milk.",
+        "Ippodo Sayaka with regular full cream milk.",
         "Sayaka",
     ),
 ]
+
+UPDATED_PRODUCT_DESCRIPTIONS = {
+    "Ikuyo Matcha Latte": {
+        "old": "Ippodo Ikuyo with low-fat milk.",
+        "new": "Ippodo Ikuyo with regular full cream milk.",
+    },
+    "Sayaka Matcha Latte": {
+        "old": "Ippodo Sayaka with low-fat milk.",
+        "new": "Ippodo Sayaka with regular full cream milk.",
+    },
+}
 
 SEED_PRODUCT_IMAGES = {
     "Ikuyo Matcha Latte": [
@@ -46,18 +55,6 @@ SEED_PRODUCT_IMAGES = {
         (
             "/static/images/ikuyo-latte-2.svg",
             "Ikuyo matcha latte close-up foam view",
-            2,
-        ),
-    ],
-    "Strawberry Ikuyo Matcha Latte": [
-        (
-            "/static/images/strawberry-ikuyo-1.svg",
-            "Strawberry Ikuyo matcha latte layered view",
-            1,
-        ),
-        (
-            "/static/images/strawberry-ikuyo-2.svg",
-            "Strawberry Ikuyo matcha latte top garnish view",
             2,
         ),
     ],
@@ -76,8 +73,21 @@ SEED_PRODUCT_IMAGES = {
 }
 
 PREPARATION_STYLES = {
-    "type_1": "Type 1: whisk with water, add low-fat milk",
-    "type_2": "Type 2: whisk with oat or regular milk for a frothier, thicker drink",
+    "water": "Whisk with water (standard)",
+    "oat": "Whisk with oat milk for a frothier drink",
+}
+
+BASE_AGAVE_SYRUP_G = 4.0
+BASE_REGULAR_MILK_ML = 30
+MAX_EXTRA_SYRUP_G = 5.0
+MIN_MILK_ADJUSTMENT_ML = -20
+MAX_MILK_ADJUSTMENT_ML = 40
+
+ORDER_STATUSES = {
+    "new": "New",
+    "paid": "Paid",
+    "collected": "Collected",
+    "cancelled": "Cancelled",
 }
 
 ADMIN_PASSWORD_HASHER = PasswordHasher()
@@ -137,6 +147,8 @@ def init_db():
     _migrate_schema(db)
     _seed_inventory(db)
     _seed_menu(db)
+    _remove_unused_retired_products(db)
+    _update_known_product_descriptions(db)
     db.commit()
 
 
@@ -307,6 +319,24 @@ def _migrate_schema(db):
             )
     if "cancel_token_hash" not in order_columns:
         db.execute("ALTER TABLE orders ADD COLUMN cancel_token_hash TEXT")
+
+    order_item_columns = _table_columns(db, "order_items")
+    if "syrup_level" not in order_item_columns:
+        db.execute(
+            "ALTER TABLE order_items ADD COLUMN syrup_level TEXT NOT NULL DEFAULT 'standard'"
+        )
+    if "milk_volume" not in order_item_columns:
+        db.execute(
+            "ALTER TABLE order_items ADD COLUMN milk_volume TEXT NOT NULL DEFAULT 'standard'"
+        )
+    if "extra_syrup_g" not in order_item_columns:
+        db.execute(
+            "ALTER TABLE order_items ADD COLUMN extra_syrup_g REAL NOT NULL DEFAULT 0"
+        )
+    if "milk_adjustment_ml" not in order_item_columns:
+        db.execute(
+            "ALTER TABLE order_items ADD COLUMN milk_adjustment_ml INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def ensure_pickup_days(reference_date=None, days=7):
@@ -481,6 +511,62 @@ def _seed_menu(db):
         )
 
 
+def _remove_unused_retired_products(db):
+    for product_name in RETIRED_PRODUCT_NAMES:
+        product = db.execute(
+            """
+            SELECT id
+            FROM products
+            WHERE name = ?
+            """,
+            (product_name,),
+        ).fetchone()
+        if product is None:
+            continue
+
+        order_item_count = db.execute(
+            """
+            SELECT COUNT(*)
+            FROM order_items
+            WHERE product_id = ?
+            """,
+            (product["id"],),
+        ).fetchone()[0]
+        if order_item_count:
+            continue
+
+        db.execute(
+            """
+            DELETE FROM product_images
+            WHERE product_id = ?
+            """,
+            (product["id"],),
+        )
+        db.execute(
+            """
+            DELETE FROM products
+            WHERE id = ?
+            """,
+            (product["id"],),
+        )
+
+
+def _update_known_product_descriptions(db):
+    for product_name, description_update in UPDATED_PRODUCT_DESCRIPTIONS.items():
+        db.execute(
+            """
+            UPDATE products
+            SET description = ?
+            WHERE name = ? AND description = ?
+            """,
+            (
+                description_update["new"],
+                product_name,
+                description_update["old"],
+            ),
+        )
+
+
 def get_menu_items():
     db = get_db()
     products = db.execute(
@@ -526,6 +612,16 @@ def get_menu_items():
 
 def get_preparation_style_choices():
     return PREPARATION_STYLES
+
+
+def get_recipe_defaults():
+    return {
+        "base_agave_syrup_g": BASE_AGAVE_SYRUP_G,
+        "base_regular_milk_ml": BASE_REGULAR_MILK_ML,
+        "max_extra_syrup_g": MAX_EXTRA_SYRUP_G,
+        "min_milk_adjustment_ml": MIN_MILK_ADJUSTMENT_ML,
+        "max_milk_adjustment_ml": MAX_MILK_ADJUSTMENT_ML,
+    }
 
 
 def get_site_settings():
@@ -1088,11 +1184,20 @@ def create_order(name, customer_contact, pickup_at, payment_method, notes, items
         for product_id, item_data in items.items():
             quantity = item_data["quantity"]
             preparation_style = item_data["preparation_style"]
+            extra_syrup_g = float(item_data.get("extra_syrup_g", 0))
+            milk_adjustment_ml = int(item_data.get("milk_adjustment_ml", 0))
             product = products.get(product_id)
             if product is None or quantity <= 0:
                 continue
             if preparation_style not in PREPARATION_STYLES:
                 raise ValueError("Choose a valid drink style.")
+            if extra_syrup_g < 0 or extra_syrup_g > MAX_EXTRA_SYRUP_G:
+                raise ValueError("Choose a valid syrup amount.")
+            if (
+                milk_adjustment_ml < MIN_MILK_ADJUSTMENT_ML
+                or milk_adjustment_ml > MAX_MILK_ADJUSTMENT_ML
+            ):
+                raise ValueError("Choose a valid milk amount.")
 
             line_total = product["price_eur"] * quantity
             total_amount += line_total
@@ -1102,6 +1207,8 @@ def create_order(name, customer_contact, pickup_at, payment_method, notes, items
                     "name": product["name"],
                     "quantity": quantity,
                     "preparation_style": preparation_style,
+                    "extra_syrup_g": extra_syrup_g,
+                    "milk_adjustment_ml": milk_adjustment_ml,
                     "unit_price": product["price_eur"],
                     "stock_pool_id": product["stock_pool_id"],
                     "stock_pool_name": product["stock_pool_name"],
@@ -1165,9 +1272,13 @@ def create_order(name, customer_contact, pickup_at, payment_method, notes, items
                 product_id,
                 quantity,
                 preparation_style,
+                syrup_level,
+                milk_volume,
+                extra_syrup_g,
+                milk_adjustment_ml,
                 unit_price
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -1175,6 +1286,10 @@ def create_order(name, customer_contact, pickup_at, payment_method, notes, items
                     item["product_id"],
                     item["quantity"],
                     item["preparation_style"],
+                    "custom" if item["extra_syrup_g"] else "standard",
+                    "custom" if item["milk_adjustment_ml"] else "standard",
+                    item["extra_syrup_g"],
+                    item["milk_adjustment_ml"],
                     item["unit_price"],
                 )
                 for item in selected_items
@@ -1229,6 +1344,10 @@ def get_order(order_id):
             p.name,
             oi.quantity,
             oi.preparation_style,
+            oi.syrup_level,
+            oi.milk_volume,
+            oi.extra_syrup_g,
+            oi.milk_adjustment_ml,
             oi.unit_price
         FROM order_items oi
         JOIN products p ON p.id = oi.product_id
@@ -1269,6 +1388,10 @@ def list_orders():
                 p.name,
                 oi.quantity,
                 oi.preparation_style,
+                oi.syrup_level,
+                oi.milk_volume,
+                oi.extra_syrup_g,
+                oi.milk_adjustment_ml,
                 oi.unit_price
             FROM order_items oi
             JOIN products p ON p.id = oi.product_id
@@ -1303,6 +1426,24 @@ def can_cancel_order(order, now=None):
     except (TypeError, ValueError):
         return False
     return now < pickup_at
+
+
+def update_order_status(order_id, status):
+    if status not in {"new", "paid", "collected"}:
+        raise ValueError("Choose a valid order status.")
+
+    db = get_db()
+    cursor = db.execute(
+        """
+        UPDATE orders
+        SET status = ?
+        WHERE id = ? AND status != 'cancelled'
+        """,
+        (status, order_id),
+    )
+    if cursor.rowcount == 0:
+        raise ValueError("Order not found or already cancelled.")
+    db.commit()
 
 
 def _restore_stock_and_cancel_order(db, order_id):

@@ -78,6 +78,10 @@ CREATE TABLE IF NOT EXISTS order_items (
     product_id INTEGER NOT NULL,
     quantity INTEGER NOT NULL,
     preparation_style TEXT NOT NULL,
+    syrup_level TEXT NOT NULL DEFAULT 'standard',
+    milk_volume TEXT NOT NULL DEFAULT 'standard',
+    extra_syrup_g REAL NOT NULL DEFAULT 0,
+    milk_adjustment_ml INTEGER NOT NULL DEFAULT 0,
     unit_price REAL NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders (id),
     FOREIGN KEY (product_id) REFERENCES products (id)

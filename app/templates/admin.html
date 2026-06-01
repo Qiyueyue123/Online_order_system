@@ -23,14 +23,26 @@
       {% for item in bundle["items"] %}
         <li>
           {{ item["quantity"] }} x {{ item["name"] }}
-          <span class="menu-item-description">({{ item["preparation_style"].replace('_', ' ').title() }})</span>
+          <span class="menu-item-description">({{ item["preparation_label"] }} | {{ item["syrup_label"] }} | {{ item["milk_volume_label"] }})</span>
         </li>
       {% endfor %}
     </ul>
     {% if bundle["order"]["status"] == "new" and not show_delete %}
+      <form action="{{ url_for('main.update_order_status_admin', order_id=bundle['order']['id']) }}" method="post">
+        {{ csrf_field() }}
+        <input name="status" type="hidden" value="paid">
+        <button class="button secondary-button compact-action" type="submit">Mark paid</button>
+      </form>
       <form action="{{ url_for('main.cancel_order_admin', order_id=bundle['order']['id']) }}" method="post">
         {{ csrf_field() }}
         <button class="button danger-button compact-action" type="submit">Cancel order</button>
+      </form>
+    {% endif %}
+    {% if bundle["order"]["status"] == "paid" and not show_delete %}
+      <form action="{{ url_for('main.update_order_status_admin', order_id=bundle['order']['id']) }}" method="post">
+        {{ csrf_field() }}
+        <input name="status" type="hidden" value="collected">
+        <button class="button secondary-button compact-action" type="submit">Mark collected</button>
       </form>
     {% endif %}
     {% if show_delete %}

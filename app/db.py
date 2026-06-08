@@ -51,28 +51,65 @@ UPDATED_PRODUCT_DESCRIPTIONS = {
 SEED_PRODUCT_IMAGES = {
     "Ikuyo Matcha Latte": [
         (
-            "/static/images/ikuyo-latte-1.svg",
-            "Ikuyo matcha latte front view",
+            "/static/images/ikuyo-latte-real-1.webp",
+            "Ikuyo matcha latte in cup",
             1,
         ),
         (
-            "/static/images/ikuyo-latte-2.svg",
-            "Ikuyo matcha latte close-up foam view",
+            "/static/images/ikuyo-latte-real-2.png",
+            "Ikuyo matcha latte close-up",
             2,
         ),
     ],
     "Sayaka Matcha Latte": [
         (
-            "/static/images/sayaka-latte-1.svg",
-            "Sayaka matcha latte wide cup view",
+            "/static/images/sayaka-latte-real-1.webp",
+            "Sayaka matcha latte in cup",
             1,
         ),
         (
-            "/static/images/sayaka-latte-2.svg",
-            "Sayaka matcha latte whisk texture view",
+            "/static/images/sayaka-latte-real-2.png",
+            "Sayaka matcha latte close-up",
             2,
         ),
     ],
+}
+
+SEED_HOMEPAGE_IMAGES = [
+    (
+        "/static/images/homepage-matcha-cup.jpg",
+        "Fresh iced matcha latte for the cafe run",
+        1,
+    ),
+    (
+        "/static/images/homepage-matcha-pour.mp4",
+        "Short video of matcha being prepared",
+        2,
+    ),
+    (
+        "/static/images/homepage-sayaka-latte.jpg",
+        "Sayaka matcha latte served cold",
+        3,
+    ),
+]
+
+STATIC_IMAGE_REPLACEMENTS = {
+    "/static/images/ikuyo-latte-1.svg": (
+        "/static/images/ikuyo-latte-real-1.webp",
+        "Ikuyo matcha latte in cup",
+    ),
+    "/static/images/ikuyo-latte-2.svg": (
+        "/static/images/ikuyo-latte-real-2.png",
+        "Ikuyo matcha latte close-up",
+    ),
+    "/static/images/sayaka-latte-1.svg": (
+        "/static/images/sayaka-latte-real-1.webp",
+        "Sayaka matcha latte in cup",
+    ),
+    "/static/images/sayaka-latte-2.svg": (
+        "/static/images/sayaka-latte-real-2.png",
+        "Sayaka matcha latte close-up",
+    ),
 }
 
 PREPARATION_STYLES = {
@@ -153,6 +190,7 @@ def init_db():
     _seed_menu(db)
     _remove_unused_retired_products(db)
     _update_known_product_descriptions(db)
+    _update_static_seed_image_paths(db)
     db.commit()
 
 
@@ -515,6 +553,18 @@ def _seed_menu(db):
         )
 
 
+def _update_static_seed_image_paths(db):
+    for old_path, (new_path, alt_text) in STATIC_IMAGE_REPLACEMENTS.items():
+        db.execute(
+            """
+            UPDATE product_images
+            SET image_path = ?, alt_text = ?
+            WHERE image_path = ?
+            """,
+            (new_path, alt_text, old_path),
+        )
+
+
 def _remove_unused_retired_products(db):
     for product_name in RETIRED_PRODUCT_NAMES:
         product = db.execute(
@@ -769,10 +819,11 @@ def get_homepage_images():
     return [
         {
             "id": None,
-            "image_path": "/static/images/homepage-matcha-used.jpg",
-            "alt_text": "Photo of the ceremonial matcha used for this cafe run",
-            "sort_order": 1,
+            "image_path": image_path,
+            "alt_text": alt_text,
+            "sort_order": sort_order,
         }
+        for image_path, alt_text, sort_order in SEED_HOMEPAGE_IMAGES
     ]
 
 

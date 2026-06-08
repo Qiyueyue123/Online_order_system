@@ -47,7 +47,8 @@ def test_home_page_loads(tmp_path):
     assert b"Details" in response.data
     assert b"WhatsApp or Telegram for orders and questions" in response.data
     assert b"class=\"home-shell\"" in response.data
-    assert b"/static/images/homepage-matcha-used.jpg" in response.data
+    assert b"/static/images/homepage-matcha-cup.jpg" in response.data
+    assert b"/static/images/homepage-matcha-pour.mp4" in response.data
     assert b"class=\"home-showcase-image\"" in response.data
     assert b"data-carousel" in response.data
     assert b"data-lightbox-trigger" in response.data
@@ -515,7 +516,7 @@ def test_admin_rejects_heif_homepage_upload_disguised_as_jpg(tmp_path):
 
     with app.app_context():
         settings = get_site_settings()
-        assert len(settings["homepage_images"]) == 1
+        assert len(settings["homepage_images"]) == 3
         assert settings["homepage_images"][0]["id"] is None
 
 
@@ -597,13 +598,13 @@ def test_admin_can_reset_homepage_image_to_default(tmp_path):
 
     with app.app_context():
         settings = get_site_settings()
-        assert len(settings["homepage_images"]) == 1
+        assert len(settings["homepage_images"]) == 3
         assert settings["homepage_images"][0]["id"] is None
 
     assert not (Path(app.config["UPLOAD_FOLDER"]) / saved_name).exists()
 
     home_response = client.get("/")
-    assert b"/static/images/homepage-matcha-used.jpg" in home_response.data
+    assert b"/static/images/homepage-matcha-cup.jpg" in home_response.data
 
 
 def test_footer_telegram_handle_is_clickable(tmp_path):

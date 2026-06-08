@@ -29,7 +29,7 @@ SEED_MENU = [
     (
         "Sayaka Matcha Latte",
         5.00,
-        "Ippodo Sayaka with regular full cream milk.",
+        "Ippodo Sayaka, an elevated matcha line from Ippodo with a smoother, richer profile, served with regular full cream milk.",
         "Sayaka",
     ),
 ]
@@ -40,8 +40,11 @@ UPDATED_PRODUCT_DESCRIPTIONS = {
         "new": "Ippodo Ikuyo with regular full cream milk.",
     },
     "Sayaka Matcha Latte": {
-        "old": "Ippodo Sayaka with low-fat milk.",
-        "new": "Ippodo Sayaka with regular full cream milk.",
+        "old": (
+            "Ippodo Sayaka with low-fat milk.",
+            "Ippodo Sayaka with regular full cream milk.",
+        ),
+        "new": "Ippodo Sayaka, an elevated matcha line from Ippodo with a smoother, richer profile, served with regular full cream milk.",
     },
 }
 
@@ -78,10 +81,11 @@ PREPARATION_STYLES = {
 }
 
 BASE_AGAVE_SYRUP_G = 4.0
-BASE_REGULAR_MILK_ML = 30
+BASE_REGULAR_MILK_ML = 120
+MIN_SYRUP_ADJUSTMENT_G = -4.0
 MAX_EXTRA_SYRUP_G = 5.0
-MIN_MILK_ADJUSTMENT_ML = -20
-MAX_MILK_ADJUSTMENT_ML = 40
+MIN_MILK_ADJUSTMENT_ML = -30
+MAX_MILK_ADJUSTMENT_ML = 30
 
 ORDER_STATUSES = {
     "new": "New",
@@ -553,16 +557,20 @@ def _remove_unused_retired_products(db):
 
 def _update_known_product_descriptions(db):
     for product_name, description_update in UPDATED_PRODUCT_DESCRIPTIONS.items():
+        old_descriptions = description_update["old"]
+        if isinstance(old_descriptions, str):
+            old_descriptions = (old_descriptions,)
+        placeholders = ", ".join("?" for _description in old_descriptions)
         db.execute(
-            """
+            f"""
             UPDATE products
             SET description = ?
-            WHERE name = ? AND description = ?
+            WHERE name = ? AND description IN ({placeholders})
             """,
             (
                 description_update["new"],
                 product_name,
-                description_update["old"],
+                *old_descriptions,
             ),
         )
 
@@ -618,6 +626,7 @@ def get_recipe_defaults():
     return {
         "base_agave_syrup_g": BASE_AGAVE_SYRUP_G,
         "base_regular_milk_ml": BASE_REGULAR_MILK_ML,
+        "min_syrup_adjustment_g": MIN_SYRUP_ADJUSTMENT_G,
         "max_extra_syrup_g": MAX_EXTRA_SYRUP_G,
         "min_milk_adjustment_ml": MIN_MILK_ADJUSTMENT_ML,
         "max_milk_adjustment_ml": MAX_MILK_ADJUSTMENT_ML,
@@ -1191,7 +1200,7 @@ def create_order(name, customer_contact, pickup_at, payment_method, notes, items
                 continue
             if preparation_style not in PREPARATION_STYLES:
                 raise ValueError("Choose a valid drink style.")
-            if extra_syrup_g < 0 or extra_syrup_g > MAX_EXTRA_SYRUP_G:
+            if extra_syrup_g < MIN_SYRUP_ADJUSTMENT_G or extra_syrup_g > MAX_EXTRA_SYRUP_G:
                 raise ValueError("Choose a valid syrup amount.")
             if (
                 milk_adjustment_ml < MIN_MILK_ADJUSTMENT_ML

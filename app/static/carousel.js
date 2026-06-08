@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const lightboxPrev = lightbox?.querySelector("[data-lightbox-prev]");
   const lightboxNext = lightbox?.querySelector("[data-lightbox-next]");
   const toastList = document.querySelector("[data-toast-list]");
+  const copyOrderTemplateButton = document.querySelector("[data-copy-order-template]");
+  const orderTemplate = document.querySelector("[data-order-template]");
   const adminScrollKey = "admin-scroll-y";
 
   let activeLightboxItems = [];
@@ -232,6 +234,27 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 2800 + index * 180);
     });
   }
+
+  copyOrderTemplateButton?.addEventListener("click", async () => {
+    if (!orderTemplate) {
+      return;
+    }
+    const originalText = copyOrderTemplateButton.textContent;
+    try {
+      await window.navigator.clipboard.writeText(orderTemplate.value);
+      copyOrderTemplateButton.textContent = "Copied";
+      window.setTimeout(() => {
+        copyOrderTemplateButton.textContent = originalText;
+      }, 1800);
+    } catch (_error) {
+      orderTemplate.focus();
+      orderTemplate.select();
+      copyOrderTemplateButton.textContent = "Select and copy";
+      window.setTimeout(() => {
+        copyOrderTemplateButton.textContent = originalText;
+      }, 2200);
+    }
+  });
 
   if (bodyPath === "/admin") {
     const savedScrollY = window.sessionStorage.getItem(adminScrollKey);

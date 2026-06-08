@@ -17,6 +17,8 @@ def build_test_app(tmp_path):
             "ADMIN_USERNAME": "admin",
             "ADMIN_PASSWORD_HASH": hash_admin_password("test-admin-password"),
             "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+            "MANUAL_ORDER_ONLY": False,
+            "CAFE_WHATSAPP_PHONE": "+31600000000",
         }
     )
     with app.app_context():
@@ -38,10 +40,12 @@ def test_home_page_loads(tmp_path):
     assert response.status_code == 200
     assert b"Authentic Japanese matcha, whisked fresh for pickup." in response.data
     assert b"Hello! We are Qiyue and Yuxun from Singapore" in response.data
-    assert b"2 Jun - 15 Jun 2026" in response.data
-    assert b"Standard recipe: 4g matcha" in response.data
+    assert b"8 Jun - 16 Jun 2026" in response.data
+    assert b"No fixed timing" in response.data
+    assert b"We whisk 1g matcha with 10ml water or oat" in response.data
+    assert b"temporary website link may change" in response.data
     assert b"Details" in response.data
-    assert b"Whatsapp/Telegram for any query" in response.data
+    assert b"WhatsApp or Telegram for orders and questions" in response.data
     assert b"class=\"home-shell\"" in response.data
     assert b"/static/images/homepage-matcha-used.jpg" in response.data
     assert b"class=\"home-showcase-image\"" in response.data
@@ -50,6 +54,24 @@ def test_home_page_loads(tmp_path):
     assert b"data-lightbox-prev" in response.data
     assert b"data-lightbox-next" in response.data
     assert b"Show previous photo for Ikuyo Matcha Latte" in response.data
+
+
+def test_home_page_can_use_manual_order_mode(tmp_path):
+    app = build_test_app(tmp_path)
+    app.config["MANUAL_ORDER_ONLY"] = True
+    client = app.test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"Order by chat" in response.data
+    assert b"Message template" in response.data
+    assert b"Copy order template" in response.data
+    assert b"Open WhatsApp" in response.data
+    assert b"Open Telegram" in response.data
+    assert b"wa.me/31600000000" in response.data
+    assert b"Drink:" in response.data
+    assert b"Checkout" not in response.data
 
 
 def test_drink_detail_page_loads(tmp_path):
@@ -104,8 +126,8 @@ def test_checkout_creates_an_order(tmp_path):
             "payment_method": "cash",
             "quantity_1": "2",
             "preparation_style_1": "oat",
-            "extra_syrup_g_1": "1.5",
-            "milk_adjustment_ml_1": "15",
+            "extra_syrup_g_1": "1",
+            "milk_adjustment_ml_1": "10",
         },
         follow_redirects=True,
     )
@@ -113,8 +135,8 @@ def test_checkout_creates_an_order(tmp_path):
     assert response.status_code == 200
     assert b"Order #1 received" in response.data
     assert b"Whisk with oat milk" in response.data
-    assert b"Agave syrup: 5.5g" in response.data
-    assert b"Regular milk: 45ml" in response.data
+    assert b"Agave syrup: 5g" in response.data
+    assert b"Milk/oat base: 130ml" in response.data
     assert b"plastic cup and lid" in response.data
     assert b"Contact:" in response.data
     assert b"+65 12345678" in response.data
@@ -126,8 +148,8 @@ def test_checkout_creates_an_order(tmp_path):
     with app.app_context():
         order_bundle = get_order(1)
         assert order_bundle["items"][0]["preparation_style"] == "oat"
-        assert order_bundle["items"][0]["extra_syrup_g"] == 1.5
-        assert order_bundle["items"][0]["milk_adjustment_ml"] == 15
+        assert order_bundle["items"][0]["extra_syrup_g"] == 1
+        assert order_bundle["items"][0]["milk_adjustment_ml"] == 10
 
 
 def test_checkout_can_use_tikkie_payment_request(tmp_path):

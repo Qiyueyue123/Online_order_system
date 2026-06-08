@@ -233,6 +233,22 @@ main.wrap {
   max-width: 40ch;
 }
 
+.manual-order-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(280px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.manual-order-card h2 {
+  margin-bottom: 0.55rem;
+}
+
+.manual-order-actions {
+  display: grid;
+  gap: 0.8rem;
+}
+
 .home-showcase {
   display: grid;
   margin: 0;
@@ -1491,6 +1507,7 @@ input[type="number"] {
   .home-hero-compact,
   .home-spotlight,
   .home-actions-inline,
+  .manual-order-card,
   .drink-choice-card {
     grid-template-columns: 1fr;
   }

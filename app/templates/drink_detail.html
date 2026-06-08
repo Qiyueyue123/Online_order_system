@@ -67,19 +67,24 @@
 
       <section class="detail-block">
         <h2>Drink styles</h2>
-        <p class="menu-item-description">Whisk with water (standard), then add regular full cream milk as the base.</p>
-        <p class="menu-item-description">Whisk with oat milk for a frothier drink, then add regular full cream milk as the base.</p>
+        <p class="menu-item-description">Whisk with water (standard) for the cleanest texture.</p>
+        <p class="menu-item-description">Whisk with oat milk for a creamier drink; it may leave a little powder sediment.</p>
       </section>
 
       <section class="detail-block">
         <h2>Recipe</h2>
-        <p class="menu-item-description">Base: 30ml regular full cream milk per 1g matcha. Standard drink: 4g matcha, 120ml milk, and 4g agave syrup.</p>
+        <p class="menu-item-description">Whisking liquid: 1g matcha with 10ml water or oat, depending on your preference.</p>
+        <p class="menu-item-description">Base: the main drink is 120ml milk or oat for a standard 4g matcha drink, plus 4g agave syrup.</p>
         <p class="menu-item-description">Served cold with store-bought ice cubes.</p>
       </section>
 
       <p class="menu-item-description">Click the drink image to open the full uncropped photo.</p>
 
-      <a class="button" href="{{ url_for('main.checkout') }}">Order this drink</a>
+      {% if manual_order_only and manual_order_link %}
+        <a class="button" href="{{ manual_order_link }}" rel="noopener" target="_blank">Order by chat</a>
+      {% else %}
+        <a class="button" href="{{ url_for('main.checkout') }}">Order this drink</a>
+      {% endif %}
     </article>
   </section>
 {% endblock %}

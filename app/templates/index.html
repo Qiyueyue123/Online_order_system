@@ -16,22 +16,33 @@
         <p class="eyebrow">Short-run matcha cafe</p>
         <h1>Authentic Japanese matcha, whisked fresh for pickup.</h1>
         <p class="home-summary">
-          Hello! We are Qiyue and Yuxun from Singapore, and we are making fresh Japanese matcha lattes for a short pickup run from 2 June to 15 June 2026. Each drink is whisked to order, lightly sweetened with agave, and finished with regular full cream milk.
+          Hello! We are Qiyue and Yuxun from Singapore, and we are making fresh Japanese matcha lattes from 8 June to 16 June 2026. There is no fixed timing: if we are in, message us and we will help you make one.
         </p>
         <p class="payment-help-inline">
-          Standard recipe: 4g matcha, 120ml regular full cream milk, and 4g agave syrup. We use a 30ml milk base per 1g of matcha, and you can adjust syrup or milk at checkout.
+          Whisking matcha is usually done with water. If you choose oat for whisking, it tastes creamier but may leave a little powder sediment.
+        </p>
+        <p class="payment-help-inline">
+          We whisk 1g matcha with 10ml water or oat, depending on your preference. The milk or oat base is the bulk of the drink: the standard drink has 4g matcha, 120ml milk or oat base, and 4g agave syrup.
+        </p>
+        <p class="payment-help-inline">
+          This temporary website link may change during the sale. Please look out for the latest stock, timing, and link updates on our Telegram channel.
         </p>
         <div class="home-badges" aria-label="Cafe details">
-          <span class="metric-pill">2 Jun - 15 Jun 2026</span>
+          <span class="metric-pill">8 Jun - 16 Jun 2026</span>
+          <span class="metric-pill">No fixed timing</span>
           <span class="metric-pill">Haarweg 333 Block C 053</span>
           <span class="metric-pill">Cash or Tikkie request</span>
           <span class="metric-pill">Cup + lid included</span>
           <span class="metric-pill">Store-bought ice</span>
         </div>
         <div class="home-actions home-actions-inline">
-          <a class="button compact-action" href="{{ url_for('main.checkout') }}">Order now</a>
+          {% if manual_order_only and manual_order_link %}
+            <a class="button compact-action" href="{{ manual_order_link }}" rel="noopener" target="_blank">Order by chat</a>
+          {% else %}
+            <a class="button compact-action" href="{{ url_for('main.checkout') }}">Order now</a>
+          {% endif %}
           <a class="button secondary-button compact-action" href="{{ url_for('main.sale_info') }}">Sale info</a>
-          <p class="home-actions-note">Please allow 5-10 minutes per order. Choose Tikkie at checkout if you want us to send a payment request link.</p>
+          <p class="home-actions-note">Please allow 5-10 minutes per order. Order through WhatsApp or Telegram and we will confirm manually.</p>
         </div>
       </div>
       <figure class="home-showcase home-showcase-portrait-ready">
@@ -111,6 +122,29 @@
         </div>
       </figure>
     </section>
+
+    {% if manual_order_only %}
+      <section class="card manual-order-card">
+        <div>
+          <p class="eyebrow">How to order</p>
+          <h2>Message us and we will confirm manually.</h2>
+          <p class="menu-item-description">This keeps the first cafe run simple and reliable. WhatsApp opens with the template filled in. For Telegram, copy the template first, then paste it in chat. We will reply with availability, pickup time confirmation, and a Tikkie link if you choose Tikkie.</p>
+        </div>
+        <div class="manual-order-actions">
+          <button class="button secondary-button compact-action" data-copy-order-template type="button">Copy order template</button>
+          {% if manual_whatsapp_order_link %}
+            <a class="button compact-action" href="{{ manual_whatsapp_order_link }}" rel="noopener" target="_blank">Open WhatsApp</a>
+          {% endif %}
+          {% if manual_order_link %}
+            <a class="button secondary-button compact-action" href="{{ manual_order_link }}" rel="noopener" target="_blank">Open Telegram</a>
+          {% endif %}
+          <label class="copy-link-label">
+            Message template
+            <textarea data-order-template readonly rows="8">{{ manual_order_message }}</textarea>
+          </label>
+        </div>
+      </section>
+    {% endif %}
 
     <section class="menu-grid-compact" aria-label="Current drinks">
     {% for item in menu_items %}

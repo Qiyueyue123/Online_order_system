@@ -2,7 +2,7 @@ import os
 import re
 import secrets
 from datetime import timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from flask import Flask, abort, request, session
 from markupsafe import Markup
@@ -28,12 +28,60 @@ def build_contact_link_target(value):
     if lowered.startswith("whatsapp:"):
         phone = re.sub(r"\D", "", contact.split(":", 1)[1])
         return f"https://wa.me/{phone}" if phone else None
-
     digits = re.sub(r"\D", "", contact)
     if digits:
         phone_href = contact if contact.startswith("+") else f"+{digits}"
         return f"tel:{phone_href}"
     return None
+
+
+def build_order_message():
+    return "\n".join(
+        [
+            "Hi QY & YX, I would like to order matcha.",
+            "",
+            "Drink:",
+            "Quantity:",
+            "Style: water / oat",
+            "Syrup: standard / less / extra",
+            "Milk/oat base adjustment: -30ml / -20ml / -10ml / 0 / +10ml / +20ml / +30ml",
+            "When can you collect?:",
+            "Payment: cash / Tikkie",
+        ]
+    )
+
+
+def build_manual_order_link(value):
+    if not value:
+        return None
+
+    contact = value.strip()
+    lowered = contact.lower()
+    if lowered.startswith("@") and len(contact) > 1:
+        return f"https://t.me/{quote(contact[1:])}"
+    if lowered.startswith("telegram:"):
+        handle = contact.split(":", 1)[1].strip().lstrip("@")
+        return f"https://t.me/{quote(handle)}" if handle else None
+    if lowered.startswith("t.me/"):
+        return f"https://{contact}"
+    if lowered.startswith("https://t.me/"):
+        return contact
+    return None
+
+
+def build_manual_whatsapp_order_link(value):
+    if not value:
+        return None
+
+    contact = value.strip()
+    lowered = contact.lower()
+    if lowered.startswith("whatsapp:"):
+        phone = re.sub(r"\D", "", contact.split(":", 1)[1])
+    else:
+        phone = re.sub(r"\D", "", contact)
+    if not phone:
+        return None
+    return f"https://wa.me/{phone}?{urlencode({'text': build_order_message()})}"
 
 
 def create_app(test_config=None):
@@ -58,9 +106,11 @@ def create_app(test_config=None):
         ADMIN_PASSWORD_HASH=os.environ.get("ADMIN_PASSWORD_HASH"),
         CAFE_CONTACT_LINE=os.environ.get(
             "CAFE_CONTACT_LINE",
-            "Whatsapp/Telegram for any query: +65 97888146",
+            "WhatsApp or Telegram for orders and questions: @matchaorders",
         ),
-        CAFE_CONTACT_PHONE=os.environ.get("CAFE_CONTACT_PHONE", "+6597888146"),
+        CAFE_CONTACT_PHONE=os.environ.get("CAFE_CONTACT_PHONE", "@matchaorders"),
+        CAFE_WHATSAPP_PHONE=os.environ.get("CAFE_WHATSAPP_PHONE", ""),
+        MANUAL_ORDER_ONLY=os.environ.get("MANUAL_ORDER_ONLY", "1") == "1",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get(
@@ -143,6 +193,12 @@ def create_app(test_config=None):
             "cafe_contact_line": settings["contact_line"],
             "cafe_contact_phone": settings["contact_phone"],
             "cafe_contact_link": build_contact_link_target(settings["contact_phone"]),
+            "manual_order_only": app.config["MANUAL_ORDER_ONLY"],
+            "manual_order_link": build_manual_order_link(settings["contact_phone"]),
+            "manual_whatsapp_order_link": build_manual_whatsapp_order_link(
+                app.config.get("CAFE_WHATSAPP_PHONE"),
+            ),
+            "manual_order_message": build_order_message(),
             "csrf_token": get_csrf_token,
             "csrf_field": csrf_field,
         }

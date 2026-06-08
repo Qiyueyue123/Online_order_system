@@ -203,7 +203,7 @@ def enrich_order_bundle(order_bundle, cancel_token=None):
             item["preparation_style"].replace("_", " ").title(),
         )
         item["syrup_label"] = f"Agave syrup: {total_syrup_g:g}g"
-        item["milk_volume_label"] = f"Regular milk: {total_milk_ml}ml"
+        item["milk_volume_label"] = f"Milk/oat base: {total_milk_ml}ml"
         items.append(item)
     return {
         "order": order,

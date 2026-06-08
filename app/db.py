@@ -22,17 +22,28 @@ RETIRED_PRODUCT_NAMES = {
 SEED_MENU = [
     (
         "Ikuyo Matcha Latte",
-        4.00,
+        3.90,
         "Ippodo Ikuyo with regular full cream milk.",
         "Ikuyo",
     ),
     (
         "Sayaka Matcha Latte",
-        5.00,
+        5.90,
         "Ippodo Sayaka, an elevated matcha line from Ippodo with a smoother, richer profile, served with regular full cream milk.",
         "Sayaka",
     ),
 ]
+
+UPDATED_PRODUCT_PRICES = {
+    "Ikuyo Matcha Latte": {
+        "old": (4.00,),
+        "new": 3.90,
+    },
+    "Sayaka Matcha Latte": {
+        "old": (5.00,),
+        "new": 5.90,
+    },
+}
 
 UPDATED_PRODUCT_DESCRIPTIONS = {
     "Ikuyo Matcha Latte": {
@@ -190,6 +201,7 @@ def init_db():
     _seed_menu(db)
     _remove_unused_retired_products(db)
     _update_known_product_descriptions(db)
+    _update_known_product_prices(db)
     _update_placeholder_contact_settings(db)
     _update_static_seed_image_paths(db)
     db.commit()
@@ -641,6 +653,23 @@ def _update_known_product_descriptions(db):
                 description_update["new"],
                 product_name,
                 *old_descriptions,
+            ),
+        )
+
+
+def _update_known_product_prices(db):
+    for product_name, price_update in UPDATED_PRODUCT_PRICES.items():
+        placeholders = ", ".join("?" for _price in price_update["old"])
+        db.execute(
+            f"""
+            UPDATE products
+            SET price_eur = ?
+            WHERE name = ? AND ROUND(price_eur, 2) IN ({placeholders})
+            """,
+            (
+                price_update["new"],
+                product_name,
+                *price_update["old"],
             ),
         )
 

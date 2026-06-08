@@ -77,6 +77,19 @@ def test_home_page_can_use_manual_order_mode(tmp_path):
     assert b"Checkout" not in response.data
 
 
+def test_default_menu_prices_match_sale_prices(tmp_path):
+    app = build_test_app(tmp_path)
+
+    with app.app_context():
+        prices = {
+            item["name"]: float(item["price_eur"])
+            for item in get_menu_items()
+        }
+
+    assert prices["Ikuyo Matcha Latte"] == 3.9
+    assert prices["Sayaka Matcha Latte"] == 5.9
+
+
 def test_drink_detail_page_loads(tmp_path):
     app = build_test_app(tmp_path)
     client = app.test_client()

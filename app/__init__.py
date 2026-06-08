@@ -180,8 +180,9 @@ def create_app(test_config=None):
             "object-src 'none'; "
             "img-src 'self' data:; "
             "media-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; "
             "style-src 'self' 'unsafe-inline'; "
+            "connect-src 'self' https://cloudflareinsights.com; "
             "form-action 'self'",
         )
         return response

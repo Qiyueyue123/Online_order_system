@@ -58,6 +58,18 @@ def test_home_page_loads(tmp_path):
     assert b"Show previous photo for Ikuyo Matcha Latte" in response.data
 
 
+def test_cloudflare_analytics_beacon_is_allowed(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+
+    response = client.get("/")
+    csp = response.headers["Content-Security-Policy"]
+
+    assert b"https://static.cloudflareinsights.com/beacon.min.js" in response.data
+    assert "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com" in csp
+    assert "connect-src 'self' https://cloudflareinsights.com" in csp
+
+
 def test_home_page_can_use_manual_order_mode(tmp_path):
     app = build_test_app(tmp_path)
     app.config["MANUAL_ORDER_ONLY"] = True

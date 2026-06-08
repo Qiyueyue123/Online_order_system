@@ -80,8 +80,15 @@
 
       <p class="menu-item-description">Click the drink image to open the full uncropped photo.</p>
 
-      {% if manual_order_only and manual_order_link %}
-        <a class="button" href="{{ manual_order_link }}" rel="noopener" target="_blank">Order by chat</a>
+      {% if manual_order_only %}
+        <div class="home-actions-inline">
+          {% if manual_whatsapp_order_link %}
+            <a class="button compact-action" href="{{ manual_whatsapp_order_link }}" rel="noopener" target="_blank">Order on WhatsApp</a>
+          {% endif %}
+          {% if manual_order_link %}
+            <a class="button secondary-button compact-action" href="{{ manual_order_link }}" rel="noopener" target="_blank">Order on Telegram</a>
+          {% endif %}
+        </div>
       {% else %}
         <a class="button" href="{{ url_for('main.checkout') }}">Order this drink</a>
       {% endif %}

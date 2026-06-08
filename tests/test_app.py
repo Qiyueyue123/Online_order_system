@@ -18,7 +18,8 @@ def build_test_app(tmp_path):
             "ADMIN_PASSWORD_HASH": hash_admin_password("test-admin-password"),
             "UPLOAD_FOLDER": str(tmp_path / "uploads"),
             "MANUAL_ORDER_ONLY": False,
-            "CAFE_WHATSAPP_PHONE": "+31600000000",
+            "CAFE_CONTACT_PHONE": "@notqiyue",
+            "CAFE_WHATSAPP_PHONE": "+6597888146",
         }
     )
     with app.app_context():
@@ -65,12 +66,13 @@ def test_home_page_can_use_manual_order_mode(tmp_path):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b"Order by chat" in response.data
+    assert b"Choose chat" in response.data
     assert b"Message template" in response.data
     assert b"Copy order template" in response.data
-    assert b"Open WhatsApp" in response.data
-    assert b"Open Telegram" in response.data
-    assert b"wa.me/31600000000" in response.data
+    assert b"Order on WhatsApp" in response.data
+    assert b"Order on Telegram" in response.data
+    assert b"wa.me/6597888146" in response.data
+    assert b"t.me/notqiyue" in response.data
     assert b"Drink:" in response.data
     assert b"Checkout" not in response.data
 

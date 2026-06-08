@@ -37,7 +37,7 @@
         </div>
         <div class="home-actions home-actions-inline">
           {% if manual_order_only and manual_order_link %}
-            <a class="button compact-action" href="{{ manual_order_link }}" rel="noopener" target="_blank">Order by chat</a>
+            <a class="button compact-action" href="#manual-order">Choose chat</a>
           {% else %}
             <a class="button compact-action" href="{{ url_for('main.checkout') }}">Order now</a>
           {% endif %}
@@ -124,7 +124,7 @@
     </section>
 
     {% if manual_order_only %}
-      <section class="card manual-order-card">
+      <section class="card manual-order-card" id="manual-order">
         <div>
           <p class="eyebrow">How to order</p>
           <h2>Message us and we will confirm manually.</h2>
@@ -133,10 +133,10 @@
         <div class="manual-order-actions">
           <button class="button secondary-button compact-action" data-copy-order-template type="button">Copy order template</button>
           {% if manual_whatsapp_order_link %}
-            <a class="button compact-action" href="{{ manual_whatsapp_order_link }}" rel="noopener" target="_blank">Open WhatsApp</a>
+            <a class="button compact-action" href="{{ manual_whatsapp_order_link }}" rel="noopener" target="_blank">Order on WhatsApp</a>
           {% endif %}
           {% if manual_order_link %}
-            <a class="button secondary-button compact-action" href="{{ manual_order_link }}" rel="noopener" target="_blank">Open Telegram</a>
+            <a class="button secondary-button compact-action" href="{{ manual_order_link }}" rel="noopener" target="_blank">Order on Telegram</a>
           {% endif %}
           <label class="copy-link-label">
             Message template

@@ -190,6 +190,7 @@ def init_db():
     _seed_menu(db)
     _remove_unused_retired_products(db)
     _update_known_product_descriptions(db)
+    _update_placeholder_contact_settings(db)
     _update_static_seed_image_paths(db)
     db.commit()
 
@@ -563,6 +564,25 @@ def _update_static_seed_image_paths(db):
             """,
             (new_path, alt_text, old_path),
         )
+
+
+def _update_placeholder_contact_settings(db):
+    db.execute(
+        """
+        UPDATE site_settings
+        SET contact_line = ?, contact_phone = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+          AND (
+            contact_phone IS NULL
+            OR contact_phone = ''
+            OR contact_phone = '@matchaorders'
+          )
+        """,
+        (
+            current_app.config.get("CAFE_CONTACT_LINE"),
+            current_app.config.get("CAFE_CONTACT_PHONE"),
+        ),
+    )
 
 
 def _remove_unused_retired_products(db):

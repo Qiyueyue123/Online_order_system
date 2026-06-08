@@ -106,10 +106,10 @@ def create_app(test_config=None):
         ADMIN_PASSWORD_HASH=os.environ.get("ADMIN_PASSWORD_HASH"),
         CAFE_CONTACT_LINE=os.environ.get(
             "CAFE_CONTACT_LINE",
-            "WhatsApp or Telegram for orders and questions: @matchaorders",
+            "WhatsApp or Telegram for orders and questions:",
         ),
-        CAFE_CONTACT_PHONE=os.environ.get("CAFE_CONTACT_PHONE", "@matchaorders"),
-        CAFE_WHATSAPP_PHONE=os.environ.get("CAFE_WHATSAPP_PHONE", ""),
+        CAFE_CONTACT_PHONE=os.environ.get("CAFE_CONTACT_PHONE", "@notqiyue"),
+        CAFE_WHATSAPP_PHONE=os.environ.get("CAFE_WHATSAPP_PHONE", "+6597888146"),
         MANUAL_ORDER_ONLY=os.environ.get("MANUAL_ORDER_ONLY", "1") == "1",
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",

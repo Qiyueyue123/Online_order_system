@@ -1,4 +1,55 @@
-# Matcha_Online_sys
+# Matcha Store
+
+This repository now contains two applications:
+
+- `apps/web` and `apps/api`: the portfolio-grade packaged-matcha demonstration store.
+- `app` and `run.py`: the original Flask café, preserved as a runnable legacy reference.
+
+The modern path uses React/TypeScript, FastAPI, PostgreSQL, Stripe test payments, and Terraform.
+It charges SGD only and never accepts live payments. Taxes, import duties, returns automation,
+and currency conversion are explicitly outside the demonstration.
+
+## Modern development
+
+Prerequisites: Python 3.12, Node 22, Docker, and optionally Terraform 1.8+.
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e 'apps/api[dev]'
+cd apps/web && npm install && cd ../..
+docker compose up -d postgres
+make migrate
+make seed
+```
+
+For the simplest fully containerized start, run:
+
+```bash
+docker compose up --build
+```
+
+Compose runs the migration and idempotent seed tasks before starting the API. The storefront is
+at `http://localhost:5173`.
+
+Alternatively, run `make api` and `make web` in separate terminals. The storefront is at
+`http://localhost:5173`; FastAPI documentation is at `http://localhost:8001/docs`.
+
+Useful commands:
+
+```bash
+make test       # legacy, API, and frontend suites
+make lint
+make openapi    # refresh contract and generated frontend declarations
+docker compose up --build
+```
+
+Architecture, decisions, walkthroughs and operations are in [`docs/`](docs/architecture.md).
+The exact account/key requirements are in
+[`docs/external-services.md`](docs/external-services.md).
+Infrastructure starts in `infra/environments/demo`; supply real domain/VPC values before adding
+the final CloudFront distribution and ECS/ALB composition.
+
+## Legacy café
 
 Small home cafe ordering system for very low traffic. This repository is now set up as a beginner-friendly Python web app project that can be run locally with a `venv` and deployed in a container with Docker.
 

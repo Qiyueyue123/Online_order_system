@@ -1,5 +1,5 @@
 services:
-  web:
+  legacy:
     build: .
     ports:
       - "8000:8000"
@@ -13,3 +13,65 @@ services:
       PORT: "8000"
     volumes:
       - ./instance:/app/instance
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: matcha
+      POSTGRES_USER: matcha
+      POSTGRES_PASSWORD: matcha
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matcha"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./apps/api
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://matcha:matcha@postgres:5432/matcha
+      APP_SECRET: development-only-secret-change-me
+      WEB_ORIGIN: http://localhost:5173
+      COOKIE_SECURE: "false"
+    ports:
+      - "8001:8001"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  migrate:
+    build: ./apps/api
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://matcha:matcha@postgres:5432/matcha
+      APP_SECRET: development-only-secret-change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    build: ./apps/api
+    command: ["python", "-m", "app.seed"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://matcha:matcha@postgres:5432/matcha
+      APP_SECRET: development-only-secret-change-me
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  storefront:
+    build: ./apps/web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:

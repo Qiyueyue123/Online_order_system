@@ -97,6 +97,28 @@ provision Stripe test keys to the deployed environment.
 
 A running record of significant changes, what each one did, and why it matters. Newest first.
 
+### 2026-07-08 — New tests immediately caught two real bugs
+
+Filling known test gaps (webhook signature/idempotency, coupon arithmetic, cart merge)
+surfaced two live defects, both fixed:
+
+- **Cart merge silently lost items.** Re-homing a guest cart item by assigning its foreign
+  key went behind the ORM's back: SQLAlchemy's `delete-orphan` cascade tracks the loaded
+  *collection*, not the FK column, so deleting the guest cart still deleted the "moved" item.
+  A user signing in at checkout lost their cart. Fix: move items through the relationship
+  (`guest_cart.items.remove(...)` / `account_cart.items.append(...)`). *Lesson: with an ORM,
+  express ownership changes through the relationship, never by writing FK columns directly.*
+- **UUID lookups worked by driver coincidence.** `db.get(Order, "<string>")` happens to work
+  on Postgres because psycopg coerces strings; on SQLite it crashes. Correctness that depends
+  on which database driver you run isn't correctness. Ids are now parsed explicitly — 404 for
+  invalid path params, logged skip for malformed webhook metadata (never a 500).
+
+Also landed today: legacy hardening (slot-capacity check moved inside the transaction —
+the classic check-then-act race; SQLite FK enforcement on; CSRF test bypass removed with
+real tokens in tests), the compose smoke-test CI job, and
+[docs/system-design.md](docs/system-design.md) — an interview-prep guide mapping system
+design topics to real code in this repo.
+
 ### 2026-07-07 (night) — Hardening wave
 
 **Database-backed rate limiting** (`apps/api/app/services/rate_limit.py`, migration

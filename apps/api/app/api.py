@@ -1,5 +1,5 @@
-import time
-from collections import defaultdict, deque
+import logging
+import uuid
 from datetime import UTC, datetime
 
 import stripe
@@ -60,9 +60,35 @@ from .security import (
 from .services.cart import cart_payload, get_or_create_cart, merge_guest_cart, set_item
 from .services.catalog import list_products
 from .services.checkout import create_pending_order, expire_order, mark_order_paid
+from .services.rate_limit import check_rate_limit
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1")
-auth_attempts: dict[str, deque[float]] = defaultdict(deque)
+
+AUTH_RATE_LIMIT = 10
+AUTH_RATE_WINDOW_SECONDS = 60
+
+
+def _parse_uuid(value: str) -> uuid.UUID | None:
+    """Best-effort coercion of a path/metadata string into a uuid.UUID.
+
+    SQLAlchemy's Uuid column type needs an actual uuid.UUID instance on
+    dialects without native UUID support (e.g. SQLite); passing a plain str
+    straight into db.get() raises at the DB layer. Callers should treat a
+    None return as "not found" rather than letting a malformed id 500.
+    """
+    try:
+        return uuid.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _parse_uuid_or_404(value: str, detail: str) -> uuid.UUID:
+    parsed = _parse_uuid(value)
+    if parsed is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
+    return parsed
 
 
 def _product_out(product) -> ProductOut:
@@ -113,15 +139,11 @@ def product(slug: str, db: Session = Depends(get_db)):
     return _product_out(row)
 
 
-def _check_auth_rate(request: Request) -> None:
-    key = request.client.host if request.client else "unknown"
-    now = time.monotonic()
-    attempts = auth_attempts[key]
-    while attempts and attempts[0] < now - 60:
-        attempts.popleft()
-    if len(attempts) >= 10:
+def _check_auth_rate(request: Request, db: Session) -> None:
+    ip = request.client.host if request.client else "unknown"
+    key = f"auth:{ip}"
+    if not check_rate_limit(db, key, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW_SECONDS):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Try again later")
-    attempts.append(now)
 
 
 @router.post("/auth/register", response_model=SessionOut, status_code=201)
@@ -133,7 +155,7 @@ def register(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
-    _check_auth_rate(request)
+    _check_auth_rate(request, db)
     user = User(
         email=str(data.email).lower(),
         name=data.name.strip(),
@@ -161,7 +183,7 @@ def login(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
-    _check_auth_rate(request)
+    _check_auth_rate(request, db)
     user = db.scalar(select(User).where(User.email == str(data.email).lower()))
     if not user or not verify_password(user.password_hash, data.password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
@@ -289,7 +311,13 @@ async def stripe_webhook(
     event_type = event["type"]
     checkout_session = event["data"]["object"]
     order_id = checkout_session.get("metadata", {}).get("order_id")
-    order = db.get(Order, order_id) if order_id else None
+    order = None
+    if order_id:
+        order_uuid = _parse_uuid(order_id)
+        if order_uuid is None:
+            logger.warning("stripe webhook metadata order_id is not a valid UUID: %r", order_id)
+        else:
+            order = db.get(Order, order_uuid)
     if event_type == "checkout.session.completed" and order:
         mark_order_paid(db, order)
     elif event_type == "checkout.session.expired" and order:
@@ -322,7 +350,7 @@ def complete_demo_payment(
 ):
     if settings.environment != "development" or settings.stripe_secret_key:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
-    order = db.get(Order, order_id)
+    order = db.get(Order, _parse_uuid_or_404(order_id, "Order not found"))
     if not order:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     account_access = login_session and login_session.user_id == order.user_id
@@ -342,7 +370,7 @@ def get_order(
     login_session: LoginSession | None = Depends(optional_session),
     db: Session = Depends(get_db),
 ):
-    order = db.get(Order, order_id)
+    order = db.get(Order, _parse_uuid_or_404(order_id, "Order not found"))
     if not order:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     account_access = login_session and (
@@ -361,7 +389,7 @@ def update_stock(
     _: LoginSession = Depends(admin_session),
     db: Session = Depends(get_db),
 ):
-    variant = db.get(Variant, variant_id)
+    variant = db.get(Variant, _parse_uuid_or_404(variant_id, "Variant not found"))
     if not variant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
     if data.stock_on_hand < variant.stock_reserved:

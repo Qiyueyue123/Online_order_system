@@ -91,7 +91,9 @@ def merge_guest_cart(
         db.commit()
         return
     account_items = {item.variant_id: item for item in account_cart.items}
-    for guest_item in guest_cart.items:
+    # Iterate over a copy: distinct-variant items are removed from guest_cart.items
+    # below, which would otherwise mutate the collection while iterating over it.
+    for guest_item in list(guest_cart.items):
         existing = account_items.get(guest_item.variant_id)
         if existing:
             existing.quantity = min(
@@ -100,7 +102,14 @@ def merge_guest_cart(
                 20,
             )
         else:
-            guest_item.cart_id = account_cart.id
+            # Re-parent the row by moving it between the relationship collections
+            # (not just setting cart_id) so SQLAlchemy's unit-of-work stops
+            # considering it an orphan of guest_cart. Cart.items cascades
+            # "all, delete-orphan"; a row left in guest_cart.items' loaded
+            # collection is deleted along with guest_cart below regardless of
+            # its foreign key value.
+            guest_cart.items.remove(guest_item)
+            account_cart.items.append(guest_item)
     db.delete(guest_cart)
     db.commit()
 

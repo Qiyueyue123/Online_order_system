@@ -284,4 +284,14 @@ class Review(TimestampMixin, Base):
     approved: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class RateLimitEvent(Base):
+    __tablename__ = "rate_limit_events"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    key: Mapped[str] = mapped_column(String(200), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
 Index("ix_orders_expirable", Order.status, Order.reservation_expires_at)
+Index("ix_rate_limit_events_key_created_at", RateLimitEvent.key, RateLimitEvent.created_at)

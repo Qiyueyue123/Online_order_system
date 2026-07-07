@@ -1,548 +1,215 @@
 # Matcha Store
 
-This repository now contains two applications:
+A full-stack e-commerce demonstration store for packaged matcha, built as a portfolio project
+that shows the complete path from a beginner Flask prototype to a production-shaped system:
+typed API contracts, transactional inventory, test-mode payments, infrastructure as code, and
+CI that guards all of it.
 
-- `apps/web` and `apps/api`: the portfolio-grade packaged-matcha demonstration store.
-- `app` and `run.py`: the original Flask café, preserved as a runnable legacy reference.
+**Stack:** FastAPI + SQLAlchemy 2.0 + PostgreSQL · React 19 + TypeScript + Vite · Stripe (test
+mode) · Terraform on AWS (S3/CloudFront, ECS Fargate, RDS) · GitHub Actions CI/CD.
 
-The modern path uses React/TypeScript, FastAPI, PostgreSQL, Stripe test payments, and Terraform.
 It charges SGD only and never accepts live payments. Taxes, import duties, returns automation,
-and currency conversion are explicitly outside the demonstration.
+and currency conversion are explicitly out of scope.
 
-## Modern development
+## Repository layout
 
-Prerequisites: Python 3.12, Node 22, Docker, and optionally Terraform 1.8+.
+| Path | What it is |
+|---|---|
+| `apps/api` | FastAPI backend: catalog, cart, checkout, orders, Stripe webhooks |
+| `apps/web` | React storefront with types generated from the API's OpenAPI contract |
+| `infra/` | Terraform: static site (S3+CloudFront), ECS/ALB/RDS demo environment, budget alarms |
+| `docs/` | Architecture, operations, walkthrough, and five ADRs recording key decisions |
+| `app/`, `run.py` | The original Flask/SQLite café — kept as a runnable v1 reference ([its full docs](docs/legacy-cafe.md)) |
+
+## Highlights worth reading
+
+- **Inventory that can't oversell** — checkout locks variant rows (`SELECT … FOR UPDATE`),
+  reprices server-side (client prices are never trusted), reserves stock separately from
+  on-hand stock, and writes an audit trail (`apps/api/app/services/checkout.py`).
+- **Payments where the webhook is the source of truth** — only a signature-verified Stripe
+  webhook can mark an order paid; redirect pages are presentation only. Events are recorded
+  for idempotency ([ADR 0004](docs/adr/0004-stripe-webhooks.md)).
+- **Opaque server-side sessions** — random tokens stored as SHA-256 hashes, httponly cookies,
+  CSRF via double-submit header; JWTs deliberately rejected ([ADR 0001](docs/adr/0001-opaque-sessions.md)).
+- **A contract the compiler enforces** — the frontend's API types are generated from
+  `openapi.json`; CI fails if the committed contract drifts from the code, and the frontend
+  fails to compile if it drifts from the contract ([ADR 0002](docs/adr/0002-rest-contract.md)).
+
+## Quick start
+
+Prerequisites: Docker (simplest), or Python 3.12 + Node 22 for the manual path.
+
+```bash
+docker compose up --build
+```
+
+Compose runs migrations and an idempotent seed before starting the API. Storefront:
+`http://localhost:5173` · API docs: `http://localhost:8001/docs`.
+
+Manual development setup:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e 'apps/api[dev]'
 cd apps/web && npm install && cd ../..
 docker compose up -d postgres
-make migrate
-make seed
+make migrate && make seed
+make api    # terminal 1 — FastAPI on :8001
+make web    # terminal 2 — Vite dev server on :5173
 ```
-
-For the simplest fully containerized start, run:
-
-```bash
-docker compose up --build
-```
-
-Compose runs the migration and idempotent seed tasks before starting the API. The storefront is
-at `http://localhost:5173`.
-
-Alternatively, run `make api` and `make web` in separate terminals. The storefront is at
-`http://localhost:5173`; FastAPI documentation is at `http://localhost:8001/docs`.
 
 Useful commands:
 
 ```bash
 make test       # legacy, API, and frontend suites
-make lint
-make openapi    # refresh contract and generated frontend declarations
-docker compose up --build
+make lint       # ruff + eslint
+make openapi    # regenerate the API contract + frontend type declarations
 ```
 
-Architecture, decisions, walkthroughs and operations are in [`docs/`](docs/architecture.md).
-The exact account/key requirements are in
-[`docs/external-services.md`](docs/external-services.md).
-Infrastructure starts in `infra/environments/demo`; supply real domain/VPC values before adding
-the final CloudFront distribution and ECS/ALB composition.
-
-## Legacy café
-
-Small home cafe ordering system for very low traffic. This repository is now set up as a beginner-friendly Python web app project that can be run locally with a `venv` and deployed in a container with Docker.
-
-## Why this stack
-
-This starter uses:
-- `Flask` for a small server-rendered web app
-- `SQLite` for a simple local database
-- `Gunicorn` as the production app server
-- `Docker` for packaging the app into a deployable container
-
-This is a good learning stack because it shows the full path from:
-1. local development
-2. dependency management with a virtual environment
-3. persistent data
-4. production serving
-5. containerized deployment
-
-## Current product direction
-
-Current assumptions:
-- Max around 50 users
-- Main use case is online ordering with pickup time slots
-- Focus on simple operations, not a full restaurant platform
-- Version 1 supports `cash on pickup`
-- Version 1 supports manual `Tikkie payment request` as a low-automation option
-- No full payment gateway in version 1
-- Use a relational database design for orders, products, and pickup data
-- Inventory is tracked by shared matcha stock pools
-
-## Project structure
-
-```text
-.
-├── app/
-│   ├── __init__.py
-│   ├── db.py
-│   ├── routes.py
-│   ├── schema.sql
-│   ├── static/
-│   └── templates/
-├── tests/
-├── Dockerfile
-├── docker-compose.yml
-├── docker-entrypoint.sh
-├── requirements.txt
-├── requirements-dev.txt
-└── run.py
-```
-
-## What the app already does
-
-The starter app includes:
-- menu page
-- admin-managed homepage alert banner
-- shared contact line in the site footer
-- admin-editable footer contact details
-- multi-image galleries visible directly on the home page
-- dedicated drink detail pages
-- multi-image drink galleries
-- admin-uploadable drink images
-- admin image reordering controls
-- admin image deletion controls
-- admin stock editing
-- admin product create/update/delete
-- admin order cancellation with stock restoration
-- compact admin dashboard with collapsible sections
-- checkout form
-- two preparation style options for each drink
-- selectable pickup datetime slots
-- admin-managed pickup availability by day
-- WhatsApp number or Telegram handle collected for order contact
-- payment method selection
-- order confirmation page
-- private cancellation links without account creation
-- visible cancellation URL on the confirmation page
-- real admin user login with session-based authentication
-- health check endpoint at `/healthz`
-- SQLite database initialization command
-- SQLite database reset command
-- Docker startup flow
-- basic tests
-- optional product image support in the schema
-- a `product_images` table for multi-image drink pages
-
-## How to start locally with `venv`
-
-### 1. Create the virtual environment
-
-```bash
-python3 -m venv .venv
-```
-
-This creates an isolated Python environment inside the project folder.
-
-### 2. Activate it
-
-On macOS or Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-When it is active, your terminal prompt usually shows `(.venv)`.
-
-### 3. Install dependencies
-
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-```
-
-Why `requirements-dev.txt`:
-- it installs the app dependencies
-- it also installs `pytest` so you can run tests
-
-### 4. Reset the database once after schema changes
-
-If you already ran an older version of the project, reset the local database first:
-
-```bash
-python -m flask --app run reset-db
-```
-
-This recreates the SQLite file with the current schema and seed data.
-
-Run this again whenever you change database fields such as orders, alerts, or product tables.
-
-### 5. Initialize the database
-
-For a fresh setup:
-
-```bash
-python -m flask --app run init-db
-```
-
-This creates the SQLite schema and seeds sample menu items.
-
-### 6. Run the app in development
-
-```bash
-FLASK_DEBUG=1 python run.py
-```
-
-Then open:
-
-```text
-http://127.0.0.1:8000
-```
-
-Useful routes:
-- `/` for the menu
-- `/checkout` for the order form
-- `/admin/login` for the admin login page
-- `/admin` for the admin dashboard after login
-- `/healthz` for the deployment health check
-
-### 7. Run tests
-
-```bash
-pytest
-```
-
-### Admin login for local development
-
-Defaults:
-- username: `admin`
-- password: `change-me-admin`
-
-Where to change admin credentials:
-- your local shell environment before running `python run.py`
-- your local `.env` file for Docker Compose
-- your production host's secret or environment-variable settings
-
-For anything beyond local testing, set your own values with environment variables:
-
-```bash
-export ADMIN_USERNAME=your-admin-name
-export ADMIN_PASSWORD=your-strong-password
-```
-
-How it works now:
-- the app stores admin accounts in the `admin_users` table
-- on startup, the app creates or updates the bootstrap admin user from your environment variables
-- login checks the database record, not just in-memory config values
-
-If you prefer to provide a precomputed password hash instead of a raw password:
-
-```bash
-python -m flask --app run hash-password "your-strong-password"
-export ADMIN_USERNAME=your-admin-name
-export ADMIN_PASSWORD_HASH='paste-an-argon2-password-hash-here'
-```
-
-Recommended secure setup:
-- set a strong `SECRET_KEY`
-- use `ADMIN_PASSWORD_HASH` for deployment so you are not storing a raw password in app config
-- keep real secrets out of Git-tracked files
-- use the default `admin / change-me-admin` only for local development
-
-For Docker Compose, copy the template and fill in your own values:
-
-```bash
-cp .env.example .env
-python -m flask --app run hash-password "your-strong-password"
-```
-
-Then paste the generated hash into `.env` as `ADMIN_PASSWORD_HASH`.
-
-Keep the hash wrapped in single quotes:
-
-```env
-ADMIN_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=4$...$...'
-```
-
-Copy the whole generated line after the command output. A valid Argon2 hash usually starts with `$argon2id$`. The single quotes still matter because Argon2 hashes contain `$`, and Docker Compose treats unquoted `$...` text as environment-variable interpolation.
-
-Existing Werkzeug admin password hashes are still accepted during login so older local databases can keep working while you switch to Argon2.
-
-Admin-uploaded images are stored in the instance upload folder and served by the app:
-- local folder: `instance/uploads/`
-- public URL pattern: `/uploads/<filename>`
-
-## How Docker fits in
-
-`venv` and Docker solve different problems:
-
-- `venv` isolates Python packages on your own machine during development
-- `Docker` packages the whole app into a consistent runtime that can be deployed elsewhere
-
-You still learn both because a real deployable project usually has:
-- a local developer workflow
-- a deployment workflow
-
-In this project:
-- [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile) defines the production container image
-- [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml) is mainly for local Docker testing
-- [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) keeps local secrets, the virtual environment, the SQLite database, and uploaded images out of the image build
-- the app reads `PORT`, `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, and `DATABASE_PATH` from environment variables
-
-## Docker learning notes
-
-This project uses Docker in the same basic way many small deployable web apps do: the application code is packaged into an image, then run as a container with configuration injected from the outside.
-
-Important terms:
-- `Image`: the packaged application template built from the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile)
-- `Container`: a running instance of that image
-- `Build`: the process of turning source code and dependencies into an image
-- `Port`: the network entry point used to reach the app from a browser
-- `Volume`: persistent storage mounted into the container so runtime data survives restarts
-- `Environment variable`: configuration passed into the container without hardcoding secrets in the code
-
-How the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile) works:
-1. It starts from `python:3.12-slim`, which gives the app a clean Python runtime.
-2. It sets `/app` as the working directory inside the container.
-3. It installs production dependencies from [requirements.txt](/Users/qy/Documents/GitHub/Matcha_Online_sys/requirements.txt).
-4. It copies the application code into the image.
-5. It starts the app using `gunicorn`, which is more suitable for deployment than Flask's development server.
-6. It binds to `${PORT:-8000}`, so local Docker can use port `8000` while deployment platforms can provide their own `PORT`.
-7. It includes a health check that calls `/healthz`.
-
-How [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml) helps locally:
-- it builds the image from the current folder
-- it maps your browser's `localhost:8000` to the container's port `8000`
-- it passes environment variables from `.env`
-- it mounts `./instance` on your laptop to `/app/instance` inside the container
-
-Why the mounted volume matters:
-- SQLite stores orders in `/app/instance/matcha.db`
-- admin uploads store images under `/app/instance/uploads/`
-- containers are replaceable, so data written only inside the container can disappear
-- mounting `./instance:/app/instance` keeps order data and uploaded images outside the disposable container
-
-Why `.env` is not committed:
-- `.env` contains real secrets such as `SECRET_KEY` and `ADMIN_PASSWORD_HASH`
-- secrets should be configured separately on each machine or deployment platform
-- [.env.example](/Users/qy/Documents/GitHub/Matcha_Online_sys/.env.example) documents the required variables without exposing real values
-
-Why [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) exists:
-- it prevents `.env` from being copied into the image
-- it prevents `.venv` from making the image large and machine-specific
-- it prevents local SQLite databases and uploaded images from being baked into the app image
-- the image should contain code and dependencies, not private runtime data
-
-Useful Docker commands for this project:
-
-```bash
-docker compose up --build
-```
-
-Build the image and start the app.
-
-```bash
-docker compose up -d
-```
-
-Start the app in the background.
-
-```bash
-docker compose ps
-```
-
-Show running containers for this project.
-
-```bash
-docker compose logs -f
-```
-
-Follow application logs.
-
-```bash
-docker compose down
-```
-
-Stop the running containers. This does not delete the mounted `instance/` folder.
-
-```bash
-docker compose build --no-cache
-```
-
-Rebuild from scratch if dependency or image-layer caching causes confusion.
-
-What Docker proves for this project:
-- the app can run outside the local Python virtual environment
-- production startup uses `gunicorn`
-- configuration is externalized through environment variables
-- runtime data is separated from application code
-- the same image structure can be used later by a real deployment platform
-
-What Docker does not solve by itself:
-- it does not automatically give a public URL
-- it does not automatically provide HTTPS
-- it does not replace backups
-- it does not make SQLite suitable for high traffic
-- it does not remove the need for secure secrets and admin credentials
-
-How this maps to deployment later:
-- local `docker compose` becomes a platform web service
-- local `.env` becomes platform environment variables
-- local `./instance:/app/instance` becomes a platform persistent disk or volume
-- local `localhost:8000` becomes a public domain
-- local logs become platform deployment/runtime logs
-
-## How to run with Docker
-
-### Option A: use Docker Compose
-
-First make sure Docker Desktop is open and running. On macOS, `docker compose` talks to the Docker daemon through Docker Desktop, so the command will fail if Docker Desktop is closed.
-
-```bash
-docker compose up --build
-```
-
-Then open:
-
-```text
-http://127.0.0.1:8000
-```
-
-### Option B: build and run manually
-
-Build the image:
-
-```bash
-docker build -t matcha-home-cafe .
-```
-
-Run the container:
-
-```bash
-docker run --rm -p 8000:8000 \
-  -e SECRET_KEY=change-me \
-  -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD=change-me-admin \
-  -e DATABASE_PATH=/app/instance/matcha.db \
-  -v "$(pwd)/instance:/app/instance" \
-  matcha-home-cafe
-```
-
-Why the volume matters:
-- the SQLite database file lives in `/app/instance`
-- without a mounted volume, container data disappears when the container stops
-
-Docker Compose now reads secrets from your local `.env` file or shell environment instead of hardcoding them in [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml).
-
-If you see a warning like `The "..." variable is not set`, check your `.env` file. The most common cause is an unquoted `ADMIN_PASSWORD_HASH`. Regenerate the hash if needed and store the full value in single quotes.
-
-## How this becomes a deployable website
-
-This project is now close to a basic deployment shape:
-- app code is separated from startup config
-- production serving uses `gunicorn`
-- the app exposes one port
-- there is a health endpoint
-- Docker can package the app for deployment
-- the container respects a platform-provided `PORT`
-- local secrets and uploaded files are excluded from Docker image builds
-
-What you would improve next for a stronger showcase:
-- add a proper migration workflow
-- move from SQLite to PostgreSQL when traffic or features grow
-- deploy to a platform such as Render, Railway, Fly.io, or a VPS
-
-## Path to a real URL
-
-Recommended beginner path:
-1. Push the project to GitHub
-2. Create a web service on a deployment platform from the GitHub repository
-3. Choose Dockerfile-based deployment
-4. Set environment variables on the platform, not in Git:
-   - `SECRET_KEY`
-   - `ADMIN_USERNAME`
-   - `ADMIN_PASSWORD_HASH`
-   - `DATABASE_PATH=/app/instance/matcha.db`
-5. Attach persistent storage mounted at `/app/instance`
-6. Point the platform health check at `/healthz`
-7. Generate the platform-provided domain
-8. Test home page, admin login, image upload persistence, order persistence, and cancellation links
-
-For this project, persistent storage is required because both the SQLite database and uploaded images live under `/app/instance`. If the host does not persist that folder, orders and uploaded images can disappear after a redeploy.
-
-Docker Compose is not usually what gets deployed directly. Most platforms read your [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile), build an image, inject environment variables, attach storage, and provide a public URL.
-
-## Suggested learning path
-
-Follow this order:
-1. Run the project with `venv`
-2. Read `run.py`, [app/__init__.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/app/__init__.py), [app/routes.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/app/routes.py), and [app/db.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/app/db.py)
-3. Place a few test orders through the browser
-4. Inspect the SQLite database file in `instance/`
-5. Run `pytest`
-6. Run the app with Docker
-7. Change one feature and rebuild the container
-
-## Progress log
-
-### 2026-04-07
-
-- Defined product direction: home cafe pickup ordering system
-- Confirmed this is a very small-scale project, so simplicity matters more than payment automation
-- Decided the safest MVP payment flow is pay on pickup
-- Noted that Netherlands-local payment expectations are relevant, but full payment integration is optional for this project size
-- Identified `cash on pickup` as the best starting option
-
-### 2026-04-09
-
-- Chose Python + Flask as the teaching stack
-- Added a real starter app structure instead of keeping the repo empty
-- Added SQLite-backed order storage
-- Added templates and styling for a minimal web UI
-- Added Docker support for a deployable container workflow
-- Added tests so the project demonstrates basic verification
-- Updated the README to explain `venv`, local setup, and Docker usage
-- Verified local `venv` setup, dependency installation, database initialization, and test execution
-- Confirmed `docker compose config` is valid
-- Full Docker image build was not verified in this session because the local Docker daemon was not running
-- Decided that SQL is the better learning and showcase choice than MongoDB for this project type
-- Added shared inventory tracking for Ikuyo and Sayaka stock
-- Replaced query-string admin access with a real login flow
-- Removed most filler text from the UI and tightened the storefront presentation
-- Added optional product image fields for future menu photos
-- Added a proper multi-image drink gallery with a dedicated drink detail page
-- Added admin image uploads stored in the writable instance folder
-- Moved admin authentication to a real `admin_users` database table bootstrapped from environment variables
-- Made drink image galleries viewable from the home page without leaving the menu
-- Added admin controls to reorder drink gallery images
-- Added admin CRUD tools for products, stock levels, and image deletion
-- Added visible overlay arrow controls to the home-page drink galleries
-- Added a CLI password-hash command so admin auth can use hashed environment values
-- Switched Docker Compose away from hardcoded admin secrets and added a `.env.example` template
-- Upgraded the drink galleries to animate with a sliding transition instead of instant image swaps
-- Added admin-controlled homepage alerts that display on the menu page
-- Replaced free-text pickup entry with selectable datetime slots
-- Switched order contact from last 4 phone digits to full WhatsApp or Telegram contact details
-- Added a shared WhatsApp/Telegram contact line in the site footer
-- Made footer contact details editable from the admin dashboard
-- Added private order management links so customers can cancel before pickup without an account
-- Displayed the full cancellation URL on the confirmation page for copying or screenshots
-- Replaced quantity number inputs with circular quantity choices
-- Added admin controls for pickup-day availability, hours, and orders per slot
-- Added admin order cancellation with automatic stock restoration
-- Refactored the admin dashboard into compact collapsible control panels
-- Added a Docker `.env.example` and documented why password hashes need single quotes in Docker Compose
-- Made the Docker container use the platform-provided `PORT`
-- Added `.dockerignore` so local secrets, database files, uploads, and the virtual environment are not copied into Docker images
-- Documented the path from local Docker testing to deployment on a real URL
-- Added Docker learning notes explaining images, containers, Compose, environment variables, volumes, persistence, and deployment mapping
-- Split admin orders into current live orders and cancelled/past records
-- Added guarded admin deletion for cancelled or past order records without changing stock
-- Made footer contact targets clickable for phone numbers, Telegram handles, Telegram URLs, and WhatsApp links
-- Redesigned the home page into a compact menu-first layout with improved photo lightbox controls and outside-photo closing
-- Added manual Tikkie payment-request guidance on home, checkout, confirmation, and admin-facing order labels
+Docs: [architecture](docs/architecture.md) · [operations](docs/operations.md) ·
+[walkthrough](docs/walkthrough.md) · [external services](docs/external-services.md) ·
+[legacy café guide](docs/legacy-cafe.md).
+
+## Session status — morning of 2026-07-08
+
+Overnight autonomous session ended when the usage limit was reached (~4:30am reset).
+
+**Landed and green in CI (PR #1, branch `qiyueclaude`)** — three waves, all five CI checks
+passing after each: reservation sweeper, OpenAPI-derived frontend types, CI web lint/tests,
+CD workflow, optional ALB HTTPS, observability middleware, checkout/auth frontend tests,
+DB-backed rate limiting, dependabot, SEO metadata, docs updates. Details in the engineering
+log below.
+
+**Interrupted mid-work (uncommitted changes left in the working tree — review before
+committing or discard with `git checkout -- .`):**
+- Legacy hardening (`app/`, `tests/`): pickup-slot capacity race fix, SQLite
+  `PRAGMA foreign_keys=ON`, CSRF test-bypass removal. Code partially written, tests not run.
+- Compose smoke-test CI job (`.github/workflows/ci.yml`): partially written, not validated.
+- API test gaps (webhook idempotency, coupons, cart merge): not started — no files written.
+
+**To resume tomorrow:** finish/verify the three interrupted items, then remaining roadmap:
+merge PR #1, enable `DEPLOY_ENABLED` + AWS secrets for CD, set `domain_name` for HTTPS,
+provision Stripe test keys to the deployed environment.
+
+**Permission-blocked items:** none — nothing was skipped for permissions this session.
+
+## Engineering log
+
+A running record of significant changes, what each one did, and why it matters. Newest first.
+
+### 2026-07-07 (night) — Hardening wave
+
+**Database-backed rate limiting** (`apps/api/app/services/rate_limit.py`, migration
+`1c2f8a9d4e6b`). The auth rate limiter was an in-process dict — each Gunicorn worker or
+Fargate replica had its own counter, so the real limit was `10 × number_of_processes` and
+reset on every restart. Attempts are now recorded in a `rate_limit_events` table: one shared
+counter no matter how many replicas, with stale events pruned on each check so the table
+can't grow unboundedly. *Lesson: any state that must be enforced globally (rate limits,
+sessions, locks) cannot live in process memory once you scale past one process.*
+
+**Dependabot** (`.github/dependabot.yml`). Weekly grouped update PRs across all six
+ecosystems in the repo (pip ×2, npm, GitHub Actions, Terraform, Docker). *Lesson: unpatched
+dependencies are how most real sites get compromised; automation beats discipline.*
+
+**Storefront SEO/metadata** (`apps/web/index.html`, `public/`). Title, meta description,
+Open Graph/Twitter cards, SVG favicon, robots.txt, and a `<noscript>` fallback — the
+difference between a link that unfurls properly when shared and a blank card.
+
+**Docs updated** — `docs/operations.md` and `docs/architecture.md` now document the CD
+workflow, HTTPS variables, sweeper knob, and request-ID log correlation.
+
+### 2026-07-07 (evening) — Deployability and observability wave
+
+**CD pipeline** (`.github/workflows/deploy.yml`). On every push to `main`: build the API
+image, push to ECR tagged with the git SHA, then deploy by rendering a *new ECS task-definition
+revision pinned to that exact image* — not `--force-new-deployment` on `:latest`, which would
+redeploy "whatever latest happens to be" with no rollback trail. Gated behind a
+`DEPLOY_ENABLED` repository variable so the workflow skips (grey, not red) until AWS
+credentials are configured. *Lesson: deploys should be immutable and auditable — a SHA-pinned
+revision is both a receipt and an undo button.*
+
+**HTTPS for the API** (`infra/environments/demo`). The ALB previously spoke plain HTTP :80 —
+the single biggest "not actually production" gap. Now setting `domain_name` provisions an ACM
+certificate (DNS-validated, automatically if `hosted_zone_id` is given), a TLS 1.3 :443
+listener, and converts :80 into a 301 redirect. With no domain set, behavior is unchanged, so
+the config still applies for demo users. *Lesson: TLS terminates at the load balancer; the
+cert is free (ACM) — the real work is DNS validation proving you own the domain.*
+
+**Observability middleware** (`apps/api/app/observability.py`). Every response now carries an
+`X-Request-ID` (accepted from the caller or generated), every request logs one structured
+access line (method, path, status, duration), optionally as JSON (`JSON_LOGS=1`) for log
+aggregators, and every response gets security headers (nosniff, frame-deny, referrer policy,
+HSTS only under secure-cookie config). Implemented as pure ASGI middleware so streaming and
+error responses are covered too. *Lesson: request IDs are the thread you pull when debugging
+distributed systems — the ID in the user's error report finds the exact log lines.*
+
+**Checkout and auth flow tests** (`apps/web`, 7 → 14 tests). The two riskiest user flows —
+paying and signing in — now have tests covering validation, exact API payloads, redirects,
+and error display. Along the way, a latent test-infrastructure bug: Testing Library's
+automatic DOM cleanup silently never ran (it requires Vitest globals, which this project
+doesn't enable), so DOM leaked between tests and could satisfy queries by accident. Explicit
+`cleanup()` fixed it. *Lesson: a test suite that can pass by accident is worse than a smaller
+honest one.*
+
+**README restructured** — legacy café tutorial moved to `docs/legacy-cafe.md`; this file now
+leads with what the project demonstrates.
+
+### 2026-07-07 — First CI run, and everything it caught
+
+**Reservation-expiry sweeper** (`apps/api/app/services/checkout.py`, `main.py`). Checkout
+reserves stock and relies on Stripe's `checkout.session.expired` webhook to release it — but
+webhooks are push-based and can never be the *only* mechanism (no Stripe configured = stock
+reserved forever). Added `expire_stale_orders()`, an idempotent function that releases
+reservations on pending orders past their deadline, driven by a background loop in the FastAPI
+lifespan (`RESERVATION_SWEEP_INTERVAL_SECONDS`, default 300; `0` disables it for tests). The
+DB work runs via `asyncio.to_thread` so it never blocks the event loop — async functions don't
+make blocking code non-blocking. *Lesson: every webhook needs a reconciliation job backstop.*
+
+**Frontend now consumes the generated OpenAPI types** (`apps/web/src/api/client.ts`). The types
+were hand-copied duplicates of the contract; CI checked the contract but nothing forced the app
+to obey it. Now `Product`, `Cart`, `Order` etc. are aliases into the generated
+`components["schemas"]`, so a backend contract change breaks the frontend at compile time
+instead of at runtime. Found on arrival: the hand-written types were *stricter* than the
+contract (literal `"SGD"` vs `string`) — assumptions the backend never guaranteed.
+
+**Real frontend tests** — jsdom + Testing Library wired into Vitest; catalog, cart, and API
+error-handling tests replace a suite that previously covered only a currency formatter.
+
+**CI actually guards the frontend** (`.github/workflows/ci.yml`) — the web job ran only
+`npm run build`; lint and tests now run first. CI only proves what it runs.
+
+**First-ever CI run: 3/5 green, and both failures were real.**
+- *terraform job*: `variables.tf` used semicolons inside single-line HCL blocks — invalid
+  syntax that had never been caught because Terraform had never been executed anywhere.
+  Fixed to canonical multi-line blocks, then a second failure: `terraform fmt -check`
+  enforces canonical *formatting* (like gofmt), fixed by running the formatter.
+- *contract job*: the committed `openapi.json` was stale — the API code had grown a cart
+  cookie parameter and orders endpoints that were never regenerated. The drift check did
+  exactly its job on its first run. Fixed with `make openapi`.
+- Bonus lesson: a local `terraform init` pulled a 648 MB provider binary into `.terraform/`
+  which accidentally got committed — GitHub rejected the push (100 MB limit). `.terraform/`
+  is local cache and is now gitignored; `.terraform.lock.hcl` (version + checksum pins, the
+  `package-lock.json` of Terraform) *is* committed.
+
+*The meta-lesson of the day: "works on my machine" only covers what's installed on your
+machine. CI is the machine that never forgets to check.*
+
+### Earlier — the v1 → v2 rewrite
+
+The project began as a server-rendered Flask/SQLite café for a real ~50-user use case
+(pickup slots, cash/Tikkie payment, admin dashboard) — see the
+[legacy café guide](docs/legacy-cafe.md) for its full history and learning notes. The modern
+stack was then designed around the questions the prototype couldn't answer: concurrent-safe
+inventory, real payment flows, typed API contracts, repeatable infrastructure, and CI. The
+five [ADRs](docs/adr/) record those decisions.
+
+## Known limitations (deliberate scope)
+
+- Demo/test payments only; no live Stripe keys, taxes, duties, or currency conversion.
+- Single-AZ RDS and `desired_count = 1` — a documented cost tradeoff ([ADR 0005](docs/adr/0005-aws-topology.md)).
+- Rate limiting is in-process (not distributed); observability is CloudWatch logs plus
+  structured request logging.
 
 ## Notes
 
-This README should be updated periodically as project decisions change and implementation progresses.
+This README is updated as the project evolves; the engineering log above is the change record.

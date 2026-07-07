@@ -37,6 +37,21 @@ sequenceDiagram
 The webhook event identifier is stored in `processed_webhooks` in the same transaction as
 the state change. Duplicate delivery is a no-op. A browser redirect cannot mark an order paid.
 
+## Observability
+
+Every HTTP request passes through ASGI middleware that assigns (or propagates) a request ID,
+returns it as the `X-Request-ID` response header, and emits a structured access log line tagged
+with that ID, the route, status and duration. A second middleware adds standard security response
+headers on every response, including ones raised from exception handlers.
+
+## Reservation sweep as reconciliation backstop
+
+Per ADR 0004, only a signature-verified Stripe webhook may mark an order paid — the webhook is the
+single source of payment truth. A background sweeper independently reconciles the other side of
+that boundary: it periodically releases stock reservations attached to orders that never reached
+a paid state, so an abandoned or failed checkout doesn't hold stock indefinitely. It does not
+grant payment authority; it only cleans up reservations once they expire.
+
 ## Glossary
 
 - **Available stock:** on-hand units minus units held by active reservations.

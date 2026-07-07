@@ -120,7 +120,26 @@ turns "a user saw an error" into "these exact log lines."
 
 **Interview line:** "No single control is the answer; each layer assumes another failed."
 
-## 12. The testing pyramid, deployed
+## 12. Authorization: the admin plane
+
+The admin capability ([ADR 0006](adr/0006-admin-authorization.md)) demonstrates the
+authorization questions interviewers probe:
+
+- **Where does authorization live?** Only in the API (`admin_session` dependency on every
+  `/admin` route, 401/403 tested for each). The UI hiding admin pages is UX, not security —
+  say this sentence in the interview and you're ahead of most candidates.
+- **How much RBAC?** Two roles, because one shop has one operator. Name the upgrade path
+  (role→permissions table) instead of building it — right-sizing is the skill being tested.
+- **Why an audit log, and why synchronous?** Every admin mutation writes who/what/when *in
+  the same transaction*, so the audit row and the change commit or roll back together.
+  Compliance frameworks (SOC 2, GDPR) fundamentally ask "who had access and what did they
+  do" — an async audit trail that can drop writes fails that question precisely when it
+  matters.
+- **State machines over booleans.** Order status transitions are an explicit allowlist
+  (paid→fulfilled, pending→cancelled, paid→refunded; else 409). Invalid states become
+  unrepresentable instead of "we validate in the UI."
+
+## 13. The testing pyramid, deployed
 
 Unit/service tests (checkout invariants, sweeper idempotency), contract tests (OpenAPI
 drift), frontend component tests (Testing Library), and an end-to-end compose smoke test in

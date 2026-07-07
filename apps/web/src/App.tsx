@@ -23,6 +23,7 @@ export function App() {
           <Link to={session ? "/account" : "/signin"}>
             {session ? session.user.name : "Sign in"}
           </Link>
+          {session?.user.role === "admin" && <Link to="/admin">Admin</Link>}
           <Link className="cart-link" to="/cart">
             Bag <span aria-label={`${itemCount} items`}>{itemCount}</span>
           </Link>

@@ -12,6 +12,15 @@ export type User = components["schemas"]["UserOut"];
 export type Session = components["schemas"]["SessionOut"];
 export type OrderItem = components["schemas"]["OrderItemOut"];
 export type Order = components["schemas"]["OrderOut"];
+export type AdminOrder = components["schemas"]["AdminOrderOut"];
+export type AdminOrderPage = components["schemas"]["AdminOrderPage"];
+export type AdminOrderStatusIn = components["schemas"]["AdminOrderStatusIn"];
+export type AdminProductIn = components["schemas"]["AdminProductIn"];
+export type AdminProductUpdateIn = components["schemas"]["AdminProductUpdateIn"];
+export type AdminVariantCreateIn = components["schemas"]["AdminVariantCreateIn"];
+export type AdminVariantUpdateIn = components["schemas"]["AdminVariantUpdateIn"];
+export type AuditLogEntry = components["schemas"]["AuditLogOut"];
+export type AuditLogPage = components["schemas"]["AuditLogPage"];
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

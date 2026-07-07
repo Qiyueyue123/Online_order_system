@@ -10,6 +10,7 @@ import { AccountPage } from "./pages/AccountPage";
 import { AuthPage } from "./pages/AuthPage";
 import { DemoPaymentPage } from "./pages/DemoPaymentPage";
 import { ProductPage } from "./pages/ProductPage";
+import { AdminPage } from "./pages/admin/AdminPage";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -26,6 +27,7 @@ const router = createBrowserRouter([
       { path: "/signin", element: <AuthPage /> },
       { path: "/account", element: <AccountPage /> },
       { path: "/demo-payment/:orderId", element: <DemoPaymentPage /> },
+      { path: "/admin", element: <AdminPage /> },
     ],
   },
 ]);

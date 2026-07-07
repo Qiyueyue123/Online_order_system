@@ -113,6 +113,13 @@ surfaced two live defects, both fixed:
   on which database driver you run isn't correctness. Ids are now parsed explicitly — 404 for
   invalid path params, logged skip for malformed webhook metadata (never a 500).
 
+The compose smoke-test job took three CI rounds to go green, both failures being
+environment truths rather than app bugs: (1) Linux runners enforce uid ownership on bind
+mounts, so the non-root container couldn't create its SQLite file (macOS Docker hides
+this); (2) the legacy app correctly refused to boot when CI supplied no admin credentials
+— the guard worked, CI had to provide a real value. *Lesson: e2e failures peel like an
+onion — each fix reveals the next thing the boot sequence needs.*
+
 Also landed today: legacy hardening (slot-capacity check moved inside the transaction —
 the classic check-then-act race; SQLite FK enforcement on; CSRF test bypass removed with
 real tokens in tests), the compose smoke-test CI job, and

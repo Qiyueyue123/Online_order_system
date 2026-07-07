@@ -79,7 +79,7 @@ jobs:
           cat > .env <<'EOF'
           SECRET_KEY=ci-smoke-test-secret-not-for-production-0000
           ADMIN_USERNAME=admin
-          ADMIN_PASSWORD_HASH=
+          ADMIN_PASSWORD=ci-smoke-only-password
           MANUAL_ORDER_ONLY=1
           SESSION_COOKIE_SECURE=0
           EOF

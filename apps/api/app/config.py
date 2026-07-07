@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     app_secret: str = "development-only-secret-change-me"
     web_origin: str = "http://localhost:5173"
     cookie_secure: bool = False
+    json_logs: bool = False
     session_days: int = 14
     reservation_minutes: int = 30
     reservation_sweep_interval_seconds: int = 300

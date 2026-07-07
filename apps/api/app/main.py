@@ -10,9 +10,15 @@ from sqlalchemy.orm import Session
 from .api import router
 from .config import get_settings
 from .db import engine
+from .observability import (
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+    configure_logging,
+)
 from .services.checkout import expire_stale_orders
 
 settings = get_settings()
+configure_logging(settings.json_logs)
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +66,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Added after CORS so they wrap it (outermost), guaranteeing the request-id
+# header, access log, and security headers cover every response -- including
+# CORS preflight replies and errors raised before reaching the router.
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware, hsts_enabled=settings.cookie_secure)
 app.include_router(router)
 
 

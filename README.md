@@ -70,7 +70,20 @@ Docs: [architecture](docs/architecture.md) · [operations](docs/operations.md) �
 [walkthrough](docs/walkthrough.md) · [external services](docs/external-services.md) ·
 [legacy café guide](docs/legacy-cafe.md).
 
-## Session status — morning of 2026-07-08
+## Session status — 2026-07-08 (admin rebuild in progress)
+
+**Current work:** building a real admin capability for the modern store. The store had
+essentially no admin surface (one stock-patch endpoint, no UI). In progress, in order:
+(1) admin API — orders list/status transitions, product/variant management, an
+AdminAuditLog table recording every admin mutation with its actor (grounded in RBAC/audit
+best practice: server-side role checks on every endpoint, least privilege, audit trail);
+(2) role-gated /admin UI section in the storefront; (3) ADR 0006 documenting the
+authorization design; (4) browser-driven walkthrough with screenshots.
+If this session stopped abruptly: check `git status` for uncommitted agent work, and the
+task list above reflects what was mid-flight. Browser-use is installed and connected
+(Chrome remote debugging enabled).
+
+## Previous session status — morning of 2026-07-08
 
 Overnight autonomous session ended when the usage limit was reached (~4:30am reset).
 

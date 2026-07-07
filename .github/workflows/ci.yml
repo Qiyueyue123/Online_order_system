@@ -70,6 +70,69 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: pytest tests
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write CI env file for legacy service
+        run: |
+          cat > .env <<'EOF'
+          SECRET_KEY=ci-smoke-test-secret-not-for-production-0000
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD_HASH=
+          MANUAL_ORDER_ONLY=1
+          SESSION_COOKIE_SECURE=0
+          EOF
+      - name: Build and start the stack
+        run: docker compose up -d --build
+      - name: Wait for api to be ready (migrate + seed must finish first)
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8001/healthz | grep -q '"status":"ok"'; then
+              echo "api is healthy"
+              exit 0
+            fi
+            echo "waiting for api... (${i}/60)"
+            sleep 2
+          done
+          echo "::error::api did not become healthy within 120s"
+          exit 1
+      - name: Assert seeded products are served by the api
+        run: |
+          body=$(curl -fsS http://localhost:8001/api/v1/products)
+          echo "$body" | jq -e '.items | length > 0' > /dev/null
+      - name: Wait for storefront to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:5173/ > /dev/null 2>&1; then
+              echo "storefront is up"
+              exit 0
+            fi
+            echo "waiting for storefront... (${i}/30)"
+            sleep 2
+          done
+          echo "::error::storefront did not come up within 60s"
+          exit 1
+      - name: Assert storefront serves the shop page
+        run: curl -fsS http://localhost:5173/ | grep -q "Matcha Store"
+      - name: Wait for legacy app to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/healthz | grep -q '"status":"ok"'; then
+              echo "legacy is healthy"
+              exit 0
+            fi
+            echo "waiting for legacy... (${i}/30)"
+            sleep 2
+          done
+          echo "::error::legacy did not become healthy within 60s"
+          exit 1
+      - name: Dump service logs on failure
+        if: failure()
+        run: docker compose logs --tail 100
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v
   terraform:
     runs-on: ubuntu-latest
     defaults:

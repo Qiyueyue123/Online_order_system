@@ -1,13 +1,46 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .config import get_settings
 from .db import Base, engine
-from .models import Category, Product, ProductImage, Variant
+from .models import Category, Product, ProductImage, Role, User, Variant
+from .security import hash_password
+
+
+def _bootstrap_admin(db: Session) -> None:
+    """Create-or-promote the admin account from ADMIN_EMAIL / ADMIN_PASSWORD.
+
+    There is no admin signup flow in the API (by design: admin accounts are
+    provisioned out-of-band, not self-served). This is the only bootstrap path
+    today. It's a no-op unless both env vars are set, and idempotent when they
+    are: re-running just refreshes the password/role on the existing row
+    instead of creating duplicates, so it's safe to run on every deploy.
+    """
+    settings = get_settings()
+    if not settings.admin_email or not settings.admin_password:
+        return
+    email = settings.admin_email.strip().lower()
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None:
+        db.add(
+            User(
+                email=email,
+                name="Administrator",
+                password_hash=hash_password(settings.admin_password),
+                role=Role.ADMIN,
+                email_verified=True,
+            )
+        )
+    else:
+        user.role = Role.ADMIN
+        user.password_hash = hash_password(settings.admin_password)
+    db.commit()
 
 
 def seed() -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as db:
+        _bootstrap_admin(db)
         if db.scalar(select(Product.id).limit(1)):
             return
         ceremonial = Category(slug="matcha", name="Matcha tins")

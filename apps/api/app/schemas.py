@@ -132,3 +132,72 @@ class OrderOut(ApiModel):
 class AdminStockIn(BaseModel):
     stock_on_hand: int = Field(ge=0)
     reason: str = Field(min_length=3, max_length=80)
+
+
+class AdminOrderOut(OrderOut):
+    created_at: datetime
+    user_id: uuid.UUID | None
+
+
+class AdminOrderPage(BaseModel):
+    items: list[AdminOrderOut]
+    page: int
+    page_size: int
+    total: int
+
+
+class AdminOrderStatusIn(BaseModel):
+    status: str = Field(min_length=1, max_length=40)
+    note: str | None = Field(default=None, max_length=240)
+
+
+class AdminImageIn(BaseModel):
+    url: str = Field(min_length=1, max_length=1000)
+    alt_text: str = Field(default="", max_length=240)
+    position: int = Field(default=0, ge=0)
+
+
+class AdminVariantCreateIn(BaseModel):
+    sku: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=120)
+    weight_grams: int = Field(gt=0)
+    price_sgd_cents: int = Field(ge=0)
+    stock_on_hand: int = Field(default=0, ge=0)
+
+
+class AdminProductIn(BaseModel):
+    slug: str = Field(min_length=1, max_length=120)
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(min_length=1)
+    category_slug: str | None = Field(default=None, max_length=80)
+    images: list[AdminImageIn] = Field(default_factory=list)
+    variants: list[AdminVariantCreateIn] = Field(min_length=1)
+
+
+class AdminProductUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = Field(default=None, min_length=1)
+    active: bool | None = None
+
+
+class AdminVariantUpdateIn(BaseModel):
+    price_sgd_cents: int | None = Field(default=None, ge=0)
+    stock_on_hand: int | None = Field(default=None, ge=0)
+    reason: str = Field(min_length=3, max_length=80)
+
+
+class AuditLogOut(BaseModel):
+    id: uuid.UUID
+    actor_user_id: uuid.UUID
+    action: str
+    entity_type: str
+    entity_id: str
+    detail: dict | None
+    created_at: datetime
+
+
+class AuditLogPage(BaseModel):
+    items: list[AuditLogOut]
+    page: int
+    page_size: int
+    total: int

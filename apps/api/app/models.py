@@ -32,6 +32,7 @@ class OrderStatus(str, enum.Enum):
     CANCELLED = "cancelled"
     EXPIRED = "expired"
     FULFILLED = "fulfilled"
+    REFUNDED = "refunded"
 
 
 class PaymentStatus(str, enum.Enum):
@@ -288,6 +289,27 @@ class RateLimitEvent(Base):
     __tablename__ = "rate_limit_events"
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     key: Mapped[str] = mapped_column(String(200), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class AdminAuditLog(Base):
+    """One row per admin mutation, written in the same transaction as the change.
+
+    `detail` holds a small JSON-serialised dict of context (e.g. old/new status,
+    changed fields) rather than a typed column set, since the shape varies by
+    action; callers should treat it as write-once diagnostic/compliance data,
+    not a queryable structure.
+    """
+
+    __tablename__ = "admin_audit_log"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    actor_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(60))
+    entity_type: Mapped[str] = mapped_column(String(40))
+    entity_id: Mapped[str] = mapped_column(String(64))
+    detail: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

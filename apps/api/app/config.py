@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     media_bucket: str = "matcha-demo-media"
     aws_region: str = "ap-southeast-1"
     shipping_countries: list[str] = Field(default_factory=lambda: ["SG", "MY", "JP", "AU", "NZ"])
+    # There is no in-product admin signup flow; admin accounts are provisioned
+    # out-of-band. Setting both of these makes `python -m app.seed` idempotently
+    # create-or-promote that account to Role.ADMIN. Leave unset to skip (default
+    # dev/test runs have neither set).
+    admin_email: str | None = None
+    admin_password: str | None = None
 
     @field_validator("shipping_countries", mode="before")
     @classmethod

@@ -143,6 +143,37 @@ def mark_order_paid(db: Session, order: Order) -> None:
     order.reservation_expires_at = None
 
 
+def _release_reservation(db: Session, order: Order, reason: str) -> None:
+    """Give back reserved stock for every line item, without touching stock_on_hand.
+
+    Shared by the automatic sweep (expire_order) and admin-initiated cancellation
+    (cancel_order) so both paths keep stock_reserved and InventoryMovement bookkeeping
+    consistent; only the terminal status and movement `reason` differ.
+    """
+    for item in order.items:
+        variant = db.get(Variant, item.variant_id)
+        variant.stock_reserved -= item.quantity
+        db.add(
+            InventoryMovement(
+                variant_id=variant.id,
+                quantity_delta=0,
+                reserved_delta=-item.quantity,
+                reason=reason,
+                reference=str(order.id),
+            )
+        )
+
+
+def cancel_order(db: Session, order: Order) -> None:
+    """Admin-initiated cancellation of a still-pending order (pending_payment -> cancelled)."""
+    if order.status != OrderStatus.PENDING_PAYMENT:
+        raise ValueError(f"Cannot cancel order in state {order.status}")
+    _release_reservation(db, order, "admin_cancelled")
+    order.status = OrderStatus.CANCELLED
+    order.payment.status = PaymentStatus.FAILED
+    order.reservation_expires_at = None
+
+
 def expire_stale_orders(db: Session) -> int:
     now = datetime.now(UTC)
     orders = db.scalars(
@@ -165,18 +196,7 @@ def expire_stale_orders(db: Session) -> int:
 def expire_order(db: Session, order: Order) -> None:
     if order.status != OrderStatus.PENDING_PAYMENT:
         return
-    for item in order.items:
-        variant = db.get(Variant, item.variant_id)
-        variant.stock_reserved -= item.quantity
-        db.add(
-            InventoryMovement(
-                variant_id=variant.id,
-                quantity_delta=0,
-                reserved_delta=-item.quantity,
-                reason="reservation_expired",
-                reference=str(order.id),
-            )
-        )
+    _release_reservation(db, order, "reservation_expired")
     order.status = OrderStatus.EXPIRED
     order.payment.status = PaymentStatus.FAILED
     order.reservation_expires_at = None

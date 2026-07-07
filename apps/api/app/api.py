@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -22,9 +23,9 @@ from .config import Settings, get_settings
 from .db import get_db
 from .models import (
     Cart,
-    InventoryMovement,
     LoginSession,
     Order,
+    OrderStatus,
     ProcessedWebhook,
     Product,
     Role,
@@ -32,7 +33,15 @@ from .models import (
     Variant,
 )
 from .schemas import (
+    AdminOrderOut,
+    AdminOrderPage,
+    AdminOrderStatusIn,
+    AdminProductIn,
+    AdminProductUpdateIn,
     AdminStockIn,
+    AdminVariantUpdateIn,
+    AuditLogOut,
+    AuditLogPage,
     CartItemIn,
     CartOut,
     CheckoutIn,
@@ -56,6 +65,15 @@ from .security import (
     optional_session,
     token_hash,
     verify_password,
+)
+from .services.admin import (
+    apply_order_transition,
+    create_product,
+    list_audit_log,
+    list_orders_admin,
+    update_product,
+    update_variant,
+    write_audit,
 )
 from .services.cart import cart_payload, get_or_create_cart, merge_guest_cart, set_item
 from .services.catalog import list_products
@@ -382,26 +400,195 @@ def get_order(
     return order
 
 
+# --- Admin ---------------------------------------------------------------
+#
+# Every mutation below is behind admin_session (admin role + CSRF) and writes
+# exactly one AdminAuditLog row in the same transaction as the change, so the
+# audit trail can never silently drift from what actually happened.
+
+
 @router.patch("/admin/variants/{variant_id}/stock", status_code=204)
 def update_stock(
     variant_id: str,
     data: AdminStockIn,
-    _: LoginSession = Depends(admin_session),
+    session: LoginSession = Depends(admin_session),
     db: Session = Depends(get_db),
 ):
+    """Legacy stock-only endpoint, kept working so existing callers don't break.
+
+    Superseded by PATCH /admin/variants/{variant_id}, which folds in price
+    updates too; new integrations should use that route. This one now shares
+    the same update_variant() logic instead of duplicating the stock checks.
+    """
     variant = db.get(Variant, _parse_uuid_or_404(variant_id, "Variant not found"))
     if not variant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
-    if data.stock_on_hand < variant.stock_reserved:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Stock cannot be below active reservations")
-    delta = data.stock_on_hand - variant.stock_on_hand
-    variant.stock_on_hand = data.stock_on_hand
-    db.add(
-        InventoryMovement(
-            variant_id=variant.id,
-            quantity_delta=delta,
-            reason="admin_adjustment",
-            reference=data.reason,
-        )
+    changes = update_variant(
+        db, variant, price_sgd_cents=None, stock_on_hand=data.stock_on_hand, reason=data.reason
+    )
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="variant_stock_updated",
+        entity_type="variant",
+        entity_id=variant.id,
+        detail=changes or None,
     )
     db.commit()
+
+
+@router.patch("/admin/variants/{variant_id}", status_code=204)
+def patch_variant(
+    variant_id: str,
+    data: AdminVariantUpdateIn,
+    session: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    if data.price_sgd_cents is None and data.stock_on_hand is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to update")
+    variant = db.get(Variant, _parse_uuid_or_404(variant_id, "Variant not found"))
+    if not variant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
+    changes = update_variant(
+        db,
+        variant,
+        price_sgd_cents=data.price_sgd_cents,
+        stock_on_hand=data.stock_on_hand,
+        reason=data.reason,
+    )
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="variant_updated",
+        entity_type="variant",
+        entity_id=variant.id,
+        detail=changes or None,
+    )
+    db.commit()
+
+
+@router.post("/admin/products", response_model=ProductOut, status_code=201)
+def create_admin_product(
+    data: AdminProductIn,
+    session: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    try:
+        product = create_product(db, data)
+        write_audit(
+            db,
+            actor_user_id=session.user_id,
+            action="product_created",
+            entity_type="product",
+            entity_id=product.id,
+            detail={"slug": product.slug, "name": product.name},
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Slug or SKU already exists") from None
+    db.refresh(product)
+    return _product_out(product)
+
+
+@router.patch("/admin/products/{product_id}", response_model=ProductOut)
+def patch_admin_product(
+    product_id: str,
+    data: AdminProductUpdateIn,
+    session: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    changes = update_product(db, product, data)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_updated",
+        entity_type="product",
+        entity_id=product.id,
+        detail=changes or None,
+    )
+    db.commit()
+    db.refresh(product)
+    return _product_out(product)
+
+
+@router.get("/admin/orders", response_model=AdminOrderPage)
+def admin_list_orders(
+    status_filter: str | None = Query(default=None, alias="status"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    _: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    order_status = None
+    if status_filter is not None:
+        try:
+            order_status = OrderStatus(status_filter)
+        except ValueError:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid status") from None
+    rows, total = list_orders_admin(db, order_status=order_status, page=page, page_size=page_size)
+    return AdminOrderPage(
+        items=[AdminOrderOut.model_validate(row) for row in rows],
+        page=page,
+        page_size=page_size,
+        total=total,
+    )
+
+
+@router.patch("/admin/orders/{order_id}", response_model=AdminOrderOut)
+def admin_update_order(
+    order_id: str,
+    data: AdminOrderStatusIn,
+    session: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    order = db.get(Order, _parse_uuid_or_404(order_id, "Order not found"))
+    if not order:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    try:
+        target = OrderStatus(data.status)
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid status") from None
+    previous = order.status
+    apply_order_transition(db, order, target)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="order_status_changed",
+        entity_type="order",
+        entity_id=order.id,
+        detail={"from": previous.value, "to": target.value, "note": data.note},
+    )
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@router.get("/admin/audit-log", response_model=AuditLogPage)
+def admin_audit_log(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    _: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    rows, total = list_audit_log(db, page=page, page_size=page_size)
+    return AuditLogPage(
+        items=[
+            AuditLogOut(
+                id=row.id,
+                actor_user_id=row.actor_user_id,
+                action=row.action,
+                entity_type=row.entity_type,
+                entity_id=row.entity_id,
+                detail=json.loads(row.detail) if row.detail else None,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ],
+        page=page,
+        page_size=page_size,
+        total=total,
+    )

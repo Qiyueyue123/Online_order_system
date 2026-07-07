@@ -14,3 +14,6 @@ apps/api/*.db
 apps/web/dist/
 apps/web/vite.config.js
 apps/web/vite.config.d.ts
+
+# Terraform local cache (providers/modules); lockfile IS committed
+**/.terraform/

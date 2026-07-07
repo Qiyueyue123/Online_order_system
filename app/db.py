@@ -149,6 +149,10 @@ class InventoryError(ValueError):
     pass
 
 
+class SlotCapacityError(ValueError):
+    pass
+
+
 def hash_admin_password(password):
     return ADMIN_PASSWORD_HASHER.hash(password)
 
@@ -183,6 +187,7 @@ def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(current_app.config["DATABASE"])
         g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
 
 
@@ -1289,6 +1294,29 @@ def create_order(name, customer_contact, pickup_at, payment_method, notes, items
 
     try:
         db.execute("BEGIN IMMEDIATE")
+
+        pickup_date = pickup_at.split("T", 1)[0]
+        pickup_day = db.execute(
+            """
+            SELECT slot_capacity
+            FROM pickup_days
+            WHERE pickup_date = ?
+            """,
+            (pickup_date,),
+        ).fetchone()
+        if pickup_day is not None:
+            active_slot_order_count = db.execute(
+                """
+                SELECT COUNT(*)
+                FROM orders
+                WHERE pickup_at = ? AND status != 'cancelled'
+                """,
+                (pickup_at,),
+            ).fetchone()[0]
+            if active_slot_order_count >= pickup_day["slot_capacity"]:
+                raise SlotCapacityError(
+                    "That pickup time just filled up. Please choose another slot."
+                )
 
         for product_id, item_data in items.items():
             quantity = item_data["quantity"]

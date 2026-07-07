@@ -155,7 +155,7 @@ def create_app(test_config=None):
 
     @app.before_request
     def validate_csrf_token():
-        if request.method != "POST" or app.config.get("TESTING"):
+        if request.method != "POST":
             return
         expected_token = session.get("_csrf_token")
         submitted_token = request.form.get("_csrf_token") or request.headers.get(

@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 
 from .db import (
     InventoryError,
+    SlotCapacityError,
     add_product_image,
     add_homepage_image,
     admin_password_hash_needs_upgrade,
@@ -323,6 +324,9 @@ def checkout():
                     notes=notes,
                     items=quantities,
                 )
+            except SlotCapacityError as exc:
+                flash(str(exc))
+                pickup_slots = build_pickup_slot_choices()
             except InventoryError as exc:
                 flash(str(exc))
             except ValueError as exc:

@@ -1,10 +1,15 @@
+import sqlite3
 from io import BytesIO
 from pathlib import Path
+
+import pytest
 
 from app import create_app
 from app.db import get_db, get_homepage_alert, get_menu_items, get_order, get_product_with_images, get_site_settings, hash_admin_password, init_db, list_pickup_days, list_stock_pools
 from app.routes import ADMIN_LOGIN_FAILURES, build_pickup_slot_choices
 from werkzeug.security import generate_password_hash
+
+from conftest import CsrfTestClient, extract_csrf_token
 
 
 def build_test_app(tmp_path):
@@ -22,6 +27,7 @@ def build_test_app(tmp_path):
             "CAFE_WHATSAPP_PHONE": "+6597888146",
         }
     )
+    app.test_client_class = CsrfTestClient
     with app.app_context():
         init_db()
     return app
@@ -244,6 +250,7 @@ def test_admin_login_accepts_legacy_werkzeug_hashes(tmp_path):
             "UPLOAD_FOLDER": str(tmp_path / "uploads"),
         }
     )
+    app.test_client_class = CsrfTestClient
     client = app.test_client()
 
     response = client.post(
@@ -1157,6 +1164,137 @@ def test_init_db_migrates_existing_site_settings_table(tmp_path):
         assert "homepage_image_alt" in columns
         assert homepage_images_table is not None
         assert settings["homepage_alert"] == "Legacy alert"
+
+
+def test_checkout_post_without_csrf_token_is_rejected(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    response = client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "+65 12345678",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "1",
+            "preparation_style_1": "water",
+        },
+        csrf=False,
+    )
+
+    assert response.status_code == 400
+
+    with app.app_context():
+        assert get_order(1) is None
+
+
+def test_checkout_post_with_token_scraped_from_rendered_page_succeeds(tmp_path):
+    app = build_test_app(tmp_path)
+    client = app.test_client()
+    pickup_value = first_pickup_value(app)
+
+    checkout_page = client.get("/checkout")
+    csrf_token = extract_csrf_token(checkout_page.data)
+
+    response = client.post(
+        "/checkout",
+        data={
+            "customer_name": "Qy",
+            "customer_contact": "+65 12345678",
+            "pickup_at": pickup_value,
+            "payment_method": "cash",
+            "quantity_1": "1",
+            "preparation_style_1": "water",
+            "_csrf_token": csrf_token,
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Order #1 received" in response.data
+
+
+def test_pickup_slot_rejects_order_once_capacity_is_reached(tmp_path):
+    app = build_test_app(tmp_path)
+    from app.db import SlotCapacityError, create_order
+
+    with app.app_context():
+        pickup_value = build_pickup_slot_choices()[0]["value"]
+        pickup_day = list_pickup_days(days=1)[0]
+        slot_capacity = pickup_day["slot_capacity"]
+        assert slot_capacity == 2
+
+        # Fill the slot up to (and including) its capacity: these must succeed.
+        for index in range(slot_capacity):
+            result = create_order(
+                name=f"Customer {index}",
+                customer_contact=f"+65 1000000{index}",
+                pickup_at=pickup_value,
+                payment_method="cash",
+                notes="",
+                items={1: {"quantity": 1, "preparation_style": "water"}},
+            )
+            assert result["order_id"] is not None
+
+        # The next order for the same slot must be rejected once it's full.
+        with pytest.raises(SlotCapacityError):
+            create_order(
+                name="One too many",
+                customer_contact="+65 19999999",
+                pickup_at=pickup_value,
+                payment_method="cash",
+                notes="",
+                items={1: {"quantity": 1, "preparation_style": "water"}},
+            )
+
+
+def test_pickup_slot_accepts_orders_up_to_capacity_minus_one(tmp_path):
+    app = build_test_app(tmp_path)
+    from app.db import create_order
+
+    with app.app_context():
+        pickup_value = build_pickup_slot_choices()[0]["value"]
+        pickup_day = list_pickup_days(days=1)[0]
+        slot_capacity = pickup_day["slot_capacity"]
+        assert slot_capacity == 2
+
+        for index in range(slot_capacity - 1):
+            result = create_order(
+                name=f"Customer {index}",
+                customer_contact=f"+65 1000000{index}",
+                pickup_at=pickup_value,
+                payment_method="cash",
+                notes="",
+                items={1: {"quantity": 1, "preparation_style": "water"}},
+            )
+            assert result["order_id"] is not None
+
+        # Still one seat left in the slot, so this booking must succeed.
+        remaining_slots = build_pickup_slot_choices()
+        matching_slot = next(
+            slot for slot in remaining_slots if slot["value"] == pickup_value
+        )
+        assert matching_slot["remaining_capacity"] == 1
+
+
+def test_foreign_key_violation_is_rejected(tmp_path):
+    app = build_test_app(tmp_path)
+
+    with app.app_context():
+        db = get_db()
+        fk_status = db.execute("PRAGMA foreign_keys").fetchone()[0]
+        assert fk_status == 1
+
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute(
+                """
+                INSERT INTO product_images (product_id, image_path, alt_text, sort_order)
+                VALUES (?, ?, ?, ?)
+                """,
+                (999999, "/static/images/orphan.png", "orphan image", 1),
+            )
 
 
 def test_seed_inventory_handles_legacy_site_settings_table(tmp_path):

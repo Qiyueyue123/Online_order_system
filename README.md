@@ -70,18 +70,32 @@ Docs: [architecture](docs/architecture.md) · [operations](docs/operations.md) �
 [walkthrough](docs/walkthrough.md) · [external services](docs/external-services.md) ·
 [legacy café guide](docs/legacy-cafe.md).
 
-## Session status — 2026-07-08 (admin rebuild in progress)
+## Session status — end of 2026-07-08
 
-**Current work:** building a real admin capability for the modern store. The store had
-essentially no admin surface (one stock-patch endpoint, no UI). In progress, in order:
-(1) admin API — orders list/status transitions, product/variant management, an
-AdminAuditLog table recording every admin mutation with its actor (grounded in RBAC/audit
-best practice: server-side role checks on every endpoint, least privilege, audit trail);
-(2) role-gated /admin UI section in the storefront; (3) ADR 0006 documenting the
-authorization design; (4) browser-driven walkthrough with screenshots.
-If this session stopped abruptly: check `git status` for uncommitted agent work, and the
-task list above reflects what was mid-flight. Browser-use is installed and connected
-(Chrome remote debugging enabled).
+**Done and green in CI (all six checks):** the admin rebuild is complete.
+- Admin API: `/api/v1/admin/*` — orders list + explicit status transitions
+  (paid→fulfilled, pending→cancelled with stock release, paid→refunded demo-only,
+  else 409), product/variant management, `AdminAuditLog` written in the same
+  transaction as every mutation, idempotent `ADMIN_EMAIL`/`ADMIN_PASSWORD` bootstrap.
+  54 API tests including 401/403 on every admin route.
+- Admin UI: role-gated `/admin` (Orders / Products / Audit log tabs); nav link only for
+  admins; UI gating is UX — the API enforces authz. 23 web tests.
+- Docs: [ADR 0006](docs/adr/0006-admin-authorization.md) records the authorization
+  decisions; [docs/system-design.md](docs/system-design.md) §12 has the interview phrasing.
+
+**In progress, resume here tomorrow (task: browser walkthrough + screenshots):**
+- Stack runs via `docker compose up -d`; admin login `admin@example.com` /
+  `demo-admin-pass-123` (local only; user was promoted via SQL — the seed bootstrap
+  env path is the proper route).
+- Screenshots so far in `docs/images/` (home, cart) — not yet referenced from this README.
+- Next: finish the checkout in the browser (was at the checkout form), demo-pay the
+  order, then in `/admin` fulfill it and screenshot the audit log; add a screenshot
+  gallery section to this README.
+- Note: `.local` emails are rejected by the API's validator — use `@example.com`.
+- Run `docker compose down` when finished (add `-v` to reset data).
+
+**Open decisions:** merge PR #1; AWS deploy (DEPLOY_ENABLED + secrets), domain for
+HTTPS, Stripe test keys. No unfixable bugs or blocked items outstanding.
 
 ## Previous session status — morning of 2026-07-08
 

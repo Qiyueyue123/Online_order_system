@@ -162,6 +162,36 @@ def test_replaying_same_event_id_is_a_no_op(client, db, monkeypatch):
     assert db.query(ProcessedWebhook).filter_by(event_id=event["id"]).count() == 1
 
 
+def test_webhook_sends_one_email_and_replay_does_not_resend(client, db, monkeypatch):
+    import app.api as api_module
+
+    _use_webhook_secret(client)
+    order, variant = pending_order(db)
+    event = fake_event("evt_completed_email", "checkout.session.completed", order.id)
+    monkeypatch.setattr(stripe.Webhook, "construct_event", lambda *a, **k: event)
+
+    sent = []
+    monkeypatch.setattr(
+        api_module, "send_order_confirmation", lambda order, s=None: sent.append(order.id)
+    )
+
+    first = client.post(
+        "/api/v1/stripe/webhook",
+        content=b"{}",
+        headers={"Stripe-Signature": "t=1,v1=whatever"},
+    )
+    assert first.status_code == 204
+    assert len(sent) == 1
+
+    second = client.post(
+        "/api/v1/stripe/webhook",
+        content=b"{}",
+        headers={"Stripe-Signature": "t=1,v1=whatever"},
+    )
+    assert second.status_code == 204
+    assert len(sent) == 1
+
+
 def test_checkout_session_expired_releases_reservation(client, db, monkeypatch):
     _use_webhook_secret(client)
     order, variant = pending_order(db)

@@ -39,11 +39,20 @@ services:
       APP_SECRET: development-only-secret-change-me
       WEB_ORIGIN: http://localhost:5173
       COOKIE_SECURE: "false"
+      EMAIL_BACKEND: smtp
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
     ports:
       - "8001:8001"
     depends_on:
       seed:
         condition: service_completed_successfully
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
   migrate:
     build: ./apps/api
@@ -63,6 +72,8 @@ services:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg://matcha:matcha@postgres:5432/matcha
       APP_SECRET: development-only-secret-change-me
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
     depends_on:
       migrate:
         condition: service_completed_successfully

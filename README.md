@@ -44,7 +44,17 @@ docker compose up --build
 ```
 
 Compose runs migrations and an idempotent seed before starting the API. Storefront:
-`http://localhost:5173` · API docs: `http://localhost:8001/docs`.
+`http://localhost:5173` · API docs: `http://localhost:8001/docs` · Mailpit (local email
+inbox — order confirmations land here): `http://localhost:8025`.
+
+To get a store admin account, set both of these in `.env` before the seed runs
+(see `.env.example`); the seed creates or promotes that user idempotently — there are
+no built-in admin credentials:
+
+```bash
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=choose-a-password
+```
 
 Manual development setup:
 
@@ -72,18 +82,24 @@ Docs: [architecture](docs/architecture.md) · [operations](docs/operations.md) �
 
 ## Walkthrough
 
-One order, end to end: browse → bag → checkout → simulated payment → admin fulfillment,
-with the audit log recording the admin action. (Payments run in local demo mode — the
-simulator page stands in for Stripe; in a deployed environment the Stripe-hosted checkout
-and webhook take its place, per [ADR 0004](docs/adr/0004-stripe-checkout.md).)
+One order, end to end: browse → bag → checkout → simulated payment → confirmation
+email → admin fulfillment, with the audit log recording the admin action. (Payments run
+in local demo mode — the simulator page stands in for Stripe; in a deployed environment
+the Stripe-hosted checkout and webhook take its place, per
+[ADR 0004](docs/adr/0004-stripe-checkout.md). Emails land in the Mailpit inbox locally,
+per [ADR 0007](docs/adr/0007-transactional-email.md).)
 
-| Storefront | Product page |
+| Storefront | The collection |
 | --- | --- |
-| ![Storefront home](docs/images/storefront-home.png) | ![Product page](docs/images/product-page.png) |
+| ![Storefront home](docs/images/storefront-home.png) | ![Catalog grid](docs/images/catalog-grid.png) |
 
-| Shopping bag | Admin — orders |
+| Product page | Shopping bag |
 | --- | --- |
-| ![Cart](docs/images/cart.png) | ![Admin orders](docs/images/admin-orders.png) |
+| ![Product page](docs/images/product-page.png) | ![Cart](docs/images/cart.png) |
+
+| Order confirmation email | Admin — orders |
+| --- | --- |
+| ![Order email in Mailpit](docs/images/order-email.png) | ![Admin orders](docs/images/admin-orders.png) |
 
 | Admin — audit log |
 | --- |
@@ -93,25 +109,29 @@ The last screenshot is the point of the admin design: the order was marked fulfi
 the audit log shows *who* changed *what*, *when* — written in the same transaction as the
 change itself ([ADR 0006](docs/adr/0006-admin-authorization.md)).
 
-## Session status — end of 2026-07-08
+## Session status — end of 2026-07-08 (evening)
 
-**Walkthrough complete.** The full order lifecycle was exercised in a real browser:
-checkout → simulated payment → admin fulfillment → audit log entry. Screenshots are in
-the Walkthrough section above.
+Three things landed today, all green in CI:
 
-**Doing the walkthrough found (and fixed) a real bug:** every admin *read* view 403'd in
-the browser because `admin_session` required a CSRF token on GET requests — see the
-engineering log entry below. Fix + 3 regression tests landed; suite is now
-45 legacy + 57 API + 23 web = 125 tests, all passing locally.
+1. **Admin CSRF-on-GET bug** found by the browser walkthrough, fixed with regression
+   tests (log entry below).
+2. **Order confirmation email** ([ADR 0007](docs/adr/0007-transactional-email.md)):
+   pluggable console/SMTP backend, sent after commit from both payment paths, never
+   resent on webhook replays. Locally, emails arrive in Mailpit at `http://localhost:8025`.
+   Admin bootstrap is now explicit: `ADMIN_EMAIL`/`ADMIN_PASSWORD` in `.env` (documented
+   in `.env.example`) — the earlier `admin@example.com` / `demo-admin-pass-123` account
+   exists only in the local database volume from a manual promotion.
+3. **Storefront design refresh**: refined Japanese-editorial direction (washi texture,
+   pine + persimmon accent, monoline SVG product illustrations, staggered reveal), the
+   seed catalog expanded from 2 to 8 products, footer/breadcrumb/status-chip fixes.
+   Gallery above shows the result.
 
-**How to resume:** `docker compose up -d`, admin login `admin@example.com` /
-`demo-admin-pass-123` (local demo data only). `.local` emails are rejected by the
-validator — use `@example.com`. Run `docker compose down` when finished
-(add `-v` to reset data).
+Suite: 45 legacy + 63 API + 23 web = **131 tests**, all passing.
 
 **Open decisions (yours):** merge PR #1; AWS deploy (`DEPLOY_ENABLED` + AWS secrets),
-`domain_name` for HTTPS, Stripe test keys for the deployed environment.
-No unfixable bugs or permission-blocked items outstanding.
+`domain_name` for HTTPS, Stripe test keys for the deployed environment. Still on the
+roadmap: metrics/error tracking (Sentry), remote Terraform state, multi-AZ.
+Run `docker compose down` when finished (add `-v` to reset data).
 
 ## Previous session status — morning of 2026-07-08
 
@@ -139,6 +159,47 @@ provision Stripe test keys to the deployed environment.
 ## Engineering log
 
 A running record of significant changes, what each one did, and why it matters. Newest first.
+
+### 2026-07-08 — Order confirmation email: a side effect that must not lie
+
+Paying an order now sends a plain-text receipt. The interesting part is *when* it sends
+([ADR 0007](docs/adr/0007-transactional-email.md)):
+
+- **After the commit, never inside the transaction.** An SMTP call mid-transaction holds
+  row locks for the duration of a network round-trip, and a rollback after a send means
+  the customer got a confirmation for an order that never happened. The email is
+  dispatched only once `db.commit()` has succeeded.
+- **Only when *this request* made the order paid.** Stripe delivers webhooks
+  at-least-once; a replayed `checkout.session.completed` that no-ops must not resend.
+  The transition is detected before `mark_order_paid` and the send is gated on it.
+- **A failed send never fails the request.** Otherwise Stripe would retry the webhook and
+  a mail outage would double-process payments. Failures are logged and dropped —
+  at-most-once delivery, accepted for a demo; the production upgrade is a transactional
+  outbox (write the pending email in the same transaction, deliver from a worker).
+- Locally, compose now runs [Mailpit](https://mailpit.axllent.org/) — a fake SMTP server
+  with a web inbox at `http://localhost:8025`, so "did the email send" is something you
+  can *see* instead of infer from logs.
+
+### 2026-07-08 — Design refresh: what "AI-looking" actually was
+
+The storefront worked but felt undone. The audit said why: 79 lines of CSS for the whole
+app, kanji-on-a-colored-block placeholders where product images should be, a two-product
+catalog, no texture, no motion. The fixes, in order of impact:
+
+- **Catalog content**: 2 products → 8 (11 variants) with believable copy. No amount of
+  CSS makes a two-item shop look real. The seed became idempotent *per product* (insert
+  missing slugs only) instead of skip-if-anything-exists, so existing databases pick up
+  the new items on the next seed run.
+- **Product art**: a `ProductArt` component mapping slug/category to monoline SVG
+  illustrations (tin, whisk, bowl, scoop, sifter, leaf) on tinted paper — deliberate
+  art direction instead of a missing-image fallback.
+- **A committed direction**: washi-cream base, deep pine, one burnt-persimmon accent,
+  hairline rules, a ghosted enso in the hero, SVG-noise grain, tightened display type,
+  one staggered card reveal. Distinctive choices executed consistently read as designed;
+  evenly-hedged defaults read as generated.
+- Kept honest: all 23 web tests pass unchanged (they query semantics — roles, labels,
+  text — not pixels), lint and production build clean, reduced-motion respected, no new
+  dependencies.
 
 ### 2026-07-08 — The admin console rendered empty tables: CSRF checks belong on writes, not reads
 

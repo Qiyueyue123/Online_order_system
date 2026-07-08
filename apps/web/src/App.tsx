@@ -19,7 +19,7 @@ export function App() {
         </Link>
         <nav aria-label="Primary navigation">
           <Link to="/">Shop</Link>
-          <a href="#story">Our story</a>
+          <Link to="/#story">Our story</Link>
           <Link to={session ? "/account" : "/signin"}>
             {session ? session.user.name : "Sign in"}
           </Link>
@@ -33,11 +33,25 @@ export function App() {
         <Outlet />
       </main>
       <footer>
-        <div>
-          <span className="brand">MORI MATCHA</span>
-          <p>Fictional Japanese tea goods, curated in Singapore.</p>
+        <div className="footer-brand">
+          <span className="brand"><span>森</span> MORI MATCHA</span>
+          <p>Fictional Japanese tea goods, curated in Singapore. A portfolio storefront—every order here is a demonstration.</p>
         </div>
-        <p>Taxes, import duties and currency conversion are outside this demonstration.</p>
+        <div className="footer-col">
+          <h4>Shop</h4>
+          <ul>
+            <li><Link to="/">All products</Link></li>
+            <li><Link to="/#story">Our story</Link></li>
+            <li><Link to="/cart">Your bag</Link></li>
+          </ul>
+        </div>
+        <div className="footer-col">
+          <h4>Account</h4>
+          <ul>
+            <li><Link to={session ? "/account" : "/signin"}>{session ? "Your account" : "Sign in"}</Link></li>
+          </ul>
+        </div>
+        <p className="footer-disclaimer">Taxes, import duties and currency conversion are outside this demonstration. Payments run through Stripe test mode; no real charge is ever made.</p>
       </footer>
     </>
   );

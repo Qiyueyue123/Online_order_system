@@ -66,7 +66,7 @@ export function AdminOrders({ csrfToken }: { csrfToken: string }) {
               <td>{order.display_number}</td>
               <td>{order.email}</td>
               <td>
-                <span className="status">{order.status.replace("_", " ")}</span>
+                <span className={`status status--${order.status}`}>{order.status.replace("_", " ")}</span>
               </td>
               <td>{money(order.total_cents)}</td>
               <td>{new Date(order.created_at).toLocaleString()}</td>

@@ -79,6 +79,7 @@ from .services.admin import (
 from .services.cart import cart_payload, get_or_create_cart, merge_guest_cart, set_item
 from .services.catalog import list_products
 from .services.checkout import create_pending_order, expire_order, mark_order_paid
+from .services.email import send_order_confirmation
 from .services.rate_limit import check_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -337,12 +338,24 @@ async def stripe_webhook(
             logger.warning("stripe webhook metadata order_id is not a valid UUID: %r", order_id)
         else:
             order = db.get(Order, order_uuid)
+    newly_paid = False
     if event_type == "checkout.session.completed" and order:
+        newly_paid = order.status != OrderStatus.PAID
         mark_order_paid(db, order)
     elif event_type == "checkout.session.expired" and order:
         expire_order(db, order)
     db.add(ProcessedWebhook(event_id=event["id"], event_type=event_type))
     db.commit()
+    # Email only after the commit: a slow SMTP call inside the transaction would hold
+    # row locks, and a rollback after send would confirm an order that never happened.
+    # A replayed event that no-ops (already paid) must not resend, so we only send when
+    # this request actually performed the pending -> paid transition.
+    if newly_paid:
+        db.refresh(order)
+        try:
+            send_order_confirmation(order, settings)
+        except Exception:
+            logger.exception("failed to send order confirmation email for order %s", order.id)
 
 
 @router.get("/orders", response_model=list[OrderOut])
@@ -376,9 +389,16 @@ def complete_demo_payment(
     guest_access = lookup_token and order.lookup_token_hash == token_hash(lookup_token)
     if not account_access and not guest_access:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    newly_paid = order.status != OrderStatus.PAID
     mark_order_paid(db, order)
     db.commit()
     db.refresh(order)
+    # Email only after the commit: see the identical note in stripe_webhook above.
+    if newly_paid:
+        try:
+            send_order_confirmation(order, settings)
+        except Exception:
+            logger.exception("failed to send order confirmation email for order %s", order.id)
     return order
 
 

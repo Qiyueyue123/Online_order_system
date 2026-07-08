@@ -44,7 +44,7 @@ export function AccountPage() {
             <strong>{order.display_number}</strong>
             <p>{order.items.map((item) => `${item.product_name} × ${item.quantity}`).join(", ")}</p>
           </div>
-          <div><span className="status">{order.status.replace("_", " ")}</span><strong>{money(order.total_cents)}</strong></div>
+          <div><span className={`status status--${order.status}`}>{order.status.replace("_", " ")}</span><strong>{money(order.total_cents)}</strong></div>
         </article>
       ))}
     </div>

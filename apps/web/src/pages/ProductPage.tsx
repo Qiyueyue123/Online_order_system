@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, Cart, money, Product } from "../api/client";
+import { ProductArt } from "../components/ProductArt";
 
 export function ProductPage() {
   const { slug = "" } = useParams();
@@ -17,9 +18,11 @@ export function ProductPage() {
   const selected = variantId || product.data.variants[0]?.id;
   return (
     <div className="page product-detail">
-      <div className="detail-art">{product.data.images[0] ? <img src={product.data.images[0].url} alt={product.data.images[0].alt_text} /> : <span>抹茶</span>}</div>
+      <div className="detail-art">
+        <ProductArt slug={product.data.slug} category={product.data.category} name={product.data.name} />
+      </div>
       <section>
-        <Link to="/">← Collection</Link>
+        <Link className="back-link" to="/">← Collection</Link>
         <p className="eyebrow">{product.data.category}</p>
         <h1>{product.data.name}</h1>
         <p>{product.data.description}</p>

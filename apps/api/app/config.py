@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # dev/test runs have neither set).
     admin_email: str | None = None
     admin_password: str | None = None
+    email_backend: str = "console"
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    email_from: str = "orders@morimatcha.example"
 
     @field_validator("shipping_countries", mode="before")
     @classmethod

@@ -28,9 +28,9 @@ def pending_order(db, *, stock=4, reserved=2, quantity=2):
         total_cents=3200 * quantity + 600,
         shipping_name="Guest",
         shipping_line1="1 Tea Street",
-        shipping_city="Singapore",
-        shipping_postal_code="018956",
-        shipping_country_code="SG",
+        shipping_city="Umea",
+        shipping_postal_code="90325",
+        shipping_country_code="SE",
         reservation_expires_at=datetime.now(UTC),
         items=[
             OrderItem(

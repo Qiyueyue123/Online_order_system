@@ -495,8 +495,8 @@ export interface components {
             name: string;
             /** Weight Grams */
             weight_grams: number;
-            /** Price Sgd Cents */
-            price_sgd_cents: number;
+            /** Price Cents */
+            price_cents: number;
             /**
              * Stock On Hand
              * @default 0
@@ -505,8 +505,8 @@ export interface components {
         };
         /** AdminVariantUpdateIn */
         AdminVariantUpdateIn: {
-            /** Price Sgd Cents */
-            price_sgd_cents?: number | null;
+            /** Price Cents */
+            price_cents?: number | null;
             /** Stock On Hand */
             stock_on_hand?: number | null;
             /** Reason */
@@ -591,7 +591,7 @@ export interface components {
             subtotal_cents: number;
             /**
              * Currency
-             * @default SGD
+             * @default SEK
              */
             currency: string;
         };
@@ -779,8 +779,8 @@ export interface components {
             name: string;
             /** Weight Grams */
             weight_grams: number;
-            /** Price Sgd Cents */
-            price_sgd_cents: number;
+            /** Price Cents */
+            price_cents: number;
             /** Available Stock */
             available_stock: number;
         };

@@ -11,14 +11,14 @@ def make_order(db, variant, *, status, reservation_expires_at, quantity=1):
         display_number=f"M{datetime.now(UTC):%y%m%d%H%M%S%f}",
         email="guest@example.com",
         status=status,
-        subtotal_cents=variant.price_sgd_cents * quantity,
+        subtotal_cents=variant.price_cents * quantity,
         shipping_cents=600,
-        total_cents=variant.price_sgd_cents * quantity + 600,
+        total_cents=variant.price_cents * quantity + 600,
         shipping_name="Guest",
         shipping_line1="1 Tea Street",
-        shipping_city="Singapore",
-        shipping_postal_code="018956",
-        shipping_country_code="SG",
+        shipping_city="Umea",
+        shipping_postal_code="90325",
+        shipping_country_code="SE",
         reservation_expires_at=reservation_expires_at,
     )
     db.add(order)
@@ -30,7 +30,7 @@ def make_order(db, variant, *, status, reservation_expires_at, quantity=1):
             product_name=variant.product.name,
             variant_name=variant.name,
             sku=variant.sku,
-            unit_price_cents=variant.price_sgd_cents,
+            unit_price_cents=variant.price_cents,
             quantity=quantity,
         )
     )

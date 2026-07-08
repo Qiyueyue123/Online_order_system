@@ -7,9 +7,9 @@ from app.models import Coupon, Order
 CHECKOUT_ADDRESS = {
     "recipient_name": "Guest",
     "line1": "1 Tea Street",
-    "city": "Singapore",
-    "postal_code": "018956",
-    "country_code": "SG",
+    "city": "Umea",
+    "postal_code": "90325",
+    "country_code": "SE",
 }
 
 
@@ -34,7 +34,7 @@ def test_valid_percent_coupon_applies_exact_discount_and_shipping(client, db):
 
     subtotal = 3200 * 2  # 6400
     discount = subtotal * 10 // 100  # 640
-    shipping = 600  # SG shipping rate
+    shipping = 0  # SE pickup, free
     assert order.subtotal_cents == subtotal
     assert order.discount_cents == discount
     assert order.shipping_cents == shipping
@@ -76,7 +76,7 @@ def test_no_coupon_charges_full_price(client, db):
     order = db.get(Order, uuid.UUID(response.json()["order_id"]))
 
     subtotal = 3200 * 3
-    shipping = 600
+    shipping = 0
     assert order.discount_cents == 0
     assert order.total_cents == subtotal + shipping
 

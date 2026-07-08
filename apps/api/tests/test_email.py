@@ -26,9 +26,9 @@ def build_order(db):
         shipping_name="Guest Person",
         shipping_line1="1 Tea Street",
         shipping_line2="Unit 02-03",
-        shipping_city="Singapore",
-        shipping_postal_code="018956",
-        shipping_country_code="SG",
+        shipping_city="Umea",
+        shipping_postal_code="90325",
+        shipping_country_code="SE",
         items=[
             OrderItem(
                 variant_id=variant.id,
@@ -68,10 +68,10 @@ def test_render_order_confirmation_includes_line_items_and_money_formatting(db):
 
     assert order.display_number in body
     assert f"{product_line(order)}" in body
-    assert "Subtotal: 64.00 SGD" in body
-    assert "Shipping: 6.00 SGD" in body
-    assert "Discount: 1.00 SGD" in body
-    assert "Total: 69.00 SGD" in body
+    assert "Subtotal: 64.00 SEK" in body
+    assert "Shipping: 6.00 SEK" in body
+    assert "Discount: 1.00 SEK" in body
+    assert "Total: 69.00 SEK" in body
     assert "Guest Person" in body
     assert "Unit 02-03" in body
     assert "demonstration store" in body
@@ -79,7 +79,7 @@ def test_render_order_confirmation_includes_line_items_and_money_formatting(db):
 
 def product_line(order):
     item = order.items[0]
-    return f"{item.product_name} ({item.variant_name}) x{item.quantity} @ 32.00 SGD"
+    return f"{item.product_name} ({item.variant_name}) x{item.quantity} @ 32.00 SEK"
 
 
 def test_send_order_confirmation_dispatches_through_backend(db, monkeypatch):

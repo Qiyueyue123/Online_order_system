@@ -13,7 +13,7 @@ class VariantOut(ApiModel):
     sku: str
     name: str
     weight_grams: int
-    price_sgd_cents: int
+    price_cents: int
     available_stock: int
 
 
@@ -82,7 +82,7 @@ class CartItemOut(BaseModel):
 class CartOut(BaseModel):
     items: list[CartItemOut]
     subtotal_cents: int
-    currency: str = "SGD"
+    currency: str = "SEK"
 
 
 class AddressIn(BaseModel):
@@ -161,7 +161,7 @@ class AdminVariantCreateIn(BaseModel):
     sku: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=120)
     weight_grams: int = Field(gt=0)
-    price_sgd_cents: int = Field(ge=0)
+    price_cents: int = Field(ge=0)
     stock_on_hand: int = Field(default=0, ge=0)
 
 
@@ -181,7 +181,7 @@ class AdminProductUpdateIn(BaseModel):
 
 
 class AdminVariantUpdateIn(BaseModel):
-    price_sgd_cents: int | None = Field(default=None, ge=0)
+    price_cents: int | None = Field(default=None, ge=0)
     stock_on_hand: int | None = Field(default=None, ge=0)
     reason: str = Field(min_length=3, max_length=80)
 

@@ -21,7 +21,7 @@ from ..models import (
 from ..schemas import CheckoutIn
 from ..security import token_hash
 
-SHIPPING_RATES = {"SG": 600, "MY": 1200, "JP": 1800, "AU": 2000, "NZ": 2200}
+SHIPPING_RATES = {"SE": 0}
 
 
 def create_pending_order(
@@ -49,7 +49,7 @@ def create_pending_order(
         variant = variants[item.variant_id]
         if not variant.active or item.quantity > variant.available_stock:
             raise HTTPException(status.HTTP_409_CONFLICT, f"{variant.sku} is unavailable")
-        subtotal += variant.price_sgd_cents * item.quantity
+        subtotal += variant.price_cents * item.quantity
 
     discount = 0
     if data.coupon_code:
@@ -94,7 +94,7 @@ def create_pending_order(
                 product_name=variant.product.name,
                 variant_name=variant.name,
                 sku=variant.sku,
-                unit_price_cents=variant.price_sgd_cents,
+                unit_price_cents=variant.price_cents,
                 quantity=cart_item.quantity,
             )
         )

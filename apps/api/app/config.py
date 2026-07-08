@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     media_bucket: str = "matcha-demo-media"
     aws_region: str = "ap-southeast-1"
-    shipping_countries: list[str] = Field(default_factory=lambda: ["SG", "MY", "JP", "AU", "NZ"])
+    shipping_countries: list[str] = Field(default_factory=lambda: ["SE"])
     # There is no in-product admin signup flow; admin accounts are provisioned
     # out-of-band. Setting both of these makes `python -m app.seed` idempotently
     # create-or-promote that account to Role.ADMIN. Leave unset to skip (default

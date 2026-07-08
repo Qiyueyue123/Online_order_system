@@ -201,10 +201,57 @@ footer {
   top: 6rem;
   right: clamp(1rem, 8vw, 7rem);
 }
-.hero .vertical-label { position: absolute; top: 8.5rem; right: clamp(2.5rem, 12vw, 10rem); }
+.hero .vertical-label { position: absolute; top: 8.5rem; right: clamp(2.5rem, 12vw, 10rem); color: #f4eedd; opacity: 0.85; }
 .hero-copy { position: relative; max-width: 40rem; }
-.hero h1 { margin: 0.6rem 0 1.25rem; font-size: clamp(3.6rem, 8vw, 7rem); }
-.hero-copy > p:not(.eyebrow) { max-width: 34rem; font-size: 1.1rem; line-height: 1.7; color: var(--ink-soft); }
+.hero h1 { margin: 0.6rem 0 1.25rem; font-size: clamp(3.6rem, 8vw, 7rem); color: #f8f4e8; }
+.hero-copy .eyebrow { color: #e7ddc2; }
+.hero-copy > p:not(.eyebrow) { max-width: 34rem; font-size: 1.1rem; line-height: 1.7; color: #e7e2d3; }
+
+/* Real-media hero carousel: absolute-positioned slides crossfaded with a
+   plain opacity transition, sitting behind the editorial text overlay. */
+.hero-carousel {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--pine-dark);
+}
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.1s ease;
+}
+.hero-slide.is-active { opacity: 1; }
+.hero-slide img, .hero-slide video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, rgba(15, 33, 24, 0.82) 8%, rgba(15, 33, 24, 0.45) 48%, rgba(15, 33, 24, 0.15) 78%);
+}
+.hero-pause {
+  position: absolute;
+  right: clamp(1.25rem, 4vw, 2.5rem);
+  bottom: 1.75rem;
+  z-index: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(244, 238, 221, 0.55);
+  border-radius: 2rem;
+  color: #f4eedd;
+  background: rgba(15, 33, 24, 0.35);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.hero-pause:hover { background: rgba(15, 33, 24, 0.55); }
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide { transition: none; }
+}
 
 .button {
   display: inline-flex;
@@ -305,6 +352,19 @@ footer {
 .tone-2 { background: #ecdccb; }
 .tone-3 { background: #dee6d9; }
 
+.product-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+.product-card:hover .product-photo { transform: scale(1.045); }
+
+.retail-heading { margin-top: 4.5rem; }
+.retail-heading h3 { margin: 0.35rem 0 0; font-size: clamp(1.6rem, 3vw, 2.25rem); }
+.retail-grid { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 760px) { .retail-grid { grid-template-columns: 1fr 1fr; } }
+
 .product-meta { display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; }
 .product-meta h3 { margin: 0.25rem 0; font-family: "Libre Caslon Display", serif; font-size: 1.45rem; }
 .product-meta p { margin: 0; }
@@ -331,6 +391,20 @@ footer {
   align-items: center;
 }
 .product-detail .detail-art { aspect-ratio: 1 / 1; }
+.detail-gallery { display: grid; gap: 1rem; }
+.gallery-thumbs { display: flex; gap: 0.75rem; }
+.gallery-thumb {
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--paper-panel);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.gallery-thumb.active, .gallery-thumb:hover { border-color: var(--pine); }
 .product-detail h1 { font-size: clamp(2.75rem, 6vw, 4.75rem); margin: 0.5rem 0; }
 .back-link { display: block; margin-bottom: 1.75rem; color: var(--ink-soft); font-size: 0.9rem; }
 .back-link:hover { color: var(--persimmon); }
@@ -376,6 +450,8 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 .cart-row p { color: var(--ink-soft); margin: 0.35rem 0 0; }
 .cart-total { display: flex; justify-content: space-between; padding: 2rem 0; font-size: 1.2rem; }
 .cart-total strong { color: var(--persimmon); }
+.cart-total--pickup { padding: 0 0 2rem; font-size: 0.85rem; color: var(--ink-soft); }
+.cart-total--pickup strong { color: var(--ink-soft); font-weight: 500; }
 .full { width: 100%; }
 .empty { padding: 4rem; border: 1px dashed var(--line-strong); text-align: center; }
 
@@ -387,6 +463,14 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
   margin: auto;
 }
 .checkout form { padding: 2.25rem; background: var(--paper-panel); border: 1px solid var(--line); }
+.checkout-note {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-panel);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
 .checkout h1 { margin-bottom: 1rem; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 

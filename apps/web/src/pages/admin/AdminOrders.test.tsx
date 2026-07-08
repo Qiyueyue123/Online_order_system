@@ -21,7 +21,7 @@ const ordersPage: AdminOrderPage = {
       discount_cents: 0,
       shipping_cents: 500,
       total_cents: 4300,
-      currency: "SGD",
+      currency: "SEK",
       items: [],
       created_at: "2026-01-01T00:00:00Z",
       user_id: null,

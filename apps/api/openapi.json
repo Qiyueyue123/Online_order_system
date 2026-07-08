@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Matcha Demonstration Store API",
-    "description": "SGD-only portfolio store. Test payments; duties, taxes and conversion excluded.",
+    "description": "Matcha drinks cafe run from a dorm kitchen in Umea, Sweden. Test payments only; no real money changes hands.",
     "version": "1.0.0"
   },
   "paths": {
@@ -1707,10 +1707,10 @@
             "exclusiveMinimum": 0.0,
             "title": "Weight Grams"
           },
-          "price_sgd_cents": {
+          "price_cents": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Price Sgd Cents"
+            "title": "Price Cents"
           },
           "stock_on_hand": {
             "type": "integer",
@@ -1724,13 +1724,13 @@
           "sku",
           "name",
           "weight_grams",
-          "price_sgd_cents"
+          "price_cents"
         ],
         "title": "AdminVariantCreateIn"
       },
       "AdminVariantUpdateIn": {
         "properties": {
-          "price_sgd_cents": {
+          "price_cents": {
             "anyOf": [
               {
                 "type": "integer",
@@ -1740,7 +1740,7 @@
                 "type": "null"
               }
             ],
-            "title": "Price Sgd Cents"
+            "title": "Price Cents"
           },
           "stock_on_hand": {
             "anyOf": [
@@ -1938,7 +1938,7 @@
           "currency": {
             "type": "string",
             "title": "Currency",
-            "default": "SGD"
+            "default": "SEK"
           }
         },
         "type": "object",
@@ -2386,9 +2386,9 @@
             "type": "integer",
             "title": "Weight Grams"
           },
-          "price_sgd_cents": {
+          "price_cents": {
             "type": "integer",
-            "title": "Price Sgd Cents"
+            "title": "Price Cents"
           },
           "available_stock": {
             "type": "integer",
@@ -2401,7 +2401,7 @@
           "sku",
           "name",
           "weight_grams",
-          "price_sgd_cents",
+          "price_cents",
           "available_stock"
         ],
         "title": "VariantOut"

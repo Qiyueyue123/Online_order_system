@@ -39,7 +39,7 @@ const cart: Cart = {
     },
   ],
   subtotal_cents: 12100,
-  currency: "SGD",
+  currency: "SEK",
 };
 
 describe("CartPage", () => {
@@ -59,16 +59,16 @@ describe("CartPage", () => {
     expect(screen.getByText("Bamboo Whisk")).toBeInTheDocument();
     expect(screen.getByText(/30g tin/)).toBeInTheDocument();
     expect(screen.getByText(/Qty 2/)).toBeInTheDocument();
-    expect(screen.getByText("$76.00")).toBeInTheDocument();
-    expect(screen.getByText("$45.00")).toBeInTheDocument();
-    expect(screen.getByText("$121.00")).toBeInTheDocument();
+    expect(screen.getByText(/76,00\s*kr/)).toBeInTheDocument();
+    expect(screen.getByText(/45,00\s*kr/)).toBeInTheDocument();
+    expect(screen.getByText(/121,00\s*kr/)).toBeInTheDocument();
   });
 
   it("shows an empty state when the bag has no items", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ items: [], subtotal_cents: 0, currency: "SGD" }), { status: 200 }),
+        new Response(JSON.stringify({ items: [], subtotal_cents: 0, currency: "SEK" }), { status: 200 }),
       ),
     );
 

@@ -1,15 +1,18 @@
-# Matcha Store
+# QY & YX's Cafe — matcha drinks, Umeå
 
-A full-stack e-commerce demonstration store for packaged matcha, built as a portfolio project
-that shows the complete path from a beginner Flask prototype to a production-shaped system:
-typed API contracts, transactional inventory, test-mode payments, infrastructure as code, and
-CI that guards all of it.
+The online store for a real one-person matcha café run from a dormitory kitchen in Umeå,
+Sweden: drinks whisked to order, picked up in person, with a small take-home shelf of tins
+and tools. It doubles as a portfolio project showing the path from a beginner Flask
+prototype (the café's first site, kept in `app/`) to a production-shaped system: typed API
+contracts, transactional inventory, test-mode payments, transactional email, infrastructure
+as code, and CI that guards all of it.
 
 **Stack:** FastAPI + SQLAlchemy 2.0 + PostgreSQL · React 19 + TypeScript + Vite · Stripe (test
 mode) · Terraform on AWS (S3/CloudFront, ECS Fargate, RDS) · GitHub Actions CI/CD.
 
-It charges SGD only and never accepts live payments. Taxes, import duties, returns automation,
-and currency conversion are explicitly out of scope.
+Prices are in SEK. Payments run in Stripe test mode only — the plan for going live is Stripe
+with cards + Swish (Stripe supports Swish natively in SEK) plus a pay-at-pickup option.
+Taxes and returns automation are out of scope.
 
 ## Repository layout
 
@@ -82,18 +85,18 @@ Docs: [architecture](docs/architecture.md) · [operations](docs/operations.md) �
 
 ## Walkthrough
 
-One order, end to end: browse → bag → checkout → simulated payment → confirmation
+One order, end to end: browse the menu → bag → checkout → simulated payment → confirmation
 email → admin fulfillment, with the audit log recording the admin action. (Payments run
 in local demo mode — the simulator page stands in for Stripe; in a deployed environment
 the Stripe-hosted checkout and webhook take its place, per
 [ADR 0004](docs/adr/0004-stripe-checkout.md). Emails land in the Mailpit inbox locally,
 per [ADR 0007](docs/adr/0007-transactional-email.md).)
 
-| Storefront | The collection |
+| Home — real photos and the pour video in the hero | The menu |
 | --- | --- |
-| ![Storefront home](docs/images/storefront-home.png) | ![Catalog grid](docs/images/catalog-grid.png) |
+| ![Storefront home](docs/images/storefront-home.png) | ![Menu grid](docs/images/catalog-grid.png) |
 
-| Product page | Shopping bag |
+| Drink page — photo gallery | Shopping bag |
 | --- | --- |
 | ![Product page](docs/images/product-page.png) | ![Cart](docs/images/cart.png) |
 
@@ -109,7 +112,34 @@ The last screenshot is the point of the admin design: the order was marked fulfi
 the audit log shows *who* changed *what*, *when* — written in the same transaction as the
 change itself ([ADR 0006](docs/adr/0006-admin-authorization.md)).
 
-## Session status — end of 2026-07-08 (evening)
+## Session status — end of 2026-07-08 (night): the store is now the real café
+
+The store now serves its real purpose: **QY & YX's Cafe, matcha drinks for pickup in
+Umeå**. What changed, all green in CI:
+
+- **SEK everywhere**, done properly: `price_sgd_cents` renamed to `price_cents` via an
+  Alembic migration, order currency defaults to SEK, Stripe line items in `sek`,
+  `Intl.NumberFormat("sv-SE")` on the frontend. Sweden-only, pickup is free (0 kr).
+- **The real menu**: Sayaka Latte (49 kr), Ikuyo Latte (55 kr) — iced/hot, with the actual
+  photos — and Usucha (39 kr); the Uji tin and whisk remain as a take-home shelf.
+- **The legacy site's photo/video carousel is back**: real drink photos + the pour video
+  in the homepage hero (pausable, reduced-motion safe).
+- **Payments direction** (decision, not yet code): Stripe supports **Swish** natively in
+  SEK, so going live = real Stripe keys + enabling Swish in the dashboard; a
+  pay-at-pickup option (Swish P2P/cash) comes with the pickup-slot milestone.
+- **Browser testing found bug #2**: every admin mutation 422'd from the real UI — a
+  fetch-options spread-order bug dropped `Content-Type` whenever the CSRF header was
+  passed (log entry below). Fixed with regression tests.
+
+**Next milestones (agreed):** pickup days/time slots at checkout (port the legacy
+`pickup_days` model) with pay-online/pay-at-pickup choice; then shared stock pools
+(drinks draw grams from one matcha tin, the legacy `stock_pools` idea).
+
+Suite: 45 legacy + 63 API + 25 web = **133 tests**. Admin bootstrap now lives in `.env`
+(`ADMIN_EMAIL`/`ADMIN_PASSWORD`, see `.env.example`) — the local DB was reset, so the
+admin account is exactly what `.env` says, nothing hidden.
+
+## Previous session status — end of 2026-07-08 (evening)
 
 Three things landed today, all green in CI:
 
@@ -159,6 +189,39 @@ provision Stripe test keys to the deployed environment.
 ## Engineering log
 
 A running record of significant changes, what each one did, and why it matters. Newest first.
+
+### 2026-07-08 — The pivot: build the store the business actually needs
+
+The modern stack had drifted into a fictional Singapore boutique while the *real* business
+— matcha drinks picked up at a dorm in Umeå — was sitting in the legacy app the whole
+time, schema and all (pickup slots, shared stock pools, a payment-method column). The
+pivot re-grounded the modern store in reality:
+
+- **Currency is a rename, not a constant.** SGD was baked into a *column name*
+  (`price_sgd_cents`). De-branding it to `price_cents` + a `currency` field took one
+  Alembic `alter_column` migration and a mechanical sweep — cheap now, and the next
+  currency change is config. Lesson: never encode a business assumption in an identifier.
+- **Payment methods are a market question.** In Sweden the answer is Swish (every student
+  has it) + cards; Stripe supports both in SEK, so the existing Stripe integration already
+  covers the online path — going live is keys + a dashboard toggle, zero architecture.
+  Pay-at-pickup (the legacy app's "cash" flow) returns with the pickup-slot milestone.
+- **Content is design.** The single biggest realism gain wasn't code: it was the owner's
+  actual latte photos and pour video in the hero, and a menu of drinks that exist.
+
+### 2026-07-08 — Second bug the browser found: a spread that ate a header
+
+Every admin mutation failed with 422 from the real UI — while all tests passed. In the
+API client, `fetch` options were merged as `{ headers: {...defaults}, ...options }`:
+spreading `options` *after* `headers` meant any caller passing its own headers (all admin
+mutations pass `X-CSRF-Token`) replaced the whole headers object and silently dropped
+`Content-Type: application/json`. FastAPI refused the body; the 422's structured `detail`
+array then rendered as "[object Object]" because the error path assumed `detail` was a
+string. One spread, two bugs.
+
+Fixes: spread `options` first and merge headers last; stringify non-string error details.
+Regression tests assert the merged headers and the readable message. Same moral as the
+CSRF-on-GET bug: unit tests that mock the transport encode the author's assumptions —
+only exercising the real client against the real server catches contract mismatches.
 
 ### 2026-07-08 — Order confirmation email: a side effect that must not lie
 

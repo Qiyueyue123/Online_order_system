@@ -14,7 +14,7 @@ def add_product(db, stock=3):
                 sku="TEST-30",
                 name="30 g",
                 weight_grams=30,
-                price_sgd_cents=3200,
+                price_cents=3200,
                 stock_on_hand=stock,
             )
         ],
@@ -39,9 +39,9 @@ def test_checkout_reprices_on_server_and_reserves_stock(client, db):
             "shipping_address": {
                 "recipient_name": "Guest",
                 "line1": "1 Tea Street",
-                "city": "Singapore",
-                "postal_code": "018956",
-                "country_code": "SG",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
             },
         },
     )
@@ -72,9 +72,9 @@ def _place_guest_order(client, db):
             "shipping_address": {
                 "recipient_name": "Guest",
                 "line1": "1 Tea Street",
-                "city": "Singapore",
-                "postal_code": "018956",
-                "country_code": "SG",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
             },
         },
     )

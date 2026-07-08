@@ -124,7 +124,7 @@ def _product_out(product) -> ProductOut:
                 "sku": variant.sku,
                 "name": variant.name,
                 "weight_grams": variant.weight_grams,
-                "price_sgd_cents": variant.price_sgd_cents,
+                "price_cents": variant.price_cents,
                 "available_stock": variant.available_stock,
             }
             for variant in product.variants
@@ -287,7 +287,7 @@ def checkout(
             line_items=[
                 {
                     "price_data": {
-                        "currency": "sgd",
+                        "currency": "sek",
                         "product_data": {"name": f"Matcha order {order.display_number}"},
                         "unit_amount": order.total_cents,
                     },
@@ -447,7 +447,7 @@ def update_stock(
     if not variant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
     changes = update_variant(
-        db, variant, price_sgd_cents=None, stock_on_hand=data.stock_on_hand, reason=data.reason
+        db, variant, price_cents=None, stock_on_hand=data.stock_on_hand, reason=data.reason
     )
     write_audit(
         db,
@@ -467,7 +467,7 @@ def patch_variant(
     session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
-    if data.price_sgd_cents is None and data.stock_on_hand is None:
+    if data.price_cents is None and data.stock_on_hand is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to update")
     variant = db.get(Variant, _parse_uuid_or_404(variant_id, "Variant not found"))
     if not variant:
@@ -475,7 +475,7 @@ def patch_variant(
     changes = update_variant(
         db,
         variant,
-        price_sgd_cents=data.price_sgd_cents,
+        price_cents=data.price_cents,
         stock_on_hand=data.stock_on_hand,
         reason=data.reason,
     )

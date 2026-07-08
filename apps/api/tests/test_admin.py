@@ -32,7 +32,7 @@ def add_product(db, stock=3):
                 sku=f"TEST-30-{n}",
                 name="30 g",
                 weight_grams=30,
-                price_sgd_cents=3200,
+                price_cents=3200,
                 stock_on_hand=stock,
             )
         ],
@@ -88,9 +88,9 @@ def make_order(db, order_status, *, stock=4, reserved=2):
         total_cents=7000,
         shipping_name="Guest",
         shipping_line1="1 Tea Street",
-        shipping_city="Singapore",
-        shipping_postal_code="018956",
-        shipping_country_code="SG",
+        shipping_city="Umea",
+        shipping_postal_code="90325",
+        shipping_country_code="SE",
         reservation_expires_at=(
             datetime.now(UTC) if order_status == OrderStatus.PENDING_PAYMENT else None
         ),
@@ -126,7 +126,7 @@ PRODUCT_BODY = {
             "sku": "NEW-30",
             "name": "30 g tin",
             "weight_grams": 30,
-            "price_sgd_cents": 4200,
+            "price_cents": 4200,
             "stock_on_hand": 10,
         }
     ],
@@ -148,7 +148,7 @@ ADMIN_ROUTES = [
     (
         "PATCH",
         "/api/v1/admin/variants/00000000-0000-0000-0000-000000000000",
-        {"price_sgd_cents": 100, "reason": "test adjustment"},
+        {"price_cents": 100, "reason": "test adjustment"},
     ),
     (
         "PATCH",
@@ -217,12 +217,12 @@ def test_admin_can_update_variant_price_and_stock(client, db):
     variant = product.variants[0]
     response = client.patch(
         f"/api/v1/admin/variants/{variant.id}",
-        json={"price_sgd_cents": 5000, "stock_on_hand": 20, "reason": "restock and reprice"},
+        json={"price_cents": 5000, "stock_on_hand": 20, "reason": "restock and reprice"},
         headers=headers,
     )
     assert response.status_code == 204
     db.refresh(variant)
-    assert variant.price_sgd_cents == 5000
+    assert variant.price_cents == 5000
     assert variant.stock_on_hand == 20
 
     admin = db.query(User).filter_by(email="admin@example.com").one()

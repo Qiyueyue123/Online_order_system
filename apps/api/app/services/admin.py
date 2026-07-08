@@ -108,7 +108,7 @@ def create_product(db: Session, data: AdminProductIn) -> Product:
                 sku=variant.sku,
                 name=variant.name,
                 weight_grams=variant.weight_grams,
-                price_sgd_cents=variant.price_sgd_cents,
+                price_cents=variant.price_cents,
                 stock_on_hand=variant.stock_on_hand,
             )
             for variant in data.variants
@@ -141,16 +141,16 @@ def update_variant(
     db: Session,
     variant: Variant,
     *,
-    price_sgd_cents: int | None,
+    price_cents: int | None,
     stock_on_hand: int | None,
     reason: str,
 ) -> dict:
     from ..models import InventoryMovement
 
     changes: dict = {}
-    if price_sgd_cents is not None and price_sgd_cents != variant.price_sgd_cents:
-        changes["price_sgd_cents"] = {"from": variant.price_sgd_cents, "to": price_sgd_cents}
-        variant.price_sgd_cents = price_sgd_cents
+    if price_cents is not None and price_cents != variant.price_cents:
+        changes["price_cents"] = {"from": variant.price_cents, "to": price_cents}
+        variant.price_cents = price_cents
     if stock_on_hand is not None and stock_on_hand != variant.stock_on_hand:
         if stock_on_hand < variant.stock_reserved:
             raise HTTPException(

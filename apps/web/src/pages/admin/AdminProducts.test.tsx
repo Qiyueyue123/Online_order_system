@@ -25,7 +25,7 @@ const productsPage: ProductPage = {
           sku: "SKU-1",
           name: "30g tin",
           weight_grams: 30,
-          price_sgd_cents: 3800,
+          price_cents: 3800,
           available_stock: 12,
         },
       ],
@@ -86,7 +86,7 @@ describe("AdminProducts", () => {
     const patchCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
     const body = JSON.parse(patchCall![1]!.body as string);
     expect(body.stock_on_hand).toBe(25);
-    expect(body.price_sgd_cents).toBe(3800);
+    expect(body.price_cents).toBe(3800);
     expect(typeof body.reason).toBe("string");
     expect(body.reason.length).toBeGreaterThan(0);
   });

@@ -29,7 +29,7 @@ const productPage: ProductPage = {
           sku: "SKU-1",
           name: "30g tin",
           weight_grams: 30,
-          price_sgd_cents: 3800,
+          price_cents: 3800,
           available_stock: 10,
         },
       ],
@@ -47,7 +47,7 @@ const productPage: ProductPage = {
           sku: "SKU-2",
           name: "Standard",
           weight_grams: 50,
-          price_sgd_cents: 4500,
+          price_cents: 4500,
           available_stock: 5,
         },
       ],
@@ -74,8 +74,8 @@ describe("CatalogPage", () => {
 
     expect(await screen.findByText("Ceremonial Matcha")).toBeInTheDocument();
     expect(screen.getByText("Bamboo Whisk")).toBeInTheDocument();
-    expect(screen.getByText("$38.00")).toBeInTheDocument();
-    expect(screen.getByText("$45.00")).toBeInTheDocument();
+    expect(screen.getByText(/38,00\s*kr/)).toBeInTheDocument();
+    expect(screen.getByText(/45,00\s*kr/)).toBeInTheDocument();
 
     await waitFor(() => expect(screen.queryByText(/Preparing the collection/)).not.toBeInTheDocument());
   });

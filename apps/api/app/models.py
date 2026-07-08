@@ -124,7 +124,7 @@ class ProductImage(Base):
 class Variant(TimestampMixin, Base):
     __tablename__ = "variants"
     __table_args__ = (
-        CheckConstraint("price_sgd_cents >= 0"),
+        CheckConstraint("price_cents >= 0"),
         CheckConstraint("weight_grams > 0"),
         CheckConstraint("stock_on_hand >= 0"),
         CheckConstraint("stock_reserved >= 0 AND stock_reserved <= stock_on_hand"),
@@ -134,7 +134,7 @@ class Variant(TimestampMixin, Base):
     sku: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     weight_grams: Mapped[int] = mapped_column(Integer)
-    price_sgd_cents: Mapped[int] = mapped_column(Integer)
+    price_cents: Mapped[int] = mapped_column(Integer)
     stock_on_hand: Mapped[int] = mapped_column(Integer, default=0)
     stock_reserved: Mapped[int] = mapped_column(Integer, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -198,7 +198,7 @@ class Order(TimestampMixin, Base):
     discount_cents: Mapped[int] = mapped_column(Integer, default=0)
     shipping_cents: Mapped[int] = mapped_column(Integer)
     total_cents: Mapped[int] = mapped_column(Integer)
-    currency: Mapped[str] = mapped_column(String(3), default="SGD")
+    currency: Mapped[str] = mapped_column(String(3), default="SEK")
     shipping_name: Mapped[str] = mapped_column(String(120))
     shipping_line1: Mapped[str] = mapped_column(String(200))
     shipping_line2: Mapped[str | None] = mapped_column(String(200))
@@ -239,7 +239,7 @@ class Payment(TimestampMixin, Base):
     provider_session_id: Mapped[str | None] = mapped_column(String(255), unique=True)
     status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus))
     amount_cents: Mapped[int] = mapped_column(Integer)
-    currency: Mapped[str] = mapped_column(String(3), default="SGD")
+    currency: Mapped[str] = mapped_column(String(3), default="SEK")
     order: Mapped[Order] = relationship(back_populates="payment")
 
 

@@ -19,7 +19,12 @@ export function CheckoutPage() {
   });
   return (
     <div className="page checkout">
-      <section><p className="eyebrow">SECURE TEST CHECKOUT</p><h1>Where should we send it?</h1><p>Payments use Stripe test mode. No live charge will be made.</p></section>
+      <section>
+        <p className="eyebrow">SECURE TEST CHECKOUT</p>
+        <h1>Where do we reach you?</h1>
+        <p>Payments use Stripe test mode. No live charge will be made.</p>
+        <p className="checkout-note">Pickup at the dorm kitchen, Umeå — we&rsquo;ll confirm the time by email. Delivery is not offered.</p>
+      </section>
       <form onSubmit={handleSubmit((data) => checkout.mutate(data))}>
         <label>Email<input type="email" {...register("email", { required: true })} /></label>
         {errors.email && <span role="alert">Email is required.</span>}

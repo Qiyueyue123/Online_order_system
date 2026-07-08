@@ -29,18 +29,21 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  // Spread options first: spreading it last would let a caller's `headers`
+  // replace this object wholesale and silently drop the Content-Type.
   const response = await fetch(`/api/v1${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
+    headers: { "Content-Type": "application/json", ...options?.headers },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: "Request failed" }));
-    throw new ApiError(response.status, body.detail ?? "Request failed");
+    const detail = body.detail ?? "Request failed";
+    throw new ApiError(response.status, typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export const money = (cents: number) =>
-  new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD" }).format(cents / 100);
+  new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK" }).format(cents / 100);

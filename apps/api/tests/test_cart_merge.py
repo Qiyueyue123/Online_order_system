@@ -15,7 +15,7 @@ def add_second_product(db, stock=50):
                 sku="TEST-40",
                 name="40 g",
                 weight_grams=40,
-                price_sgd_cents=4000,
+                price_cents=4000,
                 stock_on_hand=stock,
             )
         ],

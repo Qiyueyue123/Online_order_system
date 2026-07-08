@@ -65,14 +65,14 @@ def _render_order_confirmation(order: Order) -> str:
     for item in order.items:
         lines.append(
             f"  {item.product_name} ({item.variant_name}) x{item.quantity} "
-            f"@ {_format_money(item.unit_price_cents)} SGD"
+            f"@ {_format_money(item.unit_price_cents)} {order.currency}"
         )
     lines += [
         "",
-        f"Subtotal: {_format_money(order.subtotal_cents)} SGD",
-        f"Shipping: {_format_money(order.shipping_cents)} SGD",
-        f"Discount: {_format_money(order.discount_cents)} SGD",
-        f"Total: {_format_money(order.total_cents)} SGD",
+        f"Subtotal: {_format_money(order.subtotal_cents)} {order.currency}",
+        f"Shipping: {_format_money(order.shipping_cents)} {order.currency}",
+        f"Discount: {_format_money(order.discount_cents)} {order.currency}",
+        f"Total: {_format_money(order.total_cents)} {order.currency}",
         "",
         "Shipping to:",
         f"  {order.shipping_name}",

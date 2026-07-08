@@ -123,8 +123,8 @@ def cart_payload(cart: Cart) -> dict:
             "variant_name": item.variant.name,
             "sku": item.variant.sku,
             "quantity": item.quantity,
-            "unit_price_cents": item.variant.price_sgd_cents,
-            "line_total_cents": item.quantity * item.variant.price_sgd_cents,
+            "unit_price_cents": item.variant.price_cents,
+            "line_total_cents": item.quantity * item.variant.price_cents,
         }
         for item in cart.items
     ]

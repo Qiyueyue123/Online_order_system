@@ -18,7 +18,7 @@ type NewProductFields = {
   sku: string;
   variant_name: string;
   weight_grams: number;
-  price_sgd_cents: number;
+  price_cents: number;
   stock_on_hand: number;
 };
 
@@ -33,7 +33,7 @@ function VariantRow({
   disabled: boolean;
   onSave: (variantId: string, priceCents: number, stock: number) => void;
 }) {
-  const [price, setPrice] = useState(String(variant.price_sgd_cents / 100));
+  const [price, setPrice] = useState(String(variant.price_cents / 100));
   const [stock, setStock] = useState(String(variant.available_stock));
 
   return (
@@ -107,14 +107,14 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     reset,
     formState: { errors },
   } = useForm<NewProductFields>({
-    defaultValues: { weight_grams: 100, price_sgd_cents: 0, stock_on_hand: 0 },
+    defaultValues: { weight_grams: 100, price_cents: 0, stock_on_hand: 0 },
   });
 
   function saveVariant(variantId: string, priceCents: number, stock: number) {
     updateVariant.mutate({
       variantId,
       body: {
-        price_sgd_cents: priceCents,
+        price_cents: priceCents,
         stock_on_hand: stock,
         reason: "Admin update via storefront",
       },
@@ -132,7 +132,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
           sku: fields.sku,
           name: fields.variant_name,
           weight_grams: Number(fields.weight_grams),
-          price_sgd_cents: Math.round(Number(fields.price_sgd_cents) * 100),
+          price_cents: Math.round(Number(fields.price_cents) * 100),
           stock_on_hand: Number(fields.stock_on_hand),
         },
       ],
@@ -148,7 +148,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
           <tr>
             <th>Product</th>
             <th>Variant</th>
-            <th>Price (SGD)</th>
+            <th>Price (SEK)</th>
             <th>Stock</th>
             <th></th>
           </tr>
@@ -205,12 +205,12 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
             <input type="number" min="0" {...register("weight_grams", { required: true, valueAsNumber: true })} />
           </label>
           <label>
-            Price (SGD)
+            Price (SEK)
             <input
               type="number"
               step="0.01"
               min="0"
-              {...register("price_sgd_cents", { required: true, valueAsNumber: true })}
+              {...register("price_cents", { required: true, valueAsNumber: true })}
             />
           </label>
         </div>

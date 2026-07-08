@@ -12,10 +12,10 @@ export function App() {
   const itemCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   return (
     <>
-      <div className="demo-strip">Portfolio demonstration · Stripe test mode · Prices in SGD</div>
+      <div className="demo-strip">Portfolio demonstration · Stripe test mode · Prices in SEK · Pickup in Umeå</div>
       <header>
-        <Link className="brand" to="/" aria-label="Mori Matcha home">
-          <span>森</span> MORI MATCHA
+        <Link className="brand" to="/" aria-label="QY &amp; YX's Cafe home">
+          <span>抹茶</span> QY &amp; YX&rsquo;S CAFE
         </Link>
         <nav aria-label="Primary navigation">
           <Link to="/">Shop</Link>
@@ -34,8 +34,8 @@ export function App() {
       </main>
       <footer>
         <div className="footer-brand">
-          <span className="brand"><span>森</span> MORI MATCHA</span>
-          <p>Fictional Japanese tea goods, curated in Singapore. A portfolio storefront—every order here is a demonstration.</p>
+          <span className="brand"><span>抹茶</span> QY &amp; YX&rsquo;S CAFE</span>
+          <p>Matcha drinks whisked to order and picked up at our dorm kitchen in Umeå. A portfolio storefront—every order here is a demonstration.</p>
         </div>
         <div className="footer-col">
           <h4>Shop</h4>

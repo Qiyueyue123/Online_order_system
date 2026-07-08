@@ -56,7 +56,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="Matcha Demonstration Store API",
     version="1.0.0",
-    description="SGD-only portfolio store. Test payments; duties, taxes and conversion excluded.",
+    description=(
+        "Matcha drinks cafe run from a dorm kitchen in Umea, Sweden. "
+        "Test payments only; no real money changes hands."
+    ),
     lifespan=lifespan,
 )
 app.add_middleware(

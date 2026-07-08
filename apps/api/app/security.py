@@ -86,7 +86,13 @@ def csrf_session(
     return session
 
 
-def admin_session(session: LoginSession = Depends(csrf_session)) -> LoginSession:
+def admin_session(session: LoginSession = Depends(current_session)) -> LoginSession:
+    if session.user.role != Role.ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required")
+    return session
+
+
+def admin_csrf_session(session: LoginSession = Depends(csrf_session)) -> LoginSession:
     if session.user.role != Role.ADMIN:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator access required")
     return session

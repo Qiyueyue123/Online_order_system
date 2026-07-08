@@ -297,6 +297,31 @@ def test_admin_orders_invalid_status_filter_is_rejected(client, db):
     assert response.status_code == 422
 
 
+def test_admin_get_routes_work_without_csrf_header(client, db):
+    admin_headers(client, db)
+    orders = client.get("/api/v1/admin/orders")
+    assert orders.status_code == 200
+    audit_log = client.get("/api/v1/admin/audit-log")
+    assert audit_log.status_code == 200
+
+
+def test_admin_mutation_without_csrf_header_is_rejected(client, db):
+    admin_headers(client, db)
+    order, _ = make_order(db, OrderStatus.PAID)
+    response = client.patch(
+        f"/api/v1/admin/orders/{order.id}",
+        json={"status": "fulfilled"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid CSRF token"
+
+
+def test_admin_get_routes_reject_customer_without_csrf_header(client):
+    customer_headers(client)
+    orders = client.get("/api/v1/admin/orders")
+    assert orders.status_code == 403
+
+
 def test_admin_can_fulfill_paid_order(client, db):
     headers = admin_headers(client, db)
     order, _ = make_order(db, OrderStatus.PAID)

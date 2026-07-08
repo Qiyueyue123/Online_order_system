@@ -56,6 +56,7 @@ from .schemas import (
 )
 from .security import (
     CART_COOKIE,
+    admin_csrf_session,
     admin_session,
     clear_session_cookie,
     csrf_session,
@@ -402,16 +403,18 @@ def get_order(
 
 # --- Admin ---------------------------------------------------------------
 #
-# Every mutation below is behind admin_session (admin role + CSRF) and writes
-# exactly one AdminAuditLog row in the same transaction as the change, so the
-# audit trail can never silently drift from what actually happened.
+# Every mutation below is behind admin_csrf_session (admin role + CSRF) and
+# writes exactly one AdminAuditLog row in the same transaction as the change,
+# so the audit trail can never silently drift from what actually happened.
+# The GET endpoints only need admin_session (admin role, no CSRF) since they
+# don't change state.
 
 
 @router.patch("/admin/variants/{variant_id}/stock", status_code=204)
 def update_stock(
     variant_id: str,
     data: AdminStockIn,
-    session: LoginSession = Depends(admin_session),
+    session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
     """Legacy stock-only endpoint, kept working so existing callers don't break.
@@ -441,7 +444,7 @@ def update_stock(
 def patch_variant(
     variant_id: str,
     data: AdminVariantUpdateIn,
-    session: LoginSession = Depends(admin_session),
+    session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
     if data.price_sgd_cents is None and data.stock_on_hand is None:
@@ -470,7 +473,7 @@ def patch_variant(
 @router.post("/admin/products", response_model=ProductOut, status_code=201)
 def create_admin_product(
     data: AdminProductIn,
-    session: LoginSession = Depends(admin_session),
+    session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
     try:
@@ -495,7 +498,7 @@ def create_admin_product(
 def patch_admin_product(
     product_id: str,
     data: AdminProductUpdateIn,
-    session: LoginSession = Depends(admin_session),
+    session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
     product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
@@ -542,7 +545,7 @@ def admin_list_orders(
 def admin_update_order(
     order_id: str,
     data: AdminOrderStatusIn,
-    session: LoginSession = Depends(admin_session),
+    session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
     order = db.get(Order, _parse_uuid_or_404(order_id, "Order not found"))

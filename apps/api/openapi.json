@@ -1129,22 +1129,6 @@
             }
           },
           {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Csrf-Token"
-            }
-          },
-          {
             "name": "matcha_session",
             "in": "cookie",
             "required": false,
@@ -1292,22 +1276,6 @@
               "minimum": 1,
               "default": 20,
               "title": "Page Size"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Csrf-Token"
             }
           },
           {

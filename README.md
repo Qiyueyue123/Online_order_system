@@ -70,32 +70,48 @@ Docs: [architecture](docs/architecture.md) · [operations](docs/operations.md) �
 [walkthrough](docs/walkthrough.md) · [external services](docs/external-services.md) ·
 [legacy café guide](docs/legacy-cafe.md).
 
+## Walkthrough
+
+One order, end to end: browse → bag → checkout → simulated payment → admin fulfillment,
+with the audit log recording the admin action. (Payments run in local demo mode — the
+simulator page stands in for Stripe; in a deployed environment the Stripe-hosted checkout
+and webhook take its place, per [ADR 0004](docs/adr/0004-stripe-checkout.md).)
+
+| Storefront | Product page |
+| --- | --- |
+| ![Storefront home](docs/images/storefront-home.png) | ![Product page](docs/images/product-page.png) |
+
+| Shopping bag | Admin — orders |
+| --- | --- |
+| ![Cart](docs/images/cart.png) | ![Admin orders](docs/images/admin-orders.png) |
+
+| Admin — audit log |
+| --- |
+| ![Admin audit log](docs/images/admin-audit-log.png) |
+
+The last screenshot is the point of the admin design: the order was marked fulfilled, and
+the audit log shows *who* changed *what*, *when* — written in the same transaction as the
+change itself ([ADR 0006](docs/adr/0006-admin-authorization.md)).
+
 ## Session status — end of 2026-07-08
 
-**Done and green in CI (all six checks):** the admin rebuild is complete.
-- Admin API: `/api/v1/admin/*` — orders list + explicit status transitions
-  (paid→fulfilled, pending→cancelled with stock release, paid→refunded demo-only,
-  else 409), product/variant management, `AdminAuditLog` written in the same
-  transaction as every mutation, idempotent `ADMIN_EMAIL`/`ADMIN_PASSWORD` bootstrap.
-  54 API tests including 401/403 on every admin route.
-- Admin UI: role-gated `/admin` (Orders / Products / Audit log tabs); nav link only for
-  admins; UI gating is UX — the API enforces authz. 23 web tests.
-- Docs: [ADR 0006](docs/adr/0006-admin-authorization.md) records the authorization
-  decisions; [docs/system-design.md](docs/system-design.md) §12 has the interview phrasing.
+**Walkthrough complete.** The full order lifecycle was exercised in a real browser:
+checkout → simulated payment → admin fulfillment → audit log entry. Screenshots are in
+the Walkthrough section above.
 
-**In progress, resume here tomorrow (task: browser walkthrough + screenshots):**
-- Stack runs via `docker compose up -d`; admin login `admin@example.com` /
-  `demo-admin-pass-123` (local only; user was promoted via SQL — the seed bootstrap
-  env path is the proper route).
-- Screenshots so far in `docs/images/` (home, cart) — not yet referenced from this README.
-- Next: finish the checkout in the browser (was at the checkout form), demo-pay the
-  order, then in `/admin` fulfill it and screenshot the audit log; add a screenshot
-  gallery section to this README.
-- Note: `.local` emails are rejected by the API's validator — use `@example.com`.
-- Run `docker compose down` when finished (add `-v` to reset data).
+**Doing the walkthrough found (and fixed) a real bug:** every admin *read* view 403'd in
+the browser because `admin_session` required a CSRF token on GET requests — see the
+engineering log entry below. Fix + 3 regression tests landed; suite is now
+45 legacy + 57 API + 23 web = 125 tests, all passing locally.
 
-**Open decisions:** merge PR #1; AWS deploy (DEPLOY_ENABLED + secrets), domain for
-HTTPS, Stripe test keys. No unfixable bugs or blocked items outstanding.
+**How to resume:** `docker compose up -d`, admin login `admin@example.com` /
+`demo-admin-pass-123` (local demo data only). `.local` emails are rejected by the
+validator — use `@example.com`. Run `docker compose down` when finished
+(add `-v` to reset data).
+
+**Open decisions (yours):** merge PR #1; AWS deploy (`DEPLOY_ENABLED` + AWS secrets),
+`domain_name` for HTTPS, Stripe test keys for the deployed environment.
+No unfixable bugs or permission-blocked items outstanding.
 
 ## Previous session status — morning of 2026-07-08
 
@@ -123,6 +139,32 @@ provision Stripe test keys to the deployed environment.
 ## Engineering log
 
 A running record of significant changes, what each one did, and why it matters. Newest first.
+
+### 2026-07-08 — The admin console rendered empty tables: CSRF checks belong on writes, not reads
+
+The end-to-end browser walkthrough — not the 100+ passing tests — caught this one. Every
+admin list view (orders, audit log) came back 403 in a real browser: `admin_session` was
+built on top of the CSRF dependency, so even GET requests demanded an `X-CSRF-Token`
+header. The frontend correctly sends that header only on mutations, because CSRF is an
+attack on *state changes* — a forged cross-site GET can't read the response
+(same-origin policy), so safe methods don't need the token.
+
+Fix: split the dependency — `admin_session` (role check only) guards the GET routes,
+`admin_csrf_session` (role + CSRF) guards every mutation. The OpenAPI contract and
+generated frontend types shifted with it, which the contract-drift CI check would have
+flagged had it been forgotten.
+
+Two lessons worth keeping:
+- **Why didn't the tests catch it?** Every admin test attached the CSRF header on GETs
+  too — the tests encoded the bug's assumption. The regression tests now assert the
+  *absence* of the header works for reads and fails for writes. Tests that only exercise
+  the happy path a developer imagined will happily pass a broken contract; an end-to-end
+  pass with the real client is what exposes mismatched assumptions between frontend
+  and backend.
+- **Layered dependencies read nicely but compose invisibly.** `admin_session` →
+  `csrf_session` → `current_session` looked clean; the cost was that "admin" silently
+  implied "CSRF" everywhere it was used. When a dependency chain encodes policy, each
+  link needs to be a deliberate decision per route class, not an accident of reuse.
 
 ### 2026-07-08 — New tests immediately caught two real bugs
 

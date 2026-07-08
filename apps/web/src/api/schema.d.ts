@@ -1381,9 +1381,7 @@ export interface operations {
                 page?: number;
                 page_size?: number;
             };
-            header?: {
-                "X-CSRF-Token"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: {
                 matcha_session?: string | null;
@@ -1456,9 +1454,7 @@ export interface operations {
                 page?: number;
                 page_size?: number;
             };
-            header?: {
-                "X-CSRF-Token"?: string | null;
-            };
+            header?: never;
             path?: never;
             cookie?: {
                 matcha_session?: string | null;

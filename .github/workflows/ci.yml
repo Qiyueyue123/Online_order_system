@@ -119,7 +119,7 @@ jobs:
           echo "::error::storefront did not come up within 60s"
           exit 1
       - name: Assert storefront serves the shop page
-        run: curl -fsS http://localhost:5173/ | grep -q "Matcha Store"
+        run: curl -fsS http://localhost:5173/ | grep -q "QY & YX"
       - name: Wait for legacy app to be ready
         run: |
           for i in $(seq 1 30); do

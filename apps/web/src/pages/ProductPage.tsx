@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, Cart, money, Product } from "../api/client";
+import { api, Cart, CartItemIn, DrinkOptions, money, Product } from "../api/client";
 import { ProductArt } from "../components/ProductArt";
+
+const SUGAR_OPTIONS: DrinkOptions["sugar_g"][] = [2, 4, 6, 8];
 
 function ProductGallery({ product }: { product: Product }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -45,14 +47,18 @@ export function ProductPage() {
   const queryClient = useQueryClient();
   const product = useQuery({ queryKey: ["product", slug], queryFn: () => api<Product>(`/products/${slug}`) });
   const [variantId, setVariantId] = useState("");
+  const [whisk, setWhisk] = useState<DrinkOptions["whisk"]>("water");
+  const [sugarG, setSugarG] = useState<DrinkOptions["sugar_g"]>(4);
   const add = useMutation({
-    mutationFn: (id: string) => api<Cart>("/cart/items", { method: "PUT", body: JSON.stringify({ variant_id: id, quantity: 1 }) }),
+    mutationFn: (payload: CartItemIn) =>
+      api<Cart>("/cart/items", { method: "PUT", body: JSON.stringify(payload) }),
     onSuccess: (cart) => queryClient.setQueryData(["cart"], cart),
   });
   if (product.isLoading) return <div className="page"><p role="status">Loading product…</p></div>;
   if (!product.data) return <div className="page"><p role="alert">Product not found.</p></div>;
   const selected = variantId || product.data.variants[0]?.id;
-  const isDrink = product.data.category === "drinks";
+  // ProductOut.category carries the display name ("Drinks"), not the slug.
+  const isDrink = product.data.category?.toLowerCase() === "drinks";
   return (
     <div className="page product-detail">
       <ProductGallery product={product.data} />
@@ -65,7 +71,53 @@ export function ProductPage() {
         <select id="variant" value={selected} onChange={(e) => setVariantId(e.target.value)}>
           {product.data.variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.name} · {money(variant.price_cents)} · {variant.available_stock} left</option>)}
         </select>
-        <button className="button" disabled={!selected || add.isPending} onClick={() => add.mutate(selected)}>
+        {isDrink && (
+          <div className="drink-options">
+            <p className="option-label">Whisked with</p>
+            <div className="chip-row" role="group" aria-label="Whisked with">
+              <button
+                type="button"
+                className={`chip${whisk === "water" ? " active" : ""}`}
+                onClick={() => setWhisk("water")}
+              >
+                Water (standard)
+              </button>
+              <button
+                type="button"
+                className={`chip${whisk === "oat" ? " active" : ""}`}
+                onClick={() => setWhisk("oat")}
+              >
+                Oat milk (frothier)
+              </button>
+            </div>
+            <p className="option-label">Sugar</p>
+            <div className="chip-row" role="group" aria-label="Sugar">
+              {SUGAR_OPTIONS.map((grams) => (
+                <button
+                  type="button"
+                  key={grams}
+                  className={`chip${sugarG === grams ? " active" : ""}`}
+                  onClick={() => setSugarG(grams)}
+                >
+                  {grams} g{grams === 4 ? " (standard)" : ""}
+                </button>
+              ))}
+            </div>
+            <p className="recipe-line">Every latte: 4 g Ajisai 2.0, whisked, poured over cow&rsquo;s milk.</p>
+          </div>
+        )}
+        <button
+          className="button"
+          disabled={!selected || add.isPending}
+          onClick={() =>
+            selected &&
+            add.mutate(
+              isDrink
+                ? { variant_id: selected, quantity: 1, options: { whisk, sugar_g: sugarG } }
+                : { variant_id: selected, quantity: 1 },
+            )
+          }
+        >
           {add.isPending ? "Adding…" : "Add to bag"}
         </button>
         {add.isSuccess && <p role="status">Added. <Link to="/cart">View your bag</Link></p>}

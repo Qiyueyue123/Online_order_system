@@ -18,7 +18,8 @@ export function App() {
           <span>抹茶</span> QY &amp; YX&rsquo;S CAFE
         </Link>
         <nav aria-label="Primary navigation">
-          <Link to="/">Shop</Link>
+          <Link to="/">Drinks</Link>
+          <Link to="/store">Store</Link>
           <Link to="/#story">Our story</Link>
           <Link to={session ? "/account" : "/signin"}>
             {session ? session.user.name : "Sign in"}
@@ -36,11 +37,16 @@ export function App() {
         <div className="footer-brand">
           <span className="brand"><span>抹茶</span> QY &amp; YX&rsquo;S CAFE</span>
           <p>Matcha drinks whisked to order and picked up at our dorm kitchen in Umeå. A portfolio storefront—every order here is a demonstration.</p>
+          <p className="photo-credit">
+            Drink and product photography courtesy of{" "}
+            <a href="https://www.nikonekomatcha.com/" target="_blank" rel="noreferrer">Niko Neko Matcha</a>.
+          </p>
         </div>
         <div className="footer-col">
           <h4>Shop</h4>
           <ul>
-            <li><Link to="/">All products</Link></li>
+            <li><Link to="/">Drinks</Link></li>
+            <li><Link to="/store">Store</Link></li>
             <li><Link to="/#story">Our story</Link></li>
             <li><Link to="/cart">Your bag</Link></li>
           </ul>
@@ -49,6 +55,7 @@ export function App() {
           <h4>Account</h4>
           <ul>
             <li><Link to={session ? "/account" : "/signin"}>{session ? "Your account" : "Sign in"}</Link></li>
+            <li><Link to="/track">Track order</Link></li>
           </ul>
         </div>
         <p className="footer-disclaimer">Taxes, import duties and currency conversion are outside this demonstration. Payments run through Stripe test mode; no real charge is ever made.</p>

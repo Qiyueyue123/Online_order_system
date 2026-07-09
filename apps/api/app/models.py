@@ -37,6 +37,7 @@ class OrderStatus(str, enum.Enum):
     EXPIRED = "expired"
     FULFILLED = "fulfilled"
     REFUNDED = "refunded"
+    CONFIRMED = "confirmed"
 
 
 class PaymentStatus(str, enum.Enum):
@@ -173,11 +174,17 @@ class Cart(TimestampMixin, Base):
 
 class CartItem(Base):
     __tablename__ = "cart_items"
-    __table_args__ = (UniqueConstraint("cart_id", "variant_id"), CheckConstraint("quantity > 0"))
+    __table_args__ = (CheckConstraint("quantity > 0"),)
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     cart_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("carts.id", ondelete="CASCADE"))
     variant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("variants.id"))
     quantity: Mapped[int] = mapped_column(Integer)
+    # Serialised JSON dict (same text-column pattern as AdminAuditLog.detail, for
+    # SQLite/Postgres portability), canonicalised with sort_keys so two lines with
+    # the same options always compare equal as strings. NULL means "no options
+    # chosen" (non-drink items). A drink's normalised shape is
+    # {"whisk": "water"|"oat", "sugar_g": 2|4|6|8}.
+    options: Mapped[str | None] = mapped_column(Text)
     variant: Mapped[Variant] = relationship(lazy="joined")
 
 
@@ -231,6 +238,9 @@ class Order(TimestampMixin, Base):
     reservation_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )
+    # "online" (Stripe/demo-pay flow) or "pay_at_pickup" (order is confirmed
+    # immediately, paid in person at the café).
+    payment_method: Mapped[str] = mapped_column(String(20), default="online")
     items: Mapped[list["OrderItem"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     payment: Mapped["Payment | None"] = relationship(
         back_populates="order", cascade="all, delete-orphan", uselist=False, lazy="selectin"
@@ -251,6 +261,9 @@ class OrderItem(Base):
     sku: Mapped[str] = mapped_column(String(80))
     unit_price_cents: Mapped[int] = mapped_column(Integer)
     quantity: Mapped[int] = mapped_column(Integer)
+    # Snapshot of the CartItem.options that produced this line at checkout time
+    # (same serialisation convention; see CartItem.options).
+    options: Mapped[str | None] = mapped_column(Text)
 
 
 class Payment(TimestampMixin, Base):

@@ -734,6 +734,59 @@
         }
       }
     },
+    "/api/v1/orders/track": {
+      "get": {
+        "summary": "Track Order",
+        "description": "Guest order tracking usable from any device: display_number + email, no\nstored token required (the raw checkout lookup_token is never persisted --\nonly its hash is -- so it can't be reconstructed server-side for the email).\n\nTradeoff: display_number + email is guessable by anyone who already knows\nboth, same as most real shops' guest-order-lookup pages. Rate-limited like\nthe auth endpoints to slow down enumeration.",
+        "operationId": "track_order_api_v1_orders_track_get",
+        "parameters": [
+          {
+            "name": "display_number",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 24,
+              "title": "Display Number"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 320,
+              "title": "Email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/orders/{order_id}": {
       "get": {
         "summary": "Get Order",
@@ -1705,6 +1758,10 @@
             ],
             "title": "Pickup At"
           },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/OrderItemOut"
@@ -1742,6 +1799,7 @@
           "total_cents",
           "currency",
           "pickup_at",
+          "payment_method",
           "items",
           "created_at",
           "user_id"
@@ -2255,6 +2313,16 @@
             "maximum": 20.0,
             "minimum": 1.0,
             "title": "Quantity"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DrinkOptionsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2298,6 +2366,18 @@
           "line_total_cents": {
             "type": "integer",
             "title": "Line Total Cents"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
           }
         },
         "type": "object",
@@ -2389,6 +2469,15 @@
               }
             ],
             "title": "Coupon Code"
+          },
+          "payment_method": {
+            "type": "string",
+            "enum": [
+              "online",
+              "pay_at_pickup"
+            ],
+            "title": "Payment Method",
+            "default": "online"
           }
         },
         "type": "object",
@@ -2424,8 +2513,15 @@
             "title": "Guest Lookup Token"
           },
           "reservation_expires_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Reservation Expires At"
           }
         },
@@ -2434,10 +2530,37 @@
           "order_id",
           "display_number",
           "checkout_url",
-          "guest_lookup_token",
-          "reservation_expires_at"
+          "guest_lookup_token"
         ],
         "title": "CheckoutOut"
+      },
+      "DrinkOptionsIn": {
+        "properties": {
+          "whisk": {
+            "type": "string",
+            "enum": [
+              "water",
+              "oat"
+            ],
+            "title": "Whisk",
+            "default": "water"
+          },
+          "sugar_g": {
+            "type": "integer",
+            "enum": [
+              2,
+              4,
+              6,
+              8
+            ],
+            "title": "Sugar G",
+            "default": 4
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DrinkOptionsIn",
+        "description": "Per-line customisation for a drink. Unknown keys are rejected (422) rather\nthan silently ignored, so a typo in a future field doesn't get dropped\nwithout notice."
       },
       "HTTPValidationError": {
         "properties": {
@@ -2510,6 +2633,18 @@
           "quantity": {
             "type": "integer",
             "title": "Quantity"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
           }
         },
         "type": "object",
@@ -2574,6 +2709,10 @@
             ],
             "title": "Pickup At"
           },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/OrderItemOut"
@@ -2594,6 +2733,7 @@
           "total_cents",
           "currency",
           "pickup_at",
+          "payment_method",
           "items"
         ],
         "title": "OrderOut"

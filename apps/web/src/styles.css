@@ -143,6 +143,9 @@ footer {
 }
 .footer-brand .brand span { color: var(--paper); }
 .footer-brand p { max-width: 26rem; line-height: 1.7; color: #b9c6b3; margin-top: 1rem; }
+.photo-credit { font-size: 0.78rem; color: #8ea187; }
+.photo-credit a { text-decoration: underline; text-underline-offset: 2px; }
+.photo-credit a:hover { color: var(--paper); }
 .footer-col h4 {
   margin: 0 0 1rem;
   font-family: inherit;
@@ -368,6 +371,25 @@ footer {
 .retail-grid { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 760px) { .retail-grid { grid-template-columns: 1fr 1fr; } }
 
+.product-card--placeholder { cursor: default; opacity: 1; }
+.product-card--placeholder:hover { transform: none; }
+.product-card--placeholder .product-art { position: relative; opacity: 0.72; }
+.product-card--placeholder strong { color: var(--ink-soft); }
+.coming-soon-badge {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 2rem;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .product-meta { display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; }
 .product-meta h3 { margin: 0.25rem 0; font-family: "Libre Caslon Display", serif; font-size: 1.45rem; }
 .product-meta p { margin: 0; }
@@ -426,6 +448,18 @@ footer {
   text-transform: uppercase;
   color: var(--ink-soft);
 }
+.drink-options { margin-top: 1.35rem; }
+.option-label {
+  margin: 1.1rem 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.chip-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.recipe-line { margin-top: 1rem; color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
+
 select, input {
   width: 100%;
   padding: 0.9rem;
@@ -451,6 +485,7 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 }
 .cart-row h2 { margin: 0; font-size: 1.4rem; font-weight: 400; }
 .cart-row p { color: var(--ink-soft); margin: 0.35rem 0 0; }
+.cart-options { font-size: 0.82rem; color: var(--persimmon-dark); }
 .cart-total { display: flex; justify-content: space-between; padding: 2rem 0; font-size: 1.2rem; }
 .cart-total strong { color: var(--persimmon); }
 .cart-total--pickup { padding: 0 0 2rem; font-size: 0.85rem; color: var(--ink-soft); }
@@ -503,6 +538,30 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 
 .pickup-time { color: var(--ink-soft); font-size: 0.85rem; margin: 0.3rem 0 0; }
 
+.payment-choice { margin-top: 1.5rem; }
+.payment-choice h2 {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 0.75rem;
+}
+.checkout .radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 0.7rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line-strong);
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.radio-option input { width: auto; padding: 0; }
+.radio-option:has(input:checked) { border-color: var(--pine); background: var(--paper-panel); }
+
 .auth-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -552,6 +611,37 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 .status--cancelled { background: #ecdad2; color: #8a3a22; }
 .status--refunded { background: #f2d9cc; color: var(--persimmon-dark); }
 .status--expired { background: #e5e1d6; color: #5c5847; }
+
+/* -------------------------------------------------------------- */
+/* Order status / tracking                                         */
+/* -------------------------------------------------------------- */
+.order-status-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; margin-bottom: 1.5rem; }
+.order-status-heading h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0.35rem 0 0; }
+.order-timeline {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  list-style: none;
+}
+.order-timeline li {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-bottom: 3px solid var(--line-strong);
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.order-timeline li.done { border-bottom-color: var(--pine); color: var(--pine); font-weight: 600; }
+.order-terminal-note {
+  margin: 0 0 1.75rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-panel);
+  color: var(--ink-soft);
+}
+.order-items { margin-top: 1rem; }
 
 /* -------------------------------------------------------------- */
 /* Demo payment simulator                                          */
@@ -623,7 +713,7 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 @media (max-width: 760px) {
   header { height: auto; padding-top: 1rem; padding-bottom: 1rem; }
   .brand span { display: none; }
-  nav a:nth-child(2) { display: none; }
+  nav a:nth-child(3) { display: none; }
   .hero { min-height: 540px; padding-top: 6rem; }
   .hero-enso { opacity: 0.5; }
   .product-grid { grid-template-columns: 1fr 1fr; }

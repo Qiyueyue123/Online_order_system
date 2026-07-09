@@ -263,7 +263,7 @@ def put_cart_item(
     db: Session = Depends(get_db),
 ):
     cart = _cart(response, db, cart_token, login_session)
-    set_item(db, cart, data.variant_id, data.quantity)
+    set_item(db, cart, data.variant_id, data.quantity, data.options)
     db.refresh(cart)
     return cart_payload(cart)
 
@@ -297,6 +297,25 @@ def checkout(
     except Exception:
         db.rollback()
         raise
+    if order.status == OrderStatus.CONFIRMED:
+        # Pay-at-pickup: nothing to pay online, so the redirect goes straight to the
+        # order/tracking page instead of a payment provider.
+        token_qs = f"?token={guest_token}" if guest_token else ""
+        checkout_url = f"{settings.web_origin}/orders/{order.id}{token_qs}"
+        # Sent after the commit inside create_pending_order: a slow SMTP call
+        # holding row locks, or confirming an order a later rollback undoes, are
+        # exactly the failure modes the identical note on the webhook avoids.
+        try:
+            send_order_confirmation(order, settings)
+        except Exception:
+            logger.exception("failed to send order confirmation email for order %s", order.id)
+        return CheckoutOut(
+            order_id=order.id,
+            display_number=order.display_number,
+            checkout_url=checkout_url,
+            guest_lookup_token=guest_token,
+            reservation_expires_at=order.reservation_expires_at,
+        )
     # Local mode intentionally uses a deterministic demo page. Production creates Stripe Checkout
     # with the order id in metadata; only the signed webhook below can mark the order paid.
     checkout_url = f"{settings.web_origin}/demo-payment/{order.id}"
@@ -419,6 +438,39 @@ def complete_demo_payment(
             send_order_confirmation(order, settings)
         except Exception:
             logger.exception("failed to send order confirmation email for order %s", order.id)
+    return order
+
+
+TRACK_RATE_LIMIT = 10
+TRACK_RATE_WINDOW_SECONDS = 3600
+
+
+@router.get("/orders/track", response_model=OrderOut)
+def track_order(
+    request: Request,
+    display_number: str = Query(..., min_length=1, max_length=24),
+    email: str = Query(..., min_length=1, max_length=320),
+    db: Session = Depends(get_db),
+):
+    """Guest order tracking usable from any device: display_number + email, no
+    stored token required (the raw checkout lookup_token is never persisted --
+    only its hash is -- so it can't be reconstructed server-side for the email).
+
+    Tradeoff: display_number + email is guessable by anyone who already knows
+    both, same as most real shops' guest-order-lookup pages. Rate-limited like
+    the auth endpoints to slow down enumeration.
+    """
+    ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(db, f"track:{ip}", TRACK_RATE_LIMIT, TRACK_RATE_WINDOW_SECONDS):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Try again later")
+    order = db.scalar(
+        select(Order).where(
+            Order.display_number == display_number,
+            Order.email == email.lower(),
+        )
+    )
+    if not order:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     return order
 
 

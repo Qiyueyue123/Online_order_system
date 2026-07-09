@@ -29,6 +29,10 @@ export function CheckoutPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [slotConflict, setSlotConflict] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "pay_at_pickup">("online");
+  // The API rejects pay_at_pickup whenever shipping is involved, so the choice
+  // only makes sense — and is only offered — for a pickup-only cart.
+  const showPaymentChoice = needsPickup && !needsShipping;
 
   // Default to the first available day once the pickup days load.
   useEffect(() => {
@@ -45,7 +49,10 @@ export function CheckoutPage() {
 
   const checkout = useMutation({
     mutationFn: (values: Fields) => {
-      const payload: CheckoutIn = { email: values.email };
+      const payload: CheckoutIn = {
+        email: values.email,
+        payment_method: showPaymentChoice ? paymentMethod : "online",
+      };
       if (needsShipping) {
         payload.shipping_address = {
           recipient_name: values.recipient_name,
@@ -87,13 +94,18 @@ export function CheckoutPage() {
 
   const selectedDay = pickupDays.data?.find((day) => day.date === selectedDate);
   const canSubmit = !needsPickup || !!selectedSlot;
+  const payingAtPickup = showPaymentChoice && paymentMethod === "pay_at_pickup";
 
   return (
     <div className="page checkout">
       <section>
         <p className="eyebrow">SECURE TEST CHECKOUT</p>
         <h1>Where do we reach you?</h1>
-        <p>Payments use Stripe test mode. No live charge will be made.</p>
+        <p>
+          {payingAtPickup
+            ? "Pay in person when you collect your order — cash, Revolut, or Swish transfer."
+            : "Payments use Stripe test mode. No live charge will be made."}
+        </p>
         {needsPickup && (
           <p className="checkout-note">
             Pickup at the dorm kitchen, Umeå — the exact address comes with your confirmation email.
@@ -162,6 +174,32 @@ export function CheckoutPage() {
           </div>
         )}
 
+        {showPaymentChoice && (
+          <div className="payment-choice" role="radiogroup" aria-label="Payment method">
+            <h2>Payment</h2>
+            <label className="radio-option">
+              <input
+                type="radio"
+                name="payment_method"
+                value="online"
+                checked={paymentMethod === "online"}
+                onChange={() => setPaymentMethod("online")}
+              />
+              Pay online now (test mode)
+            </label>
+            <label className="radio-option">
+              <input
+                type="radio"
+                name="payment_method"
+                value="pay_at_pickup"
+                checked={paymentMethod === "pay_at_pickup"}
+                onChange={() => setPaymentMethod("pay_at_pickup")}
+              />
+              Pay at pickup — cash or Revolut/Swish transfer
+            </label>
+          </div>
+        )}
+
         {needsShipping && (
           <>
             <label>
@@ -200,7 +238,11 @@ export function CheckoutPage() {
         )}
 
         <button className="button full" disabled={checkout.isPending || !canSubmit}>
-          {checkout.isPending ? "Reserving stock…" : "Continue to Stripe test checkout"}
+          {checkout.isPending
+            ? "Reserving stock…"
+            : payingAtPickup
+              ? "Confirm order — pay at pickup"
+              : "Continue to Stripe test checkout"}
         </button>
         {checkout.isError && !slotConflict && <p role="alert">{checkout.error.message}</p>}
       </form>

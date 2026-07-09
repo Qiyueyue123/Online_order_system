@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     email_from: str = "orders@morimatcha.example"
+    # Shown in the pay-at-pickup confirmation email as a Revolut/Swish handle;
+    # empty means the email falls back to a generic "cash at pickup" line.
+    pickup_payment_note: str = ""
 
     @field_validator("shipping_countries", mode="before")
     @classmethod

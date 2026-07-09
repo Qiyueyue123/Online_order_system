@@ -1,7 +1,8 @@
 import uuid
 from datetime import date, datetime, time
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class ApiModel(BaseModel):
@@ -63,9 +64,21 @@ class SessionOut(BaseModel):
     csrf_token: str
 
 
+class DrinkOptionsIn(BaseModel):
+    """Per-line customisation for a drink. Unknown keys are rejected (422) rather
+    than silently ignored, so a typo in a future field doesn't get dropped
+    without notice."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    whisk: Literal["water", "oat"] = "water"
+    sugar_g: Literal[2, 4, 6, 8] = 4
+
+
 class CartItemIn(BaseModel):
     variant_id: uuid.UUID
     quantity: int = Field(ge=1, le=20)
+    options: DrinkOptionsIn | None = None
 
 
 class CartItemOut(BaseModel):
@@ -77,6 +90,7 @@ class CartItemOut(BaseModel):
     quantity: int
     unit_price_cents: int
     line_total_cents: int
+    options: dict | None = None
 
 
 class CartOut(BaseModel):
@@ -101,6 +115,7 @@ class CheckoutIn(BaseModel):
     shipping_address: AddressIn | None = None
     pickup_at: datetime | None = None
     coupon_code: str | None = Field(default=None, max_length=40)
+    payment_method: Literal["online", "pay_at_pickup"] = "online"
 
 
 class CheckoutOut(BaseModel):
@@ -108,7 +123,7 @@ class CheckoutOut(BaseModel):
     display_number: str
     checkout_url: str
     guest_lookup_token: str | None
-    reservation_expires_at: datetime
+    reservation_expires_at: datetime | None = None
 
 
 class OrderItemOut(ApiModel):
@@ -117,6 +132,18 @@ class OrderItemOut(ApiModel):
     sku: str
     unit_price_cents: int
     quantity: int
+    options: dict | None = None
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _parse_options(cls, value: object) -> object:
+        # OrderItem.options is stored as a serialised JSON string (see the model
+        # docstring); decode it here so API consumers always see a plain dict.
+        if isinstance(value, str):
+            import json
+
+            return json.loads(value)
+        return value
 
 
 class OrderOut(ApiModel):
@@ -130,6 +157,7 @@ class OrderOut(ApiModel):
     total_cents: int
     currency: str
     pickup_at: datetime | None
+    payment_method: str
     items: list[OrderItemOut]
 
 

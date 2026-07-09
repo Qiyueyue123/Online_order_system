@@ -1,3 +1,4 @@
+import json
 import secrets
 
 from fastapi import HTTPException, Response, status
@@ -6,7 +7,31 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import Cart, CartItem, LoginSession, Variant
+from ..schemas import DrinkOptionsIn
 from ..security import CART_COOKIE, token_hash
+
+DRINKS_CATEGORY_SLUG = "drinks"
+
+
+def _canonical_options(variant: Variant, options: DrinkOptionsIn | None) -> str | None:
+    """Normalise incoming cart-item options to the stable string stored on
+    CartItem/OrderItem.options.
+
+    Drinks always get a fully-defaulted options dict (water whisk, 4 g sugar)
+    even if the caller sent nothing, so two drink lines can be compared and
+    the receipt always has something to print. Non-drink variants carry no
+    options at all: whatever the caller sent (if anything) is ignored, since
+    there is no concept of "whisk"/"sugar" for a matcha tin.
+    """
+    is_drink = (
+        variant.product is not None
+        and variant.product.category is not None
+        and variant.product.category.slug == DRINKS_CATEGORY_SLUG
+    )
+    if not is_drink:
+        return None
+    normalised = (options or DrinkOptionsIn()).model_dump()
+    return json.dumps(normalised, sort_keys=True)
 
 
 def get_or_create_cart(
@@ -50,19 +75,42 @@ def get_or_create_cart(
     return cart
 
 
-def set_item(db: Session, cart: Cart, variant_id, quantity: int) -> None:
+def set_item(
+    db: Session,
+    cart: Cart,
+    variant_id,
+    quantity: int,
+    options: DrinkOptionsIn | None = None,
+) -> None:
     variant = db.get(Variant, variant_id)
     if not variant or not variant.active or not variant.product.active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
     if quantity > variant.available_stock:
         raise HTTPException(status.HTTP_409_CONFLICT, "Requested quantity is unavailable")
+    canonical_options = _canonical_options(variant, options)
+    # Same variant with different options is a distinct line (e.g. one Iced/oat/6g
+    # line and one Iced/water/4g line), so the match key is (variant_id, options)
+    # rather than variant_id alone.
     item = db.scalar(
-        select(CartItem).where(CartItem.cart_id == cart.id, CartItem.variant_id == variant_id)
+        select(CartItem).where(
+            CartItem.cart_id == cart.id,
+            CartItem.variant_id == variant_id,
+            CartItem.options.is_(canonical_options)
+            if canonical_options is None
+            else CartItem.options == canonical_options,
+        )
     )
     if item:
         item.quantity = quantity
     else:
-        db.add(CartItem(cart_id=cart.id, variant_id=variant_id, quantity=quantity))
+        db.add(
+            CartItem(
+                cart_id=cart.id,
+                variant_id=variant_id,
+                quantity=quantity,
+                options=canonical_options,
+            )
+        )
     db.commit()
 
 
@@ -90,11 +138,11 @@ def merge_guest_cart(
         guest_cart.token_hash = None
         db.commit()
         return
-    account_items = {item.variant_id: item for item in account_cart.items}
+    account_items = {(item.variant_id, item.options): item for item in account_cart.items}
     # Iterate over a copy: distinct-variant items are removed from guest_cart.items
     # below, which would otherwise mutate the collection while iterating over it.
     for guest_item in list(guest_cart.items):
-        existing = account_items.get(guest_item.variant_id)
+        existing = account_items.get((guest_item.variant_id, guest_item.options))
         if existing:
             existing.quantity = min(
                 existing.quantity + guest_item.quantity,
@@ -142,6 +190,7 @@ def cart_payload(cart: Cart) -> dict:
             "quantity": item.quantity,
             "unit_price_cents": item.variant.price_cents,
             "line_total_cents": item.quantity * item.variant.price_cents,
+            "options": json.loads(item.options) if item.options else None,
         }
         for item in cart.items
     ]

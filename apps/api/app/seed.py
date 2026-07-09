@@ -57,101 +57,49 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
     """
     return [
         (
-            "sayaka-latte",
+            "ajisai-latte",
             lambda: Product(
                 category=drinks,
-                slug="sayaka-latte",
-                name="Sayaka Latte",
+                slug="ajisai-latte",
+                name="Ajisai 2.0 Matcha Latte",
                 description=(
-                    "Our everyday matcha latte, whisked from Niko Neko Ajisai 2.0 "
-                    "to order with oat or whole milk. Balanced and gently sweet — "
-                    "the one to start with."
+                    "The one drink on the menu: a standard 4 g of Niko Neko "
+                    "Ajisai 2.0, whisked and poured over cow's milk. Choose Iced "
+                    "or Hot, and customise the whisk liquid and sugar at "
+                    "checkout."
                 ),
                 variants=[
                     Variant(
-                        sku="SAYAKA-ICED",
+                        sku="AJISAI-LATTE-ICED",
                         name="Iced",
                         weight_grams=350,
-                        price_cents=4900,
-                        stock_on_hand=25,
+                        price_cents=4000,
+                        stock_on_hand=30,
                     ),
                     Variant(
-                        sku="SAYAKA-HOT",
+                        sku="AJISAI-LATTE-HOT",
                         name="Hot",
                         weight_grams=300,
-                        price_cents=4900,
-                        stock_on_hand=25,
+                        price_cents=4000,
+                        stock_on_hand=30,
                     ),
                 ],
                 images=[
                     ProductImage(
                         url="/media/sayaka-latte-real-1.webp",
-                        alt_text="Sayaka matcha latte",
+                        alt_text="Ajisai 2.0 Matcha Latte",
                     ),
                     ProductImage(
                         url="/media/sayaka-latte-real-2.png",
-                        alt_text="Sayaka latte top view",
+                        alt_text="Ajisai 2.0 Matcha Latte top view",
                     ),
-                ],
-            ),
-        ),
-        (
-            "ikuyo-latte",
-            lambda: Product(
-                category=drinks,
-                slug="ikuyo-latte",
-                name="Ikuyo Latte",
-                description=(
-                    "Our signature: a double shot of Niko Neko Ajisai 2.0 whisked "
-                    "into milk over ice or steamed hot. Bolder, greener, for the "
-                    "days that need it."
-                ),
-                variants=[
-                    Variant(
-                        sku="IKUYO-ICED",
-                        name="Iced",
-                        weight_grams=350,
-                        price_cents=5500,
-                        stock_on_hand=20,
-                    ),
-                    Variant(
-                        sku="IKUYO-HOT",
-                        name="Hot",
-                        weight_grams=300,
-                        price_cents=5500,
-                        stock_on_hand=20,
-                    ),
-                ],
-                images=[
                     ProductImage(
                         url="/media/ikuyo-latte-real-1.webp",
-                        alt_text="Ikuyo double-shot matcha latte",
+                        alt_text="Ajisai 2.0 Matcha Latte close-up",
                     ),
                     ProductImage(
                         url="/media/ikuyo-latte-real-2.png",
-                        alt_text="Ikuyo latte close-up",
-                    ),
-                ],
-            ),
-        ),
-        (
-            "matcha-straight",
-            lambda: Product(
-                category=drinks,
-                slug="matcha-straight",
-                name="Usucha (Straight Matcha)",
-                description=(
-                    "No milk, no ice — just Niko Neko Ajisai 2.0 whisked "
-                    "traditionally with hot water into a thin, frothy bowl. Made "
-                    "fresh at pickup."
-                ),
-                variants=[
-                    Variant(
-                        sku="USUCHA-BOWL",
-                        name="Bowl",
-                        weight_grams=200,
-                        price_cents=3900,
-                        stock_on_hand=30,
+                        alt_text="Ajisai 2.0 Matcha Latte, second angle",
                     ),
                 ],
             ),

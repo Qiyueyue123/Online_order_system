@@ -1,8 +1,10 @@
+import json
 import logging
 import smtplib
 from dataclasses import dataclass
 from datetime import UTC
 from email.message import EmailMessage as MimeEmailMessage
+from urllib.parse import quote
 
 from ..config import Settings, get_settings
 from ..models import Order
@@ -58,7 +60,17 @@ def _format_money(cents: int) -> str:
     return f"{cents / 100:.2f}"
 
 
-def _render_order_confirmation(order: Order) -> str:
+def _format_options_suffix(raw_options: str | None) -> str:
+    if not raw_options:
+        return ""
+    options = json.loads(raw_options)
+    whisk = options.get("whisk", "water")
+    sugar_g = options.get("sugar_g", 4)
+    return f" — {whisk} whisk, {sugar_g} g sugar"
+
+
+def _render_order_confirmation(order: Order, settings: Settings | None = None) -> str:
+    settings = settings or get_settings()
     lines = [
         f"Order {order.display_number}",
         "",
@@ -68,6 +80,7 @@ def _render_order_confirmation(order: Order) -> str:
         lines.append(
             f"  {item.product_name} ({item.variant_name}) x{item.quantity} "
             f"@ {_format_money(item.unit_price_cents)} {order.currency}"
+            f"{_format_options_suffix(item.options)}"
         )
     lines += [
         "",
@@ -76,6 +89,14 @@ def _render_order_confirmation(order: Order) -> str:
         f"Discount: {_format_money(order.discount_cents)} {order.currency}",
         f"Total: {_format_money(order.total_cents)} {order.currency}",
     ]
+    if order.payment_method == "pay_at_pickup":
+        money = f"{_format_money(order.total_cents)} {order.currency}"
+        payment_line = f"Pay {money} at pickup — "
+        if settings.pickup_payment_note:
+            payment_line += f"cash, or transfer via Revolut/Swish to {settings.pickup_payment_note}"
+        else:
+            payment_line += "cash at pickup"
+        lines += ["", payment_line]
     if order.pickup_at is not None:
         # Stored as UTC (naive when read back from SQLite); the receipt must show
         # café wall-clock time, since pickup happens at a physical location.
@@ -100,7 +121,18 @@ def _render_order_confirmation(order: Order) -> str:
             f"  {order.shipping_city} {order.shipping_postal_code}",
             f"  {order.shipping_country_code}",
         ]
+    # Guest tracking: display_number + email is guessable in principle (an attacker
+    # who already knows both could look up the order), but it's the same tradeoff
+    # every guest-checkout shop makes, and it needs no server-side token storage --
+    # the raw checkout lookup_token is deliberately never persisted (only its hash
+    # is), so this is the only link we can always reconstruct from the order alone.
+    track_url = (
+        f"{settings.web_origin}/track"
+        f"?order={quote(order.display_number)}&email={quote(order.email)}"
+    )
     lines += [
+        "",
+        f"Track your order: {track_url}",
         "",
         "This is a demonstration store; no real payment or shipment has taken place.",
     ]
@@ -112,6 +144,6 @@ def send_order_confirmation(order: Order, settings: Settings | None = None) -> N
     message = EmailMessage(
         to=order.email,
         subject=f"Order confirmation - {order.display_number}",
-        text_body=_render_order_confirmation(order),
+        text_body=_render_order_confirmation(order, settings),
     )
     _get_backend(settings).send(message)

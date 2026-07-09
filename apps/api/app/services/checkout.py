@@ -45,6 +45,11 @@ def create_pending_order(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "Cart contains drinks; choose a pickup time",
         )
+    if data.payment_method == "pay_at_pickup" and not (needs_pickup and not needs_shipping):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Pay at pickup is only available for pickup-only orders",
+        )
     country = None
     if needs_shipping:
         if data.shipping_address is None:
@@ -94,12 +99,13 @@ def create_pending_order(
 
     guest_token = secrets.token_urlsafe(32) if not session else None
     address = data.shipping_address if needs_shipping else None
+    pay_at_pickup = data.payment_method == "pay_at_pickup"
     order = Order(
         display_number=f"M{datetime.now(UTC):%y%m%d}{secrets.randbelow(100000):05d}",
         user_id=session.user_id if session else None,
         email=str(data.email).lower(),
         lookup_token_hash=token_hash(guest_token) if guest_token else None,
-        status=OrderStatus.PENDING_PAYMENT,
+        status=OrderStatus.CONFIRMED if pay_at_pickup else OrderStatus.PENDING_PAYMENT,
         subtotal_cents=subtotal,
         discount_cents=discount,
         shipping_cents=shipping_cents,
@@ -111,7 +117,14 @@ def create_pending_order(
         shipping_postal_code=address.postal_code if address else None,
         shipping_country_code=country,
         pickup_at=pickup_at,
-        reservation_expires_at=datetime.now(UTC) + timedelta(minutes=settings.reservation_minutes),
+        payment_method=data.payment_method,
+        # A pay-at-pickup order is a firm commitment made at checkout time, not a
+        # reservation awaiting online payment, so it never expires via the sweep.
+        reservation_expires_at=(
+            None
+            if pay_at_pickup
+            else datetime.now(UTC) + timedelta(minutes=settings.reservation_minutes)
+        ),
     )
     db.add(order)
     db.flush()
@@ -127,6 +140,7 @@ def create_pending_order(
                 sku=variant.sku,
                 unit_price_cents=variant.price_cents,
                 quantity=cart_item.quantity,
+                options=cart_item.options,
             )
         )
         db.add(
@@ -145,17 +159,23 @@ def create_pending_order(
             amount_cents=order.total_cents,
         )
     )
+    if pay_at_pickup:
+        # Pay-at-pickup skips the online-payment step entirely, so consume the
+        # reservation right away (same bookkeeping mark_order_paid uses for a
+        # completed online payment) rather than leaving stock merely reserved.
+        _consume_reserved_stock(db, order, reason="pay_at_pickup_confirmed")
     cart.checked_out_at = datetime.now(UTC)
     db.commit()
     db.refresh(order)
     return order, guest_token
 
 
-def mark_order_paid(db: Session, order: Order) -> None:
-    if order.status == OrderStatus.PAID:
-        return
-    if order.status != OrderStatus.PENDING_PAYMENT:
-        raise ValueError(f"Cannot pay order in state {order.status}")
+def _consume_reserved_stock(db: Session, order: Order, *, reason: str) -> None:
+    """Turn a reservation into a firm stock deduction: reserved stock is released
+    and the same quantity is permanently removed from stock_on_hand. Shared by
+    mark_order_paid (online payment succeeded) and the pay-at-pickup path in
+    create_pending_order (order is a firm commitment from the moment it's placed).
+    """
     for item in order.items:
         variant = db.get(Variant, item.variant_id)
         variant.stock_reserved -= item.quantity
@@ -165,10 +185,18 @@ def mark_order_paid(db: Session, order: Order) -> None:
                 variant_id=variant.id,
                 quantity_delta=-item.quantity,
                 reserved_delta=-item.quantity,
-                reason="payment_succeeded",
+                reason=reason,
                 reference=str(order.id),
             )
         )
+
+
+def mark_order_paid(db: Session, order: Order) -> None:
+    if order.status == OrderStatus.PAID:
+        return
+    if order.status != OrderStatus.PENDING_PAYMENT:
+        raise ValueError(f"Cannot pay order in state {order.status}")
+    _consume_reserved_stock(db, order, reason="payment_succeeded")
     order.status = OrderStatus.PAID
     order.payment.status = PaymentStatus.SUCCEEDED
     order.reservation_expires_at = None
@@ -203,6 +231,32 @@ def cancel_order(db: Session, order: Order) -> None:
     order.status = OrderStatus.CANCELLED
     order.payment.status = PaymentStatus.FAILED
     order.reservation_expires_at = None
+
+
+def cancel_confirmed_order(db: Session, order: Order) -> None:
+    """Admin-initiated cancellation of a pay-at-pickup order (confirmed -> cancelled).
+
+    Unlike cancel_order, stock here was already *consumed* (not merely reserved) at
+    checkout time, since a pay-at-pickup order is a firm commitment. Cancelling it
+    must therefore restock stock_on_hand directly, mirroring the inverse of
+    _consume_reserved_stock.
+    """
+    if order.status != OrderStatus.CONFIRMED:
+        raise ValueError(f"Cannot cancel order in state {order.status}")
+    for item in order.items:
+        variant = db.get(Variant, item.variant_id)
+        variant.stock_on_hand += item.quantity
+        db.add(
+            InventoryMovement(
+                variant_id=variant.id,
+                quantity_delta=item.quantity,
+                reserved_delta=0,
+                reason="admin_cancelled_confirmed",
+                reference=str(order.id),
+            )
+        )
+    order.status = OrderStatus.CANCELLED
+    order.payment.status = PaymentStatus.FAILED
 
 
 def expire_stale_orders(db: Session) -> int:

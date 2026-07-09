@@ -9,7 +9,10 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
 import { AuthPage } from "./pages/AuthPage";
 import { DemoPaymentPage } from "./pages/DemoPaymentPage";
+import { OrderStatusPage } from "./pages/OrderStatusPage";
 import { ProductPage } from "./pages/ProductPage";
+import { StorePage } from "./pages/StorePage";
+import { TrackOrderPage } from "./pages/TrackOrderPage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import "./styles.css";
 
@@ -21,12 +24,15 @@ const router = createBrowserRouter([
     element: <App />,
     children: [
       { path: "/", element: <CatalogPage /> },
+      { path: "/store", element: <StorePage /> },
       { path: "/products/:slug", element: <ProductPage /> },
       { path: "/cart", element: <CartPage /> },
       { path: "/checkout", element: <CheckoutPage /> },
       { path: "/signin", element: <AuthPage /> },
       { path: "/account", element: <AccountPage /> },
       { path: "/demo-payment/:orderId", element: <DemoPaymentPage /> },
+      { path: "/orders/:id", element: <OrderStatusPage /> },
+      { path: "/track", element: <TrackOrderPage /> },
       { path: "/admin", element: <AdminPage /> },
     ],
   },

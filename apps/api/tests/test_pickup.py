@@ -103,19 +103,24 @@ ADDRESS = {
 }
 
 
-def checkout(client, *, pickup_at=None, address=None, email="guest@example.com"):
+def checkout(
+    client, *, pickup_at=None, address=None, email="guest@example.com", payment_method=None
+):
     body = {"email": email}
     if pickup_at is not None:
         body["pickup_at"] = pickup_at
     if address is not None:
         body["shipping_address"] = address
+    if payment_method is not None:
+        body["payment_method"] = payment_method
     return client.post("/api/v1/checkout", json=body)
 
 
-def put_item(client, variant, quantity=1):
-    response = client.put(
-        "/api/v1/cart/items", json={"variant_id": str(variant.id), "quantity": quantity}
-    )
+def put_item(client, variant, quantity=1, options=None):
+    body = {"variant_id": str(variant.id), "quantity": quantity}
+    if options is not None:
+        body["options"] = options
+    response = client.put("/api/v1/cart/items", json=body)
     assert response.status_code == 200
     return response
 

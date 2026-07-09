@@ -16,7 +16,7 @@ from ..models import (
     Variant,
 )
 from ..schemas import AdminProductIn, AdminProductUpdateIn
-from .checkout import cancel_order
+from .checkout import cancel_confirmed_order, cancel_order
 
 
 def write_audit(
@@ -86,6 +86,15 @@ def apply_order_transition(db: Session, order: Order, target: OrderStatus) -> No
         # local status once Stripe confirms the refund via webhook.
         order.status = OrderStatus.REFUNDED
         order.payment.status = PaymentStatus.REFUNDED
+        return
+    if current == OrderStatus.CONFIRMED and target == OrderStatus.FULFILLED:
+        # Pay-at-pickup: cash/transfer changes hands at the counter, so "fulfilled"
+        # here also stands in for "paid" -- there is no separate paid state for it.
+        order.status = OrderStatus.FULFILLED
+        order.payment.status = PaymentStatus.SUCCEEDED
+        return
+    if current == OrderStatus.CONFIRMED and target == OrderStatus.CANCELLED:
+        cancel_confirmed_order(db, order)
         return
     raise HTTPException(
         status.HTTP_409_CONFLICT, f"Cannot move order from {current.value} to {target.value}"

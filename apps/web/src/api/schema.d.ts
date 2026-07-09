@@ -228,6 +228,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Track Order
+         * @description Guest order tracking usable from any device: display_number + email, no
+         *     stored token required (the raw checkout lookup_token is never persisted --
+         *     only its hash is -- so it can't be reconstructed server-side for the email).
+         *
+         *     Tradeoff: display_number + email is guessable by anyone who already knows
+         *     both, same as most real shops' guest-order-lookup pages. Rate-limited like
+         *     the auth endpoints to slow down enumeration.
+         */
+        get: operations["track_order_api_v1_orders_track_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders/{order_id}": {
         parameters: {
             query?: never;
@@ -485,6 +511,8 @@ export interface components {
             currency: string;
             /** Pickup At */
             pickup_at: string | null;
+            /** Payment Method */
+            payment_method: string;
             /** Items */
             items: components["schemas"]["OrderItemOut"][];
             /**
@@ -687,6 +715,7 @@ export interface components {
             variant_id: string;
             /** Quantity */
             quantity: number;
+            options?: components["schemas"]["DrinkOptionsIn"] | null;
         };
         /** CartItemOut */
         CartItemOut: {
@@ -709,6 +738,10 @@ export interface components {
             unit_price_cents: number;
             /** Line Total Cents */
             line_total_cents: number;
+            /** Options */
+            options?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** CartOut */
         CartOut: {
@@ -744,6 +777,12 @@ export interface components {
             pickup_at?: string | null;
             /** Coupon Code */
             coupon_code?: string | null;
+            /**
+             * Payment Method
+             * @default online
+             * @enum {string}
+             */
+            payment_method: "online" | "pay_at_pickup";
         };
         /** CheckoutOut */
         CheckoutOut: {
@@ -758,11 +797,28 @@ export interface components {
             checkout_url: string;
             /** Guest Lookup Token */
             guest_lookup_token: string | null;
+            /** Reservation Expires At */
+            reservation_expires_at?: string | null;
+        };
+        /**
+         * DrinkOptionsIn
+         * @description Per-line customisation for a drink. Unknown keys are rejected (422) rather
+         *     than silently ignored, so a typo in a future field doesn't get dropped
+         *     without notice.
+         */
+        DrinkOptionsIn: {
             /**
-             * Reservation Expires At
-             * Format: date-time
+             * Whisk
+             * @default water
+             * @enum {string}
              */
-            reservation_expires_at: string;
+            whisk: "water" | "oat";
+            /**
+             * Sugar G
+             * @default 4
+             * @enum {integer}
+             */
+            sugar_g: 2 | 4 | 6 | 8;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -798,6 +854,10 @@ export interface components {
             unit_price_cents: number;
             /** Quantity */
             quantity: number;
+            /** Options */
+            options?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** OrderOut */
         OrderOut: {
@@ -827,6 +887,8 @@ export interface components {
             currency: string;
             /** Pickup At */
             pickup_at: string | null;
+            /** Payment Method */
+            payment_method: string;
             /** Items */
             items: components["schemas"]["OrderItemOut"][];
         };
@@ -1347,6 +1409,38 @@ export interface operations {
             cookie?: {
                 matcha_session?: string | null;
             };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    track_order_api_v1_orders_track_get: {
+        parameters: {
+            query: {
+                display_number: string;
+                email: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
         requestBody?: never;
         responses: {

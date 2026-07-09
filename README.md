@@ -112,7 +112,37 @@ The last screenshot is the point of the admin design: the order was marked fulfi
 the audit log shows *who* changed *what*, *when* — written in the same transaction as the
 change itself ([ADR 0006](docs/adr/0006-admin-authorization.md)).
 
-## Session status — 2026-07-09: pickup scheduling shipped
+## Session status — 2026-07-09 (later): the café's real ordering model
+
+- **The menu is the real one**: a single drink — Ajisai 2.0 Matcha Latte, 40 kr,
+  iced/hot — with true customizations: whisk base (water standard / oat for a frothier
+  cup) and sugar (2/4/6/8 g, default 4 g). Options live as JSON on cart/order lines, so
+  the same variant with different options is a separate line and the admin sees exactly
+  what to make. Recipe on the page: 4 g Ajisai 2.0, whisked, poured over cow's milk.
+- **Drinks and Store are separate pages**: the home page is the drinks menu; `/store`
+  holds the take-home shelf (Ajisai jar, whisk) plus "coming soon" placeholders.
+- **Orders no longer vanish after payment**: every confirmation email carries a
+  tracking link (`/track` — order number + email, rate-limited), the post-payment page
+  links straight to `/orders/{id}` with the guest token, and the footer has "Track
+  order". The tracking page shows a status timeline, pickup time, items with options.
+- **Pay at pickup is real**: checkout offers "pay at pickup — cash or Revolut/Swish
+  transfer" for pickup carts (configure your handle via `PICKUP_PAYMENT_NOTE`). Such
+  orders are `confirmed` (stock consumed immediately, immune to the abandonment
+  sweeper), get their instructions by email, and admin cancelling restocks correctly.
+- **When to test real payments**: staged plan in
+  [docs/payments-go-live-plan.md](docs/payments-go-live-plan.md) — pay-at-pickup runs
+  the café today with zero payment accounts; Stripe test keys when you have 30 min;
+  live keys + Swish only after the AWS deploy.
+- **Bug #4 from the browser**: drink options never rendered — the code compared the
+  category *slug* (`"drinks"`) against what the API actually returns, the display
+  *name* (`"Drinks"`), and the tests had encoded the same lowercase assumption in
+  their fixtures. Fixture realism matters as much as assertion strength.
+- Photos: hero and product photography credited to
+  [Niko Neko Matcha](https://www.nikonekomatcha.com/) (site footer + here).
+
+Suite: 45 legacy + 98 API + 46 web = **189 tests**, all green.
+
+## Previous session status — 2026-07-09: pickup scheduling shipped
 
 - **Pickup scheduling** ([ADR 0008](docs/adr/0008-pickup-scheduling.md)): admin-defined
   pickup days (window/interval/capacity, ported from the legacy schema), derived slots,

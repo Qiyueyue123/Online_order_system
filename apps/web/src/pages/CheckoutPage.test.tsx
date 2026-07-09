@@ -19,8 +19,8 @@ const pickupOnlyCart: Cart = {
   items: [
     {
       variant_id: "var-1",
-      product_slug: "sayaka-latte",
-      product_name: "Sayaka Latte",
+      product_slug: "ajisai-latte",
+      product_name: "Ajisai 2.0 Matcha Latte",
       variant_name: "Iced",
       sku: "SKU-D1",
       quantity: 1,
@@ -190,7 +190,11 @@ describe("CheckoutPage", () => {
         ([input, init]) => String(input).includes("/checkout") && init?.method === "POST",
       );
       const body = JSON.parse(checkoutCall![1]!.body as string);
-      expect(body).toEqual({ email: "shopper@example.com", pickup_at: "2026-07-09T16:15:00Z" });
+      expect(body).toEqual({
+        email: "shopper@example.com",
+        pickup_at: "2026-07-09T16:15:00Z",
+        payment_method: "online",
+      });
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     }
@@ -263,5 +267,66 @@ describe("CheckoutPage", () => {
     await vi.waitFor(() =>
       expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/pickup-days")).length).toBeGreaterThan(1),
     );
+  });
+
+  it("offers a pay-at-pickup vs pay-online choice for a pickup-only cart", async () => {
+    stubFetch(pickupOnlyCart);
+
+    renderWithProviders(<CheckoutPage />);
+
+    const radioGroup = await screen.findByRole("radiogroup", { name: "Payment method" });
+    expect(within(radioGroup).getByLabelText(/Pay online now/)).toBeChecked();
+    expect(within(radioGroup).getByLabelText(/Pay at pickup/)).not.toBeChecked();
+  });
+
+  it("does not offer a payment choice when the cart needs shipping", async () => {
+    stubFetch(retailOnlyCart);
+
+    renderWithProviders(<CheckoutPage />);
+
+    await screen.findByLabelText(/Recipient name/);
+    expect(screen.queryByRole("radiogroup", { name: "Payment method" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer a payment choice for a mixed cart (pickup + shipping)", async () => {
+    stubFetch(mixedCart);
+
+    renderWithProviders(<CheckoutPage />);
+
+    await screen.findByRole("group", { name: "Pickup day" });
+    expect(screen.queryByRole("radiogroup", { name: "Payment method" })).not.toBeInTheDocument();
+  });
+
+  it("sends payment_method: pay_at_pickup and adapts the submit label when chosen", async () => {
+    const fetchMock = stubFetch(pickupOnlyCart);
+    const assignSpy = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, assign: assignSpy },
+    });
+
+    try {
+      const { container } = renderWithProviders(<CheckoutPage />);
+      fireEvent.change(await screen.findByLabelText(/Email/), { target: { value: "shopper@example.com" } });
+      const slotGroup = await screen.findByRole("group", { name: "Pickup time slot" });
+      fireEvent.click(within(slotGroup).getAllByRole("button")[0]);
+      fireEvent.click(screen.getByLabelText(/Pay at pickup/));
+
+      expect(screen.getByRole("button", { name: "Confirm order — pay at pickup" })).toBeInTheDocument();
+
+      submitForm(container);
+
+      await vi.waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith("/api/v1/checkout", expect.objectContaining({ method: "POST" })),
+      );
+      const checkoutCall = fetchMock.mock.calls.find(
+        ([input, init]) => String(input).includes("/checkout") && init?.method === "POST",
+      );
+      const body = JSON.parse(checkoutCall![1]!.body as string);
+      expect(body.payment_method).toBe("pay_at_pickup");
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    }
   });
 });

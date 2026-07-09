@@ -112,6 +112,7 @@ export function CatalogPage() {
         <p className="eyebrow">OUR STORY</p>
         <h2>From a pop-up<br />to a dorm kitchen.</h2>
         <p>QY &amp; YX&rsquo;s Cafe started as a small pop-up in the Netherlands, whisking matcha for friends between classes. Now we&rsquo;re pouring it in Umeå — order online, and we&rsquo;ll have it ready at the door.</p>
+        <p>Every drink is whisked from Niko Neko&rsquo;s Ajisai 2.0, a ceremonial Yabukita matcha from Mie.</p>
       </section>
     </>
   );

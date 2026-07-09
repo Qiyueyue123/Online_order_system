@@ -112,7 +112,31 @@ The last screenshot is the point of the admin design: the order was marked fulfi
 the audit log shows *who* changed *what*, *when* — written in the same transaction as the
 change itself ([ADR 0006](docs/adr/0006-admin-authorization.md)).
 
-## Session status — end of 2026-07-08 (night): the store is now the real café
+## Session status — 2026-07-09: pickup scheduling shipped
+
+- **Pickup scheduling** ([ADR 0008](docs/adr/0008-pickup-scheduling.md)): admin-defined
+  pickup days (window/interval/capacity, ported from the legacy schema), derived slots,
+  capacity checked under `SELECT … FOR UPDATE` — the legacy double-booking race closed
+  by design. Public `GET /pickup-days`; admin CRUD with audit logging; new admin
+  "Pickup days" tab.
+- **Adaptive checkout**: drinks carts get a day/slot picker and no address form; retail
+  carts get the address form (any country; empty `SHIPPING_COUNTRIES` = allow all,
+  79 kr flat international); mixed carts get both. Slot-conflict 409s render as "that
+  time just filled up" with a refetch.
+- **Timezone bug found in the browser** (bug #3): slots defined 16:00–19:00 rendered as
+  "12:00 AM" for a UTC+8 viewer — see the engineering log entry. Slots are now built in
+  `Europe/Stockholm` and every renderer (checkout, admin, email) pins the café timezone.
+- **Niko Neko Ajisai 2.0**: seeded take-home product with the official jar photo (ask
+  Niko Neko before real public use), drinks credit it, hero carousel cycles three Ajisai
+  process shots + the pour video.
+- Verified end to end in the browser: drink → 16:15 slot → payment → email reads
+  "Pickup: Thu 09 Jul 2026, 16:15 at the dorm kitchen, Umeå" → admin orders show the
+  pickup column. Suite: 45 legacy + 77 API + 32 web = **154 tests**.
+- Deferred: two new gallery screenshots (adaptive checkout, admin pickup tab) need
+  Chrome CDP re-enabled — tick "Allow remote debugging" at
+  `chrome://inspect/#remote-debugging`, then ask for the screenshots.
+
+## Previous session status — end of 2026-07-08 (night): the store is now the real café
 
 The store now serves its real purpose: **QY & YX's Cafe, matcha drinks for pickup in
 Umeå**. What changed, all green in CI:
@@ -189,6 +213,49 @@ provision Stripe test keys to the deployed environment.
 ## Engineering log
 
 A running record of significant changes, what each one did, and why it matters. Newest first.
+
+### 2026-07-09 — Third browser-found bug: a pickup time belongs to a place, not a viewer
+
+The slot picker rendered "12:00 AM" instead of "16:00". The admin's 16:00–19:00 window
+was combined with the date as *UTC*, and the frontend formatted it in the *viewer's*
+timezone — from a UTC+8 browser, 16:00Z is midnight. Two stacked mistakes with the same
+root: treating a wall-clock time at a physical place as if it were an abstract instant.
+
+The fix pins the timezone at both ends: slot instants are built in the café's zone
+(`Europe/Stockholm`, a setting) and converted to UTC for storage and comparison — so a
+16:00 slot serializes as `14:00Z` in summer — and every renderer (slot chips, admin
+table, account page, the confirmation email) formats with an explicit
+`timeZone: "Europe/Stockholm"` instead of the viewer's default. A regression test asserts
+the 16:00 slot really is `14:00Z` across DST, and the email says "16:00", never "14:00".
+
+*Lesson: "store UTC" is only half the rule. The other half is knowing which timezone the
+wall-clock meaning lives in — for events at a physical place, that's the place's zone,
+both when constructing the instant and when displaying it. And no unit test asserts what
+timezone your users' browsers are in — only looking at the rendered page did.*
+
+### 2026-07-09 — Pickup scheduling: the checkout now adapts to the cart
+
+A drink and a tin of matcha need different checkouts: one needs a *time*, the other an
+*address*. The cart now declares `needs_pickup`/`needs_shipping` and both the UI and the
+API validation follow it ([ADR 0008](docs/adr/0008-pickup-scheduling.md)). Design points
+worth remembering:
+
+- **Slots are derived, never stored.** An admin defines a pickup *day* (window, slot
+  interval, per-slot capacity — ported from the legacy café's `pickup_days` table);
+  concrete times are computed. Changing a window or capacity is retroactively
+  consistent because there are no slot rows to migrate.
+- **Capacity is checked under the same lock as the write.** The legacy app's slot race
+  (validated capacity outside the transaction → double-booked pickups) is closed the
+  same way the stock race was: `SELECT … FOR UPDATE` on the pickup day, *then* count,
+  inside the checkout transaction. A test proves the third order for a 2-capacity slot
+  gets a 409 and that cancelling frees the seat.
+- **The client plans for losing the race anyway.** Between rendering "2 left" and
+  submitting, someone else can take the slot — the UI treats the 409 as normal flow:
+  explains it, clears the selection, refetches. Optimistic reads + graceful conflict
+  beats trying to hold client-side reservations.
+- **Empty allowlist = allow all.** Retail shipping is open to any country while it
+  doesn't really matter (a flat 79 kr international rate); populating
+  `SHIPPING_COUNTRIES` restores the restriction with zero code changes.
 
 ### 2026-07-08 — The pivot: build the store the business actually needs
 

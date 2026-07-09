@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { AdminOrder, AdminOrderPage, api, money } from "../../api/client";
+import { AdminOrder, AdminOrderPage, api, formatPickup, money } from "../../api/client";
 
 const STATUS_OPTIONS = ["all", "pending_payment", "paid", "fulfilled", "refunded", "cancelled"];
 
@@ -56,6 +56,7 @@ export function AdminOrders({ csrfToken }: { csrfToken: string }) {
             <th>Email</th>
             <th>Status</th>
             <th>Total</th>
+            <th>Pickup</th>
             <th>Created</th>
             <th>Actions</th>
           </tr>
@@ -69,6 +70,7 @@ export function AdminOrders({ csrfToken }: { csrfToken: string }) {
                 <span className={`status status--${order.status}`}>{order.status.replace("_", " ")}</span>
               </td>
               <td>{money(order.total_cents)}</td>
+              <td>{order.pickup_at ? formatPickup(order.pickup_at) : "—"}</td>
               <td>{new Date(order.created_at).toLocaleString()}</td>
               <td>
                 {(TRANSITIONS[order.status] ?? []).map((transition) => (

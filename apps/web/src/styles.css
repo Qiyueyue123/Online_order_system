@@ -227,6 +227,9 @@ footer {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* The photo slides are portrait crops; biasing toward the upper-middle
+     keeps the whisk/pour action in frame instead of cropping into it. */
+  object-position: center 35%;
 }
 .hero-scrim {
   position: absolute;
@@ -473,6 +476,32 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 }
 .checkout h1 { margin-bottom: 1rem; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.pickup-picker { margin-top: 1.5rem; }
+.pickup-picker h2 {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 0.75rem;
+}
+.pickup-days, .pickup-slots { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem; }
+.chip {
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 2rem;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.chip:hover { border-color: var(--pine); }
+.chip.active { color: var(--paper); background: var(--pine); border-color: var(--pine); }
+.slot-remaining { color: var(--persimmon); font-size: 0.75rem; }
+.chip.active .slot-remaining { color: var(--paper); }
+
+.pickup-time { color: var(--ink-soft); font-size: 0.85rem; margin: 0.3rem 0 0; }
 
 .auth-page {
   display: grid;

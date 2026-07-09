@@ -22,6 +22,7 @@ const ordersPage: AdminOrderPage = {
       shipping_cents: 500,
       total_cents: 4300,
       currency: "SEK",
+      pickup_at: null,
       items: [],
       created_at: "2026-01-01T00:00:00Z",
       user_id: null,

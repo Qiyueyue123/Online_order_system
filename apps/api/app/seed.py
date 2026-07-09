@@ -1,11 +1,12 @@
 from collections.abc import Callable
+from datetime import UTC, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import Base, engine
-from .models import Category, Product, ProductImage, Role, User, Variant
+from .models import Category, PickupDay, Product, ProductImage, Role, User, Variant
 from .security import hash_password
 
 
@@ -62,8 +63,9 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
                 slug="sayaka-latte",
                 name="Sayaka Latte",
                 description=(
-                    "Our everyday matcha latte, whisked to order with oat or whole "
-                    "milk. Balanced and gently sweet — the one to start with."
+                    "Our everyday matcha latte, whisked from Niko Neko Ajisai 2.0 "
+                    "to order with oat or whole milk. Balanced and gently sweet — "
+                    "the one to start with."
                 ),
                 variants=[
                     Variant(
@@ -100,9 +102,9 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
                 slug="ikuyo-latte",
                 name="Ikuyo Latte",
                 description=(
-                    "Our signature: a double shot of ceremonial-grade matcha "
-                    "whisked into milk over ice or steamed hot. Bolder, greener, "
-                    "for the days that need it."
+                    "Our signature: a double shot of Niko Neko Ajisai 2.0 whisked "
+                    "into milk over ice or steamed hot. Bolder, greener, for the "
+                    "days that need it."
                 ),
                 variants=[
                     Variant(
@@ -139,8 +141,9 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
                 slug="matcha-straight",
                 name="Usucha (Straight Matcha)",
                 description=(
-                    "No milk, no ice — just matcha whisked traditionally with hot "
-                    "water into a thin, frothy bowl. Made fresh at pickup."
+                    "No milk, no ice — just Niko Neko Ajisai 2.0 whisked "
+                    "traditionally with hot water into a thin, frothy bowl. Made "
+                    "fresh at pickup."
                 ),
                 variants=[
                     Variant(
@@ -154,26 +157,36 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
             ),
         ),
         (
-            "uji-ceremonial-matcha",
+            "ajisai-matcha",
             lambda: Product(
                 category=matcha,
-                slug="uji-ceremonial-matcha",
-                name="Uji Ceremonial Matcha",
-                description="A first-harvest matcha with sweet pea and cocoa notes.",
+                slug="ajisai-matcha",
+                name="Niko Neko Ajisai 2.0",
+                description=(
+                    "The matcha our drinks are whisked from: a ceremonial-grade "
+                    "single-cultivar Yabukita from Mie, with a nutty, creamy umami "
+                    "profile and a gentle finish."
+                ),
                 variants=[
                     Variant(
-                        sku="UJI-30",
-                        name="30 g tin",
+                        sku="AJISAI-30",
+                        name="30 g jar",
                         weight_grams=30,
-                        price_cents=28900,
-                        stock_on_hand=24,
+                        price_cents=24900,
+                        stock_on_hand=10,
                     ),
                     Variant(
-                        sku="UJI-60",
-                        name="60 g tin",
-                        weight_grams=60,
-                        price_cents=52900,
-                        stock_on_hand=12,
+                        sku="AJISAI-80",
+                        name="80 g jar",
+                        weight_grams=80,
+                        price_cents=54900,
+                        stock_on_hand=6,
+                    ),
+                ],
+                images=[
+                    ProductImage(
+                        url="/media/ajisai-01.jpg",
+                        alt_text="Niko Neko Ajisai 2.0 matcha jar",
                     ),
                 ],
             ),
@@ -199,6 +212,28 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
     ]
 
 
+def _seed_pickup_days(db: Session) -> None:
+    """Pickup slots for the next 7 days, 16:00-19:00 in 15-minute steps, 2 per slot.
+
+    Idempotent: only dates without a PickupDay row are created, so re-running the
+    seed never clobbers availability/capacity tweaks made through the admin API.
+    """
+    today = datetime.now(UTC).date()
+    wanted = [today + timedelta(days=offset) for offset in range(7)]
+    existing = set(db.scalars(select(PickupDay.date).where(PickupDay.date.in_(wanted))))
+    for day in wanted:
+        if day not in existing:
+            db.add(
+                PickupDay(
+                    date=day,
+                    start_time=time(16, 0),
+                    end_time=time(19, 0),
+                    slot_minutes=15,
+                    slot_capacity=2,
+                )
+            )
+
+
 def seed() -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -209,6 +244,7 @@ def seed() -> None:
         for slug, build in _catalog(drinks, matcha):
             if slug not in existing:
                 db.add(build())
+        _seed_pickup_days(db)
         db.commit()
 
 

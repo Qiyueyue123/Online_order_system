@@ -20,8 +20,13 @@ from ..models import (
 )
 from ..schemas import CheckoutIn
 from ..security import token_hash
+from .cart import classify_cart
+from .pickup import validate_and_lock_slot
 
+# Domestic pickup-origin shipping is free; everywhere else pays one flat
+# international rate (no carrier integration yet).
 SHIPPING_RATES = {"SE": 0}
+INTERNATIONAL_FLAT_RATE_CENTS = 79_00
 
 
 def create_pending_order(
@@ -31,11 +36,28 @@ def create_pending_order(
     session: LoginSession | None,
     settings: Settings,
 ) -> tuple[Order, str | None]:
-    country = data.shipping_address.country_code.upper()
-    if country not in settings.shipping_countries:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Shipping country unsupported")
     if not cart.items:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cart is empty")
+
+    needs_pickup, needs_shipping = classify_cart(cart)
+    if needs_pickup and data.pickup_at is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Cart contains drinks; choose a pickup time",
+        )
+    country = None
+    if needs_shipping:
+        if data.shipping_address is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Cart contains items to ship; a shipping address is required",
+            )
+        country = data.shipping_address.country_code.upper()
+        # An empty shipping_countries setting means "ship anywhere".
+        if settings.shipping_countries and country not in settings.shipping_countries:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Shipping country unsupported"
+            )
 
     variant_ids = [item.variant_id for item in cart.items]
     variants = {
@@ -62,8 +84,16 @@ def create_pending_order(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Coupon is invalid")
         discount = subtotal * coupon.percent_off // 100
 
+    # Lock-before-count: takes the PickupDay row lock and holds it until this
+    # transaction commits, so competing checkouts can't both grab the last seat.
+    pickup_at = validate_and_lock_slot(db, data.pickup_at) if needs_pickup else None
+
+    shipping_cents = 0
+    if needs_shipping:
+        shipping_cents = SHIPPING_RATES.get(country, INTERNATIONAL_FLAT_RATE_CENTS)
+
     guest_token = secrets.token_urlsafe(32) if not session else None
-    address = data.shipping_address
+    address = data.shipping_address if needs_shipping else None
     order = Order(
         display_number=f"M{datetime.now(UTC):%y%m%d}{secrets.randbelow(100000):05d}",
         user_id=session.user_id if session else None,
@@ -72,14 +102,15 @@ def create_pending_order(
         status=OrderStatus.PENDING_PAYMENT,
         subtotal_cents=subtotal,
         discount_cents=discount,
-        shipping_cents=SHIPPING_RATES.get(country, 2500),
-        total_cents=subtotal - discount + SHIPPING_RATES.get(country, 2500),
-        shipping_name=address.recipient_name,
-        shipping_line1=address.line1,
-        shipping_line2=address.line2,
-        shipping_city=address.city,
-        shipping_postal_code=address.postal_code,
+        shipping_cents=shipping_cents,
+        total_cents=subtotal - discount + shipping_cents,
+        shipping_name=address.recipient_name if address else None,
+        shipping_line1=address.line1 if address else None,
+        shipping_line2=address.line2 if address else None,
+        shipping_city=address.city if address else None,
+        shipping_postal_code=address.postal_code if address else None,
         shipping_country_code=country,
+        pickup_at=pickup_at,
         reservation_expires_at=datetime.now(UTC) + timedelta(minutes=settings.reservation_minutes),
     )
     db.add(order)

@@ -1,39 +1,208 @@
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { api } from "../api/client";
+import { ApiError, CAFE_TIMEZONE, api, Cart, CheckoutIn, CheckoutOut, PickupDay } from "../api/client";
 
-type Fields = { email: string; recipient_name: string; line1: string; city: string; postal_code: string; country_code: string };
-type Result = { checkout_url: string; guest_lookup_token: string | null };
+type Fields = {
+  email: string;
+  recipient_name: string;
+  line1: string;
+  city: string;
+  postal_code: string;
+  country_code: string;
+};
+
+const COUNTRY_SUGGESTIONS = ["SE", "NO", "DK", "FI", "DE", "GB", "SG", "MY", "JP", "AU", "NZ"];
 
 export function CheckoutPage() {
-  const { register, handleSubmit, formState: { errors } } = useForm<Fields>({ defaultValues: { country_code: "SG" } });
+  const queryClient = useQueryClient();
+  const cart = useQuery({ queryKey: ["cart"], queryFn: () => api<Cart>("/cart") });
+  const needsPickup = !!cart.data?.needs_pickup;
+  const needsShipping = !!cart.data?.needs_shipping;
+
+  const pickupDays = useQuery({
+    queryKey: ["pickup-days"],
+    queryFn: () => api<PickupDay[]>("/pickup-days"),
+    enabled: needsPickup,
+  });
+
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [slotConflict, setSlotConflict] = useState(false);
+
+  // Default to the first available day once the pickup days load.
+  useEffect(() => {
+    if (!selectedDate && pickupDays.data && pickupDays.data.length > 0) {
+      setSelectedDate(pickupDays.data[0].date);
+    }
+  }, [pickupDays.data, selectedDate]);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<Fields>({ defaultValues: { country_code: "SE" } });
+
   const checkout = useMutation({
-    mutationFn: (values: Fields) => api<Result>("/checkout", {
-      method: "POST",
-      body: JSON.stringify({ email: values.email, shipping_address: { ...values, email: undefined } }),
-    }),
+    mutationFn: (values: Fields) => {
+      const payload: CheckoutIn = { email: values.email };
+      if (needsShipping) {
+        payload.shipping_address = {
+          recipient_name: values.recipient_name,
+          line1: values.line1,
+          city: values.city,
+          postal_code: values.postal_code,
+          country_code: values.country_code.toUpperCase(),
+        };
+      }
+      if (needsPickup && selectedSlot) {
+        payload.pickup_at = selectedSlot;
+      }
+      return api<CheckoutOut>("/checkout", { method: "POST", body: JSON.stringify(payload) });
+    },
     onSuccess: (result) => {
       if (result.guest_lookup_token) sessionStorage.setItem("guestOrderToken", result.guest_lookup_token);
       window.location.assign(result.checkout_url);
     },
+    onError: (error) => {
+      setSlotConflict(false);
+      if (error instanceof ApiError && (error.status === 409 || error.status === 422)) {
+        const message = error.message.toLowerCase();
+        if (message.includes("slot") || message.includes("pickup")) {
+          setSlotConflict(true);
+          setSelectedSlot(null);
+          queryClient.invalidateQueries({ queryKey: ["pickup-days"] });
+        }
+      }
+    },
   });
+
+  if (cart.isLoading) {
+    return (
+      <div className="page">
+        <p role="status">Loading checkout…</p>
+      </div>
+    );
+  }
+
+  const selectedDay = pickupDays.data?.find((day) => day.date === selectedDate);
+  const canSubmit = !needsPickup || !!selectedSlot;
+
   return (
     <div className="page checkout">
       <section>
         <p className="eyebrow">SECURE TEST CHECKOUT</p>
         <h1>Where do we reach you?</h1>
         <p>Payments use Stripe test mode. No live charge will be made.</p>
-        <p className="checkout-note">Pickup at the dorm kitchen, Umeå — we&rsquo;ll confirm the time by email. Delivery is not offered.</p>
+        {needsPickup && (
+          <p className="checkout-note">
+            Pickup at the dorm kitchen, Umeå — the exact address comes with your confirmation email.
+          </p>
+        )}
       </section>
       <form onSubmit={handleSubmit((data) => checkout.mutate(data))}>
-        <label>Email<input type="email" {...register("email", { required: true })} /></label>
+        <label>
+          Email
+          <input type="email" {...register("email", { required: true })} />
+        </label>
         {errors.email && <span role="alert">Email is required.</span>}
-        <label>Recipient name<input {...register("recipient_name", { required: true })} /></label>
-        <label>Address<input autoComplete="street-address" {...register("line1", { required: true })} /></label>
-        <div className="field-pair"><label>City<input {...register("city", { required: true })} /></label><label>Postal code<input {...register("postal_code", { required: true })} /></label></div>
-        <label>Country<select {...register("country_code")}><option value="SG">Singapore</option><option value="MY">Malaysia</option><option value="JP">Japan</option><option value="AU">Australia</option><option value="NZ">New Zealand</option></select></label>
-        <button className="button full" disabled={checkout.isPending}>{checkout.isPending ? "Reserving stock…" : "Continue to Stripe test checkout"}</button>
-        {checkout.isError && <p role="alert">{checkout.error.message}</p>}
+
+        {needsPickup && (
+          <div className="pickup-picker">
+            <h2>Pickup time</h2>
+            {pickupDays.isLoading && <p role="status">Loading pickup times…</p>}
+            <div className="pickup-days" role="group" aria-label="Pickup day">
+              {pickupDays.data?.map((day) => (
+                <button
+                  type="button"
+                  key={day.date}
+                  className={`chip${day.date === selectedDate ? " active" : ""}`}
+                  onClick={() => {
+                    setSelectedDate(day.date);
+                    setSelectedSlot(null);
+                  }}
+                >
+                  {/* day.date is date-only; new Date() parses it as UTC midnight, so
+                      format in UTC to keep the weekday from shifting for viewers
+                      west of Greenwich. */}
+                  {new Date(day.date).toLocaleDateString(undefined, {
+                    timeZone: "UTC",
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </button>
+              ))}
+            </div>
+            {selectedDay && (
+              <div className="pickup-slots" role="group" aria-label="Pickup time slot">
+                {selectedDay.slots.map((slot) => (
+                  <button
+                    type="button"
+                    key={slot.time}
+                    className={`chip${slot.time === selectedSlot ? " active" : ""}`}
+                    onClick={() => {
+                      setSelectedSlot(slot.time);
+                      setSlotConflict(false);
+                    }}
+                  >
+                    {/* Slot instants are UTC; always render café wall-clock time. */}
+                    {new Date(slot.time).toLocaleTimeString([], {
+                      timeZone: CAFE_TIMEZONE,
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    })}
+                    {slot.remaining <= 2 && <span className="slot-remaining"> · {slot.remaining} left</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {slotConflict && <p role="alert">That time just filled up — pick another.</p>}
+          </div>
+        )}
+
+        {needsShipping && (
+          <>
+            <label>
+              Recipient name
+              <input {...register("recipient_name", { required: true })} />
+            </label>
+            <label>
+              Address
+              <input autoComplete="street-address" {...register("line1", { required: true })} />
+            </label>
+            <div className="field-pair">
+              <label>
+                City
+                <input {...register("city", { required: true })} />
+              </label>
+              <label>
+                Postal code
+                <input {...register("postal_code", { required: true })} />
+              </label>
+            </div>
+            <label>
+              Country
+              <input
+                list="country-suggestions"
+                maxLength={2}
+                style={{ textTransform: "uppercase" }}
+                {...register("country_code", { required: true, minLength: 2, maxLength: 2 })}
+              />
+              <datalist id="country-suggestions">
+                {COUNTRY_SUGGESTIONS.map((code) => (
+                  <option value={code} key={code} />
+                ))}
+              </datalist>
+            </label>
+          </>
+        )}
+
+        <button className="button full" disabled={checkout.isPending || !canSubmit}>
+          {checkout.isPending ? "Reserving stock…" : "Continue to Stripe test checkout"}
+        </button>
+        {checkout.isError && !slotConflict && <p role="alert">{checkout.error.message}</p>}
       </form>
     </div>
   );

@@ -4,8 +4,9 @@ import { api, Session } from "../../api/client";
 import { AdminOrders } from "./AdminOrders";
 import { AdminProducts } from "./AdminProducts";
 import { AdminAuditLog } from "./AdminAuditLog";
+import { AdminPickupDays } from "./AdminPickupDays";
 
-type Tab = "orders" | "products" | "audit";
+type Tab = "orders" | "products" | "pickup" | "audit";
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>("orders");
@@ -62,6 +63,14 @@ export function AdminPage() {
         </button>
         <button
           role="tab"
+          aria-selected={tab === "pickup"}
+          className={tab === "pickup" ? "active" : ""}
+          onClick={() => setTab("pickup")}
+        >
+          Pickup days
+        </button>
+        <button
+          role="tab"
           aria-selected={tab === "audit"}
           className={tab === "audit" ? "active" : ""}
           onClick={() => setTab("audit")}
@@ -71,6 +80,7 @@ export function AdminPage() {
       </div>
       {tab === "orders" && <AdminOrders csrfToken={csrfToken} />}
       {tab === "products" && <AdminProducts csrfToken={csrfToken} />}
+      {tab === "pickup" && <AdminPickupDays csrfToken={csrfToken} />}
       {tab === "audit" && <AdminAuditLog />}
     </div>
   );

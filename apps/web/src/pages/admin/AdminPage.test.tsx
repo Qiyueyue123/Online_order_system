@@ -61,6 +61,7 @@ describe("AdminPage access control", () => {
 
     expect(await screen.findByRole("tab", { name: "Orders" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Products" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Pickup days" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Audit log" })).toBeInTheDocument();
   });
 });

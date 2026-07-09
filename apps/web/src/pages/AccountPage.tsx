@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { api, money, Order, Session } from "../api/client";
+import { api, formatPickup, money, Order, Session } from "../api/client";
 
 export function AccountPage() {
   const queryClient = useQueryClient();
@@ -43,6 +43,7 @@ export function AccountPage() {
           <div>
             <strong>{order.display_number}</strong>
             <p>{order.items.map((item) => `${item.product_name} × ${item.quantity}`).join(", ")}</p>
+            {order.pickup_at && <p className="pickup-time">Pickup {formatPickup(order.pickup_at)}</p>}
           </div>
           <div><span className={`status status--${order.status}`}>{order.status.replace("_", " ")}</span><strong>{money(order.total_cents)}</strong></div>
         </article>

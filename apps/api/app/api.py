@@ -26,6 +26,7 @@ from .models import (
     LoginSession,
     Order,
     OrderStatus,
+    PickupDay,
     ProcessedWebhook,
     Product,
     Role,
@@ -36,6 +37,9 @@ from .schemas import (
     AdminOrderOut,
     AdminOrderPage,
     AdminOrderStatusIn,
+    AdminPickupDayIn,
+    AdminPickupDayOut,
+    AdminPickupDayUpdateIn,
     AdminProductIn,
     AdminProductUpdateIn,
     AdminStockIn,
@@ -48,6 +52,7 @@ from .schemas import (
     CheckoutOut,
     LoginIn,
     OrderOut,
+    PickupDayPublicOut,
     ProductOut,
     ProductPage,
     RegisterIn,
@@ -80,6 +85,7 @@ from .services.cart import cart_payload, get_or_create_cart, merge_guest_cart, s
 from .services.catalog import list_products
 from .services.checkout import create_pending_order, expire_order, mark_order_paid
 from .services.email import send_order_confirmation
+from .services.pickup import available_days, slots_for_day, upcoming_days
 from .services.rate_limit import check_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -260,6 +266,20 @@ def put_cart_item(
     set_item(db, cart, data.variant_id, data.quantity)
     db.refresh(cart)
     return cart_payload(cart)
+
+
+@router.get("/pickup-days", response_model=list[PickupDayPublicOut])
+def pickup_days(db: Session = Depends(get_db)):
+    """Bookable pickup days for checkout: only future slots with seats left."""
+    now = datetime.now(UTC)
+    days = []
+    for day in available_days(db):
+        slots = [
+            slot for slot in slots_for_day(db, day) if slot["time"] > now and slot["remaining"] > 0
+        ]
+        if slots:
+            days.append(PickupDayPublicOut(date=day.date, slots=slots))
+    return days
 
 
 @router.post("/checkout", response_model=CheckoutOut, status_code=201)
@@ -588,6 +608,96 @@ def admin_update_order(
     db.commit()
     db.refresh(order)
     return order
+
+
+@router.get("/admin/pickup-days", response_model=list[AdminPickupDayOut])
+def admin_list_pickup_days(
+    _: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    return upcoming_days(db)
+
+
+@router.post("/admin/pickup-days", response_model=AdminPickupDayOut, status_code=201)
+def admin_create_pickup_day(
+    data: AdminPickupDayIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    if data.start_time >= data.end_time:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "start_time must be before end_time"
+        )
+    day = PickupDay(
+        date=data.date,
+        start_time=data.start_time,
+        end_time=data.end_time,
+        slot_minutes=data.slot_minutes,
+        slot_capacity=data.slot_capacity,
+    )
+    db.add(day)
+    try:
+        db.flush()
+        write_audit(
+            db,
+            actor_user_id=session.user_id,
+            action="pickup_day_created",
+            entity_type="pickup_day",
+            entity_id=day.id,
+            detail={
+                "date": data.date.isoformat(),
+                "start_time": data.start_time.isoformat(),
+                "end_time": data.end_time.isoformat(),
+                "slot_minutes": data.slot_minutes,
+                "slot_capacity": data.slot_capacity,
+            },
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "A pickup day already exists for that date"
+        ) from None
+    db.refresh(day)
+    return day
+
+
+@router.patch("/admin/pickup-days/{pickup_day_id}", response_model=AdminPickupDayOut)
+def admin_update_pickup_day(
+    pickup_day_id: str,
+    data: AdminPickupDayUpdateIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    day = db.get(PickupDay, _parse_uuid_or_404(pickup_day_id, "Pickup day not found"))
+    if not day:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pickup day not found")
+    changes: dict = {}
+    for field in ("start_time", "end_time", "slot_minutes", "slot_capacity", "is_available"):
+        value = getattr(data, field)
+        if value is not None and value != getattr(day, field):
+            old = getattr(day, field)
+            changes[field] = {
+                "from": old.isoformat() if hasattr(old, "isoformat") else old,
+                "to": value.isoformat() if hasattr(value, "isoformat") else value,
+            }
+            setattr(day, field, value)
+    if day.start_time >= day.end_time:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "start_time must be before end_time"
+        )
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="pickup_day_updated",
+        entity_type="pickup_day",
+        entity_id=day.id,
+        detail=changes or None,
+    )
+    db.commit()
+    db.refresh(day)
+    return day
 
 
 @router.get("/admin/audit-log", response_model=AuditLogPage)

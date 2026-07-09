@@ -1,5 +1,7 @@
+import uuid
+
 from app.config import get_settings
-from app.models import Category, Product, Variant
+from app.models import Category, Order, Product, Variant
 
 
 def add_product(db, stock=3):
@@ -114,7 +116,40 @@ def test_demo_payment_sends_exactly_one_confirmation_email(client, db, monkeypat
     assert len(sent) == 1
 
 
-def test_unsupported_shipping_country_is_rejected(client, db):
+def test_any_country_accepted_with_flat_international_rate(client, db):
+    # Default shipping_countries is empty, meaning "ship anywhere". Non-SE
+    # destinations pay the flat international rate; SE stays free.
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items",
+        json={"variant_id": str(product.variants[0].id), "quantity": 1},
+    )
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "email": "guest@example.com",
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Paris",
+                "postal_code": "75001",
+                "country_code": "FR",
+            },
+        },
+    )
+    assert response.status_code == 201
+    order = db.get(Order, uuid.UUID(response.json()["order_id"]))
+    assert order.shipping_country_code == "FR"
+    assert order.shipping_cents == 7900
+    assert order.total_cents == 3200 + 7900
+
+
+def test_configured_shipping_countries_still_restrict(client, db):
+    from app.main import app
+
+    settings = get_settings().model_copy(update={"shipping_countries": ["SE"]})
+    app.dependency_overrides[get_settings] = lambda: settings
+
     product = add_product(db)
     client.put(
         "/api/v1/cart/items",

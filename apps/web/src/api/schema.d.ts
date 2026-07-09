@@ -140,6 +140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pickup-days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pickup Days
+         * @description Bookable pickup days for checkout: only future slots with seats left.
+         */
+        get: operations["pickup_days_api_v1_pickup_days_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/checkout": {
         parameters: {
             query?: never;
@@ -334,6 +354,41 @@ export interface paths {
         patch: operations["admin_update_order_api_v1_admin_orders__order_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/pickup-days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin List Pickup Days */
+        get: operations["admin_list_pickup_days_api_v1_admin_pickup_days_get"];
+        put?: never;
+        /** Admin Create Pickup Day */
+        post: operations["admin_create_pickup_day_api_v1_admin_pickup_days_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/pickup-days/{pickup_day_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Admin Update Pickup Day */
+        patch: operations["admin_update_pickup_day_api_v1_admin_pickup_days__pickup_day_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/audit-log": {
         parameters: {
             query?: never;
@@ -428,6 +483,8 @@ export interface components {
             total_cents: number;
             /** Currency */
             currency: string;
+            /** Pickup At */
+            pickup_at: string | null;
             /** Items */
             items: components["schemas"]["OrderItemOut"][];
             /**
@@ -455,6 +512,76 @@ export interface components {
             status: string;
             /** Note */
             note?: string | null;
+        };
+        /** AdminPickupDayIn */
+        AdminPickupDayIn: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /**
+             * Slot Minutes
+             * @default 15
+             */
+            slot_minutes: number;
+            /**
+             * Slot Capacity
+             * @default 2
+             */
+            slot_capacity: number;
+        };
+        /** AdminPickupDayOut */
+        AdminPickupDayOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /** Slot Minutes */
+            slot_minutes: number;
+            /** Slot Capacity */
+            slot_capacity: number;
+            /** Is Available */
+            is_available: boolean;
+        };
+        /** AdminPickupDayUpdateIn */
+        AdminPickupDayUpdateIn: {
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** Slot Minutes */
+            slot_minutes?: number | null;
+            /** Slot Capacity */
+            slot_capacity?: number | null;
+            /** Is Available */
+            is_available?: boolean | null;
         };
         /** AdminProductIn */
         AdminProductIn: {
@@ -594,6 +721,16 @@ export interface components {
              * @default SEK
              */
             currency: string;
+            /**
+             * Needs Pickup
+             * @default false
+             */
+            needs_pickup: boolean;
+            /**
+             * Needs Shipping
+             * @default false
+             */
+            needs_shipping: boolean;
         };
         /** CheckoutIn */
         CheckoutIn: {
@@ -602,7 +739,9 @@ export interface components {
              * Format: email
              */
             email: string;
-            shipping_address: components["schemas"]["AddressIn"];
+            shipping_address?: components["schemas"]["AddressIn"] | null;
+            /** Pickup At */
+            pickup_at?: string | null;
             /** Coupon Code */
             coupon_code?: string | null;
         };
@@ -686,8 +825,30 @@ export interface components {
             total_cents: number;
             /** Currency */
             currency: string;
+            /** Pickup At */
+            pickup_at: string | null;
             /** Items */
             items: components["schemas"]["OrderItemOut"][];
+        };
+        /** PickupDayPublicOut */
+        PickupDayPublicOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Slots */
+            slots: components["schemas"]["PickupSlotOut"][];
+        };
+        /** PickupSlotOut */
+        PickupSlotOut: {
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Remaining */
+            remaining: number;
         };
         /** ProductOut */
         ProductOut: {
@@ -1054,6 +1215,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pickup_days_api_v1_pickup_days_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickupDayPublicOut"][];
                 };
             };
         };
@@ -1435,6 +1616,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_pickup_days_api_v1_admin_pickup_days_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPickupDayOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_create_pickup_day_api_v1_admin_pickup_days_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPickupDayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPickupDayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_update_pickup_day_api_v1_admin_pickup_days__pickup_day_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                pickup_day_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPickupDayUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPickupDayOut"];
                 };
             };
             /** @description Validation Error */

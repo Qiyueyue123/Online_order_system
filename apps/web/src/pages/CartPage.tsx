@@ -18,7 +18,12 @@ export function CartPage() {
       {!!cart.data?.items.length && (
         <>
           <div className="cart-total"><span>Subtotal</span><strong>{money(cart.data.subtotal_cents)}</strong></div>
-          <div className="cart-total cart-total--pickup"><span>Pickup · dorm kitchen, Umeå</span><strong>{money(0)}</strong></div>
+          {cart.data.needs_pickup && (
+            <div className="cart-total cart-total--pickup"><span>Pickup · dorm kitchen, Umeå</span><strong>{money(0)}</strong></div>
+          )}
+          {cart.data.needs_shipping && (
+            <div className="cart-total cart-total--pickup"><span>Shipping</span><strong>Calculated at checkout</strong></div>
+          )}
         </>
       )}
       {!!cart.data?.items.length && <Link className="button full" to="/checkout">Continue to checkout</Link>}

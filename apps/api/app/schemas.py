@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -83,6 +83,8 @@ class CartOut(BaseModel):
     items: list[CartItemOut]
     subtotal_cents: int
     currency: str = "SEK"
+    needs_pickup: bool = False
+    needs_shipping: bool = False
 
 
 class AddressIn(BaseModel):
@@ -96,7 +98,8 @@ class AddressIn(BaseModel):
 
 class CheckoutIn(BaseModel):
     email: EmailStr
-    shipping_address: AddressIn
+    shipping_address: AddressIn | None = None
+    pickup_at: datetime | None = None
     coupon_code: str | None = Field(default=None, max_length=40)
 
 
@@ -126,6 +129,7 @@ class OrderOut(ApiModel):
     shipping_cents: int
     total_cents: int
     currency: str
+    pickup_at: datetime | None
     items: list[OrderItemOut]
 
 
@@ -201,3 +205,39 @@ class AuditLogPage(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class PickupSlotOut(BaseModel):
+    time: datetime
+    remaining: int
+
+
+class PickupDayPublicOut(BaseModel):
+    date: date
+    slots: list[PickupSlotOut]
+
+
+class AdminPickupDayOut(ApiModel):
+    id: uuid.UUID
+    date: date
+    start_time: time
+    end_time: time
+    slot_minutes: int
+    slot_capacity: int
+    is_available: bool
+
+
+class AdminPickupDayIn(BaseModel):
+    date: date
+    start_time: time
+    end_time: time
+    slot_minutes: int = Field(default=15, gt=0, le=240)
+    slot_capacity: int = Field(default=2, gt=0, le=100)
+
+
+class AdminPickupDayUpdateIn(BaseModel):
+    start_time: time | None = None
+    end_time: time | None = None
+    slot_minutes: int | None = Field(default=None, gt=0, le=240)
+    slot_capacity: int | None = Field(default=None, gt=0, le=100)
+    is_available: bool | None = None

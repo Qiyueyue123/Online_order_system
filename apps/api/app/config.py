@@ -20,7 +20,11 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     media_bucket: str = "matcha-demo-media"
     aws_region: str = "ap-southeast-1"
-    shipping_countries: list[str] = Field(default_factory=lambda: ["SE"])
+    # Empty list means "ship anywhere"; set e.g. SHIPPING_COUNTRIES=SE,FI to restrict.
+    shipping_countries: list[str] = Field(default_factory=list)
+    # Pickup slots are wall-clock times at the café (dorm kitchen, Umeå), not UTC:
+    # an admin-defined 16:00 day means 16:00 in this zone whatever the viewer's TZ.
+    pickup_timezone: str = "Europe/Stockholm"
     # There is no in-product admin signup flow; admin accounts are provisioned
     # out-of-band. Setting both of these makes `python -m app.seed` idempotently
     # create-or-promote that account to Role.ADMIN. Leave unset to skip (default

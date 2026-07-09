@@ -5,10 +5,10 @@ type Slide =
   | { type: "video"; src: string; alt: string };
 
 const SLIDES: Slide[] = [
-  { type: "image", src: "/media/homepage-sayaka-latte.jpg", alt: "A Sayaka matcha latte, freshly poured" },
-  { type: "image", src: "/media/homepage-matcha-cup.jpg", alt: "A cup of whisked matcha" },
+  { type: "image", src: "/media/ajisai-06-1.jpg", alt: "A bamboo whisk drizzling freshly whisked matcha into a mixing cup" },
+  { type: "image", src: "/media/ajisai-08-1.jpg", alt: "Matcha being poured over milk and ice" },
   { type: "video", src: "/media/homepage-matcha-pour.mp4", alt: "Milk being poured over matcha and ice" },
-  { type: "image", src: "/media/homepage-matcha-used.jpg", alt: "A whisk resting after preparing matcha" },
+  { type: "image", src: "/media/ajisai-05-1.jpg", alt: "Matcha syrup being whisked into milk for a latte" },
 ];
 
 const ROTATE_MS = 5200;

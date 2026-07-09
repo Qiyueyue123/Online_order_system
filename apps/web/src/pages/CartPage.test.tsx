@@ -40,6 +40,8 @@ const cart: Cart = {
   ],
   subtotal_cents: 12100,
   currency: "SEK",
+  needs_pickup: false,
+  needs_shipping: true,
 };
 
 describe("CartPage", () => {

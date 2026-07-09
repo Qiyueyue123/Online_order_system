@@ -479,6 +479,29 @@
         }
       }
     },
+    "/api/v1/pickup-days": {
+      "get": {
+        "summary": "Pickup Days",
+        "description": "Bookable pickup days for checkout: only future slots with seats left.",
+        "operationId": "pickup_days_api_v1_pickup_days_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PickupDayPublicOut"
+                  },
+                  "type": "array",
+                  "title": "Response Pickup Days Api V1 Pickup Days Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/checkout": {
       "post": {
         "summary": "Checkout",
@@ -1250,6 +1273,207 @@
         }
       }
     },
+    "/api/v1/admin/pickup-days": {
+      "get": {
+        "summary": "Admin List Pickup Days",
+        "operationId": "admin_list_pickup_days_api_v1_admin_pickup_days_get",
+        "parameters": [
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminPickupDayOut"
+                  },
+                  "title": "Response Admin List Pickup Days Api V1 Admin Pickup Days Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin Create Pickup Day",
+        "operationId": "admin_create_pickup_day_api_v1_admin_pickup_days_post",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPickupDayIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPickupDayOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/pickup-days/{pickup_day_id}": {
+      "patch": {
+        "summary": "Admin Update Pickup Day",
+        "operationId": "admin_update_pickup_day_api_v1_admin_pickup_days__pickup_day_id__patch",
+        "parameters": [
+          {
+            "name": "pickup_day_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pickup Day Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPickupDayUpdateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPickupDayOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/audit-log": {
       "get": {
         "summary": "Admin Audit Log",
@@ -1469,6 +1693,18 @@
             "type": "string",
             "title": "Currency"
           },
+          "pickup_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup At"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/OrderItemOut"
@@ -1505,6 +1741,7 @@
           "shipping_cents",
           "total_cents",
           "currency",
+          "pickup_at",
           "items",
           "created_at",
           "user_id"
@@ -1568,6 +1805,160 @@
           "status"
         ],
         "title": "AdminOrderStatusIn"
+      },
+      "AdminPickupDayIn": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "time",
+            "title": "End Time"
+          },
+          "slot_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Slot Minutes",
+            "default": 15
+          },
+          "slot_capacity": {
+            "type": "integer",
+            "maximum": 100.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Slot Capacity",
+            "default": 2
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "start_time",
+          "end_time"
+        ],
+        "title": "AdminPickupDayIn"
+      },
+      "AdminPickupDayOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "time",
+            "title": "End Time"
+          },
+          "slot_minutes": {
+            "type": "integer",
+            "title": "Slot Minutes"
+          },
+          "slot_capacity": {
+            "type": "integer",
+            "title": "Slot Capacity"
+          },
+          "is_available": {
+            "type": "boolean",
+            "title": "Is Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "start_time",
+          "end_time",
+          "slot_minutes",
+          "slot_capacity",
+          "is_available"
+        ],
+        "title": "AdminPickupDayOut"
+      },
+      "AdminPickupDayUpdateIn": {
+        "properties": {
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "slot_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Minutes"
+          },
+          "slot_capacity": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Capacity"
+          },
+          "is_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Available"
+          }
+        },
+        "type": "object",
+        "title": "AdminPickupDayUpdateIn"
       },
       "AdminProductIn": {
         "properties": {
@@ -1939,6 +2330,16 @@
             "type": "string",
             "title": "Currency",
             "default": "SEK"
+          },
+          "needs_pickup": {
+            "type": "boolean",
+            "title": "Needs Pickup",
+            "default": false
+          },
+          "needs_shipping": {
+            "type": "boolean",
+            "title": "Needs Shipping",
+            "default": false
           }
         },
         "type": "object",
@@ -1956,7 +2357,26 @@
             "title": "Email"
           },
           "shipping_address": {
-            "$ref": "#/components/schemas/AddressIn"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddressIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup At"
           },
           "coupon_code": {
             "anyOf": [
@@ -1973,8 +2393,7 @@
         },
         "type": "object",
         "required": [
-          "email",
-          "shipping_address"
+          "email"
         ],
         "title": "CheckoutIn"
       },
@@ -2143,6 +2562,18 @@
             "type": "string",
             "title": "Currency"
           },
+          "pickup_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup At"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/OrderItemOut"
@@ -2162,9 +2593,51 @@
           "shipping_cents",
           "total_cents",
           "currency",
+          "pickup_at",
           "items"
         ],
         "title": "OrderOut"
+      },
+      "PickupDayPublicOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/PickupSlotOut"
+            },
+            "type": "array",
+            "title": "Slots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "slots"
+        ],
+        "title": "PickupDayPublicOut"
+      },
+      "PickupSlotOut": {
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time",
+          "remaining"
+        ],
+        "title": "PickupSlotOut"
       },
       "ProductOut": {
         "properties": {

@@ -21,6 +21,14 @@ export type AdminVariantCreateIn = components["schemas"]["AdminVariantCreateIn"]
 export type AdminVariantUpdateIn = components["schemas"]["AdminVariantUpdateIn"];
 export type AuditLogEntry = components["schemas"]["AuditLogOut"];
 export type AuditLogPage = components["schemas"]["AuditLogPage"];
+export type AddressIn = components["schemas"]["AddressIn"];
+export type CheckoutIn = components["schemas"]["CheckoutIn"];
+export type CheckoutOut = components["schemas"]["CheckoutOut"];
+export type PickupDay = components["schemas"]["PickupDayPublicOut"];
+export type PickupSlot = components["schemas"]["PickupSlotOut"];
+export type AdminPickupDay = components["schemas"]["AdminPickupDayOut"];
+export type AdminPickupDayIn = components["schemas"]["AdminPickupDayIn"];
+export type AdminPickupDayUpdateIn = components["schemas"]["AdminPickupDayUpdateIn"];
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -47,3 +55,17 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const money = (cents: number) =>
   new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK" }).format(cents / 100);
+
+// Pickup happens at a physical location, so pickup times are always shown in the
+// café's timezone (Umeå), never the viewer's: a slot stored as 14:00Z must render
+// as 16:15-style café wall-clock time for every visitor.
+export const CAFE_TIMEZONE = "Europe/Stockholm";
+
+// Compact pickup-time label used on order cards and admin tables, e.g. "9/7, 16:15".
+export const formatPickup = (iso: string) => {
+  const date = new Date(iso);
+  const part = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-GB", { timeZone: CAFE_TIMEZONE, ...options }).format(date);
+  const time = part({ hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${part({ day: "numeric" })}/${part({ month: "numeric" })}, ${time}`;
+};

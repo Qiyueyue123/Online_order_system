@@ -1,10 +1,12 @@
 import logging
 import smtplib
 from dataclasses import dataclass
+from datetime import UTC
 from email.message import EmailMessage as MimeEmailMessage
 
 from ..config import Settings, get_settings
 from ..models import Order
+from .pickup import cafe_tz
 
 logger = logging.getLogger(__name__)
 
@@ -73,16 +75,32 @@ def _render_order_confirmation(order: Order) -> str:
         f"Shipping: {_format_money(order.shipping_cents)} {order.currency}",
         f"Discount: {_format_money(order.discount_cents)} {order.currency}",
         f"Total: {_format_money(order.total_cents)} {order.currency}",
-        "",
-        "Shipping to:",
-        f"  {order.shipping_name}",
-        f"  {order.shipping_line1}",
     ]
-    if order.shipping_line2:
-        lines.append(f"  {order.shipping_line2}")
+    if order.pickup_at is not None:
+        # Stored as UTC (naive when read back from SQLite); the receipt must show
+        # café wall-clock time, since pickup happens at a physical location.
+        pickup_at = order.pickup_at
+        if pickup_at.tzinfo is None:
+            pickup_at = pickup_at.replace(tzinfo=UTC)
+        local = pickup_at.astimezone(cafe_tz())
+        lines += [
+            "",
+            f"Pickup: {local:%a %d %b %Y, %H:%M} at the dorm kitchen, Umeå",
+        ]
+    if order.shipping_line1:
+        lines += [
+            "",
+            "Shipping to:",
+            f"  {order.shipping_name}",
+            f"  {order.shipping_line1}",
+        ]
+        if order.shipping_line2:
+            lines.append(f"  {order.shipping_line2}")
+        lines += [
+            f"  {order.shipping_city} {order.shipping_postal_code}",
+            f"  {order.shipping_country_code}",
+        ]
     lines += [
-        f"  {order.shipping_city} {order.shipping_postal_code}",
-        f"  {order.shipping_country_code}",
         "",
         "This is a demonstration store; no real payment or shipment has taken place.",
     ]

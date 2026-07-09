@@ -1,10 +1,13 @@
 import enum
 import uuid
+from datetime import date as date_
 from datetime import datetime
+from datetime import time as time_
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -12,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
     Uuid,
 )
@@ -186,6 +190,22 @@ class Coupon(TimestampMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class PickupDay(TimestampMixin, Base):
+    __tablename__ = "pickup_days"
+    __table_args__ = (
+        CheckConstraint("slot_minutes > 0"),
+        CheckConstraint("slot_capacity > 0"),
+        CheckConstraint("start_time < end_time"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    date: Mapped[date_] = mapped_column(Date, unique=True, index=True)
+    start_time: Mapped[time_] = mapped_column(Time)
+    end_time: Mapped[time_] = mapped_column(Time)
+    slot_minutes: Mapped[int] = mapped_column(Integer, default=15)
+    slot_capacity: Mapped[int] = mapped_column(Integer, default=2)
+    is_available: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class Order(TimestampMixin, Base):
     __tablename__ = "orders"
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -199,12 +219,15 @@ class Order(TimestampMixin, Base):
     shipping_cents: Mapped[int] = mapped_column(Integer)
     total_cents: Mapped[int] = mapped_column(Integer)
     currency: Mapped[str] = mapped_column(String(3), default="SEK")
-    shipping_name: Mapped[str] = mapped_column(String(120))
-    shipping_line1: Mapped[str] = mapped_column(String(200))
+    # Shipping columns only apply when the order contains non-pickup (retail) items;
+    # pickup-only orders leave them NULL and carry pickup_at instead.
+    shipping_name: Mapped[str | None] = mapped_column(String(120))
+    shipping_line1: Mapped[str | None] = mapped_column(String(200))
     shipping_line2: Mapped[str | None] = mapped_column(String(200))
-    shipping_city: Mapped[str] = mapped_column(String(120))
-    shipping_postal_code: Mapped[str] = mapped_column(String(32))
-    shipping_country_code: Mapped[str] = mapped_column(String(2))
+    shipping_city: Mapped[str | None] = mapped_column(String(120))
+    shipping_postal_code: Mapped[str | None] = mapped_column(String(32))
+    shipping_country_code: Mapped[str | None] = mapped_column(String(2))
+    pickup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reservation_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )

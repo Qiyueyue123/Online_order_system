@@ -63,6 +63,9 @@ jobs:
       - run: git diff --exit-code -- apps/api/openapi.json apps/web/src/api/schema.d.ts
   legacy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legacy
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -87,7 +90,7 @@ jobs:
       # bind-mounted ./instance dir is owned by the runner uid, so SQLite
       # can't create its database file without opening up permissions.
       - name: Make instance dir writable for the legacy container
-        run: mkdir -p instance && chmod -R 777 instance
+        run: mkdir -p legacy/instance && chmod -R 777 legacy/instance
       - name: Build and start the stack
         run: docker compose up -d --build
       - name: Wait for api to be ready (migrate + seed must finish first)

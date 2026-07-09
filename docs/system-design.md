@@ -7,7 +7,7 @@ answers are grounded in something you built — use these.
 ## 1. Start with requirements and scale honestly
 
 Interviews start with "clarify requirements," and this repo embodies why: the legacy Flask
-app (`app/`) was designed for ~50 users with cash payments — SQLite, one process,
+app (`legacy/app/`) was designed for ~50 users with cash payments — SQLite, one process,
 server-rendered HTML — and those were the *right* choices at that scale. The modern stack
 exists because the requirements changed (concurrent checkouts, card payments, deployability).
 
@@ -33,7 +33,7 @@ here, solved two ways:
 - **Modern API** (`apps/api/app/services/checkout.py`): pessimistic row locking —
   `SELECT … FOR UPDATE` on the variant rows inside the checkout transaction. Second
   transaction blocks until the first commits, then re-reads and fails cleanly.
-- **Legacy app** (`app/db.py`): SQLite `BEGIN IMMEDIATE` — a coarse whole-database write
+- **Legacy app** (`legacy/app/db.py`): SQLite `BEGIN IMMEDIATE` — a coarse whole-database write
   lock. Cruder, but correct at its scale. (A slot-capacity check that *wasn't* inside the
   transaction was a real race bug we found and fixed — capacity was validated before the
   lock, so two orders could both pass and overbook the slot.)

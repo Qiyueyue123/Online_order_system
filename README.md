@@ -3,7 +3,7 @@
 The online store for a real one-person matcha café run from a dormitory kitchen in Umeå,
 Sweden: drinks whisked to order, picked up in person, with a small take-home shelf of tins
 and tools. It doubles as a portfolio project showing the path from a beginner Flask
-prototype (the café's first site, kept in `app/`) to a production-shaped system: typed API
+prototype (the café's first site, kept in `legacy/`) to a production-shaped system: typed API
 contracts, transactional inventory, test-mode payments, transactional email, infrastructure
 as code, and CI that guards all of it.
 
@@ -22,7 +22,7 @@ Taxes and returns automation are out of scope.
 | `apps/web` | React storefront with types generated from the API's OpenAPI contract |
 | `infra/` | Terraform: static site (S3+CloudFront), ECS/ALB/RDS demo environment, budget alarms |
 | `docs/` | Architecture, operations, walkthrough, and five ADRs recording key decisions |
-| `app/`, `run.py` | The original Flask/SQLite café — kept as a runnable v1 reference ([its full docs](docs/legacy-cafe.md)) |
+| `legacy/` | The original Flask/SQLite café — kept as a runnable v1 reference ([its full docs](docs/legacy-cafe.md)) |
 
 ## Highlights worth reading
 
@@ -243,6 +243,29 @@ provision Stripe test keys to the deployed environment.
 ## Engineering log
 
 A running record of significant changes, what each one did, and why it matters. Newest first.
+
+### 2026-07-09 — A four-angle cleanup pass, and the legacy app gets its own room
+
+Four parallel review agents swept the whole branch on separate angles (reuse,
+simplification, efficiency, altitude). Applied: one shared stock-adjustment helper
+replaced three copies of the same loop (now bulk-locking variants in one query instead
+of per-item fetches); the duplicated drink-options formatter, slot-time formatter, admin
+field-diff and pagination boilerplate all collapsed into single helpers; two names for
+the same `"drinks"` constant became one; ~35 lines of dead CSS from earlier design
+iterations deleted; `lazy="joined"` on two many-to-one relationships killed real N+1s on
+the catalog and cart paths; and `ProductOut` now carries `category_slug`, so the
+frontend's drink check uses the same identifier the backend classifies by instead of
+string-matching a display name (the deeper fix for bug #4).
+
+Skipped deliberately (recorded, not forgotten): a shared admin-mutation hook (three
+call sites don't justify the churn yet), serving payment-method eligibility as data
+(the cart flags already are that data), deriving option enums from the generated types
+(needs codegen), a config endpoint for the café timezone, and a declarative
+status-transition table (right idea, disproportionate at two payment methods).
+
+Separately, the legacy Flask café moved from the repo root into `legacy/` via `git mv`
+(history follows), with compose/CI/Makefile/docs updated — the root now reads as what
+the project is: `apps/` (the store), `legacy/` (the v1 reference), `infra/`, `docs/`.
 
 ### 2026-07-09 — Third browser-found bug: a pickup time belongs to a place, not a viewer
 

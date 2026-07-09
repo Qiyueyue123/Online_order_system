@@ -7,7 +7,7 @@ local-down:
 	docker compose down
 
 legacy:
-	.venv/bin/python run.py
+	cd legacy && ../.venv/bin/python run.py
 
 db-up:
 	docker compose up -d postgres
@@ -25,7 +25,7 @@ web:
 	cd apps/web && npm run dev
 
 test:
-	.venv/bin/pytest tests
+	cd legacy && ../.venv/bin/pytest tests
 	cd apps/api && ../../.venv/bin/pytest
 	cd apps/web && npm test
 

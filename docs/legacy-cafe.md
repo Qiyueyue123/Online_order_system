@@ -33,20 +33,22 @@ Current assumptions:
 
 ```text
 .
-├── app/
-│   ├── __init__.py
-│   ├── db.py
-│   ├── routes.py
-│   ├── schema.sql
-│   ├── static/
-│   └── templates/
-├── tests/
-├── Dockerfile
-├── docker-compose.yml
-├── docker-entrypoint.sh
-├── requirements.txt
-├── requirements-dev.txt
-└── run.py
+├── legacy/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── db.py
+│   │   ├── routes.py
+│   │   ├── schema.sql
+│   │   ├── static/
+│   │   └── templates/
+│   ├── tests/
+│   ├── instance/
+│   ├── Dockerfile
+│   ├── docker-entrypoint.sh
+│   ├── requirements.txt
+│   ├── requirements-dev.txt
+│   └── run.py
+└── docker-compose.yml
 ```
 
 ## What the app already does
@@ -107,6 +109,7 @@ When it is active, your terminal prompt usually shows `(.venv)`.
 ### 3. Install dependencies
 
 ```bash
+cd legacy
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 ```
@@ -219,7 +222,7 @@ Copy the whole generated line after the command output. A valid Argon2 hash usua
 Existing Werkzeug admin password hashes are still accepted during login so older local databases can keep working while you switch to Argon2.
 
 Admin-uploaded images are stored in the instance upload folder and served by the app:
-- local folder: `instance/uploads/`
+- local folder: `legacy/instance/uploads/`
 - public URL pattern: `/uploads/<filename>`
 
 ## How Docker fits in
@@ -234,9 +237,9 @@ You still learn both because a real deployable project usually has:
 - a deployment workflow
 
 In this project:
-- [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile) defines the production container image
+- [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/Dockerfile) defines the production container image
 - [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-compose.yml) is mainly for local Docker testing
-- [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) keeps local secrets, the virtual environment, the SQLite database, and uploaded images out of the image build
+- [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/.dockerignore) keeps local secrets, the virtual environment, the SQLite database, and uploaded images out of the image build
 - the app reads `PORT`, `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, and `DATABASE_PATH` from environment variables
 
 ## Docker learning notes
@@ -244,17 +247,17 @@ In this project:
 This project uses Docker in the same basic way many small deployable web apps do: the application code is packaged into an image, then run as a container with configuration injected from the outside.
 
 Important terms:
-- `Image`: the packaged application template built from the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile)
+- `Image`: the packaged application template built from the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/Dockerfile)
 - `Container`: a running instance of that image
 - `Build`: the process of turning source code and dependencies into an image
 - `Port`: the network entry point used to reach the app from a browser
 - `Volume`: persistent storage mounted into the container so runtime data survives restarts
 - `Environment variable`: configuration passed into the container without hardcoding secrets in the code
 
-How the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile) works:
+How the [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/Dockerfile) works:
 1. It starts from `python:3.12-slim`, which gives the app a clean Python runtime.
 2. It sets `/app` as the working directory inside the container.
-3. It installs production dependencies from [requirements.txt](/Users/qy/Documents/GitHub/Matcha_Online_sys/requirements.txt).
+3. It installs production dependencies from [requirements.txt](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/requirements.txt).
 4. It copies the application code into the image.
 5. It starts the app using `gunicorn`, which is more suitable for deployment than Flask's development server.
 6. It binds to `${PORT:-8000}`, so local Docker can use port `8000` while deployment platforms can provide their own `PORT`.
@@ -264,20 +267,20 @@ How [docker-compose.yml](/Users/qy/Documents/GitHub/Matcha_Online_sys/docker-com
 - it builds the image from the current folder
 - it maps your browser's `localhost:8000` to the container's port `8000`
 - it passes environment variables from `.env`
-- it mounts `./instance` on your laptop to `/app/instance` inside the container
+- it mounts `./legacy/instance` on your laptop to `/app/instance` inside the container
 
 Why the mounted volume matters:
 - SQLite stores orders in `/app/instance/matcha.db`
 - admin uploads store images under `/app/instance/uploads/`
 - containers are replaceable, so data written only inside the container can disappear
-- mounting `./instance:/app/instance` keeps order data and uploaded images outside the disposable container
+- mounting `./legacy/instance:/app/instance` keeps order data and uploaded images outside the disposable container
 
 Why `.env` is not committed:
 - `.env` contains real secrets such as `SECRET_KEY` and `ADMIN_PASSWORD_HASH`
 - secrets should be configured separately on each machine or deployment platform
 - [.env.example](/Users/qy/Documents/GitHub/Matcha_Online_sys/.env.example) documents the required variables without exposing real values
 
-Why [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/.dockerignore) exists:
+Why [.dockerignore](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/.dockerignore) exists:
 - it prevents `.env` from being copied into the image
 - it prevents `.venv` from making the image large and machine-specific
 - it prevents local SQLite databases and uploaded images from being baked into the app image
@@ -313,7 +316,7 @@ Follow application logs.
 docker compose down
 ```
 
-Stop the running containers. This does not delete the mounted `instance/` folder.
+Stop the running containers. This does not delete the mounted `legacy/instance/` folder.
 
 ```bash
 docker compose build --no-cache
@@ -338,7 +341,7 @@ What Docker does not solve by itself:
 How this maps to deployment later:
 - local `docker compose` becomes a platform web service
 - local `.env` becomes platform environment variables
-- local `./instance:/app/instance` becomes a platform persistent disk or volume
+- local `./legacy/instance:/app/instance` becomes a platform persistent disk or volume
 - local `localhost:8000` becomes a public domain
 - local logs become platform deployment/runtime logs
 
@@ -363,7 +366,7 @@ http://127.0.0.1:8000
 Build the image:
 
 ```bash
-docker build -t matcha-home-cafe .
+docker build -t matcha-home-cafe ./legacy
 ```
 
 Run the container:
@@ -374,7 +377,7 @@ docker run --rm -p 8000:8000 \
   -e ADMIN_USERNAME=admin \
   -e ADMIN_PASSWORD=change-me-admin \
   -e DATABASE_PATH=/app/instance/matcha.db \
-  -v "$(pwd)/instance:/app/instance" \
+  -v "$(pwd)/legacy/instance:/app/instance" \
   matcha-home-cafe
 ```
 
@@ -420,15 +423,15 @@ Recommended beginner path:
 
 For this project, persistent storage is required because both the SQLite database and uploaded images live under `/app/instance`. If the host does not persist that folder, orders and uploaded images can disappear after a redeploy.
 
-Docker Compose is not usually what gets deployed directly. Most platforms read your [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/Dockerfile), build an image, inject environment variables, attach storage, and provide a public URL.
+Docker Compose is not usually what gets deployed directly. Most platforms read your [Dockerfile](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/Dockerfile), build an image, inject environment variables, attach storage, and provide a public URL.
 
 ## Suggested learning path
 
 Follow this order:
 1. Run the project with `venv`
-2. Read `run.py`, [app/__init__.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/app/__init__.py), [app/routes.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/app/routes.py), and [app/db.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/app/db.py)
+2. Read `run.py`, [app/__init__.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/app/__init__.py), [app/routes.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/app/routes.py), and [app/db.py](/Users/qy/Documents/GitHub/Matcha_Online_sys/legacy/app/db.py)
 3. Place a few test orders through the browser
-4. Inspect the SQLite database file in `instance/`
+4. Inspect the SQLite database file in `legacy/instance/`
 5. Run `pytest`
 6. Run the app with Docker
 7. Change one feature and rebuild the container

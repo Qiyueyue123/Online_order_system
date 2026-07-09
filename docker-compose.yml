@@ -1,6 +1,6 @@
 services:
   legacy:
-    build: .
+    build: ./legacy
     ports:
       - "8000:8000"
     environment:
@@ -13,7 +13,7 @@ services:
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-0}"
       PORT: "8000"
     volumes:
-      - ./instance:/app/instance
+      - ./legacy/instance:/app/instance
 
   postgres:
     image: postgres:16-alpine

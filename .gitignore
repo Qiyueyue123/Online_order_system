@@ -7,9 +7,9 @@ __pycache__/
 node_modules/
 *.tsbuildinfo
 .env
-instance/*.db
-instance/*.sqlite3
-instance/uploads/
+legacy/instance/*.db
+legacy/instance/*.sqlite3
+legacy/instance/uploads/
 apps/api/*.db
 apps/web/dist/
 apps/web/vite.config.js

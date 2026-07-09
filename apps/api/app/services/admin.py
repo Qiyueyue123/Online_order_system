@@ -42,32 +42,28 @@ def write_audit(
     return row
 
 
+def _paginate(db: Session, stmt, *, page: int, page_size: int) -> tuple[list, int]:
+    """Run `stmt` (already filtered/ordered) as a page: one count query over the
+    same filters, then one offset/limit query for the rows. Shared by
+    list_orders_admin and list_audit_log."""
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(stmt.offset((page - 1) * page_size).limit(page_size)).all()
+    return list(rows), total
+
+
 def list_orders_admin(
     db: Session, *, order_status: OrderStatus | None, page: int, page_size: int
 ) -> tuple[list[Order], int]:
     conditions = []
     if order_status is not None:
         conditions.append(Order.status == order_status)
-    total = db.scalar(select(func.count(Order.id)).where(*conditions)) or 0
-    rows = db.scalars(
-        select(Order)
-        .where(*conditions)
-        .order_by(Order.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
-    return list(rows), total
+    stmt = select(Order).where(*conditions).order_by(Order.created_at.desc())
+    return _paginate(db, stmt, page=page, page_size=page_size)
 
 
 def list_audit_log(db: Session, *, page: int, page_size: int) -> tuple[list[AdminAuditLog], int]:
-    total = db.scalar(select(func.count(AdminAuditLog.id))) or 0
-    rows = db.scalars(
-        select(AdminAuditLog)
-        .order_by(AdminAuditLog.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).all()
-    return list(rows), total
+    stmt = select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc())
+    return _paginate(db, stmt, page=page, page_size=page_size)
 
 
 # Explicit map of allowed order-status transitions. Anything not listed here (including
@@ -132,17 +128,20 @@ def create_product(db: Session, data: AdminProductIn) -> Product:
     return product
 
 
+def _set_if_changed(changes: dict, obj: object, field: str, value: object | None) -> None:
+    """If `value` is provided and differs from `obj.field`, record the before/after
+    in `changes` and apply it to `obj`. A no-op if `value` is None (field not sent)
+    or already equal (field sent unchanged)."""
+    if value is not None and value != getattr(obj, field):
+        changes[field] = {"from": getattr(obj, field), "to": value}
+        setattr(obj, field, value)
+
+
 def update_product(db: Session, product: Product, data: AdminProductUpdateIn) -> dict:
     changes: dict = {}
-    if data.name is not None and data.name != product.name:
-        changes["name"] = {"from": product.name, "to": data.name}
-        product.name = data.name
-    if data.description is not None and data.description != product.description:
-        changes["description"] = {"from": product.description, "to": data.description}
-        product.description = data.description
-    if data.active is not None and data.active != product.active:
-        changes["active"] = {"from": product.active, "to": data.active}
-        product.active = data.active
+    _set_if_changed(changes, product, "name", data.name)
+    _set_if_changed(changes, product, "description", data.description)
+    _set_if_changed(changes, product, "active", data.active)
     return changes
 
 
@@ -157,9 +156,7 @@ def update_variant(
     from ..models import InventoryMovement
 
     changes: dict = {}
-    if price_cents is not None and price_cents != variant.price_cents:
-        changes["price_cents"] = {"from": variant.price_cents, "to": price_cents}
-        variant.price_cents = price_cents
+    _set_if_changed(changes, variant, "price_cents", price_cents)
     if stock_on_hand is not None and stock_on_hand != variant.stock_on_hand:
         if stock_on_hand < variant.stock_reserved:
             raise HTTPException(

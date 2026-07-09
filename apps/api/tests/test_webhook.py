@@ -1,53 +1,8 @@
-from datetime import UTC, datetime
-
 import stripe
-from test_checkout import add_product
+from conftest import pending_order
 
 from app.config import get_settings
-from app.models import (
-    InventoryMovement,
-    Order,
-    OrderItem,
-    OrderStatus,
-    Payment,
-    PaymentStatus,
-    ProcessedWebhook,
-)
-
-
-def pending_order(db, *, stock=4, reserved=2, quantity=2):
-    product = add_product(db, stock=stock)
-    variant = product.variants[0]
-    variant.stock_reserved = reserved
-    order = Order(
-        display_number="M-WEBHOOK-1",
-        email="guest@example.com",
-        status=OrderStatus.PENDING_PAYMENT,
-        subtotal_cents=3200 * quantity,
-        shipping_cents=600,
-        total_cents=3200 * quantity + 600,
-        shipping_name="Guest",
-        shipping_line1="1 Tea Street",
-        shipping_city="Umea",
-        shipping_postal_code="90325",
-        shipping_country_code="SE",
-        reservation_expires_at=datetime.now(UTC),
-        items=[
-            OrderItem(
-                variant_id=variant.id,
-                product_name=product.name,
-                variant_name=variant.name,
-                sku=variant.sku,
-                unit_price_cents=3200,
-                quantity=quantity,
-            )
-        ],
-        payment=Payment(status=PaymentStatus.PENDING, amount_cents=3200 * quantity + 600),
-    )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-    return order, variant
+from app.models import InventoryMovement, OrderStatus, PaymentStatus, ProcessedWebhook
 
 
 def _use_webhook_secret(client, secret="whsec_test_secret"):

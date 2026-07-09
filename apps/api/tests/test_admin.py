@@ -1,46 +1,7 @@
-import itertools
-from datetime import UTC, datetime
+from conftest import add_product, make_order
 
-from app.models import (
-    AdminAuditLog,
-    Category,
-    Order,
-    OrderItem,
-    OrderStatus,
-    Payment,
-    PaymentStatus,
-    Product,
-    Role,
-    User,
-    Variant,
-)
+from app.models import AdminAuditLog, OrderStatus, Role, User
 from app.security import hash_password
-
-_counter = itertools.count()
-
-
-def add_product(db, stock=3):
-    n = next(_counter)
-    category = Category(name="Matcha", slug=f"matcha-{n}")
-    product = Product(
-        category=category,
-        name="Test Matcha",
-        slug=f"test-matcha-{n}",
-        description="A test product",
-        variants=[
-            Variant(
-                sku=f"TEST-30-{n}",
-                name="30 g",
-                weight_grams=30,
-                price_cents=3200,
-                stock_on_hand=stock,
-            )
-        ],
-    )
-    db.add(product)
-    db.commit()
-    db.refresh(product)
-    return product
 
 ADMIN_PASSWORD = "admin-password-123"
 
@@ -73,48 +34,6 @@ def customer_headers(client, email="shopper@example.com"):
     )
     assert response.status_code == 201
     return {"X-CSRF-Token": response.json()["csrf_token"]}
-
-
-def make_order(db, order_status, *, stock=4, reserved=2):
-    product = add_product(db, stock=stock)
-    variant = product.variants[0]
-    variant.stock_reserved = reserved
-    order = Order(
-        display_number=f"M-ADMIN-{order_status.value}",
-        email="guest@example.com",
-        status=order_status,
-        subtotal_cents=6400,
-        shipping_cents=600,
-        total_cents=7000,
-        shipping_name="Guest",
-        shipping_line1="1 Tea Street",
-        shipping_city="Umea",
-        shipping_postal_code="90325",
-        shipping_country_code="SE",
-        reservation_expires_at=(
-            datetime.now(UTC) if order_status == OrderStatus.PENDING_PAYMENT else None
-        ),
-        items=[
-            OrderItem(
-                variant_id=variant.id,
-                product_name=product.name,
-                variant_name=variant.name,
-                sku=variant.sku,
-                unit_price_cents=3200,
-                quantity=2,
-            )
-        ],
-        payment=Payment(
-            status=PaymentStatus.SUCCEEDED
-            if order_status == OrderStatus.PAID
-            else PaymentStatus.PENDING,
-            amount_cents=7000,
-        ),
-    )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-    return order, variant
 
 
 PRODUCT_BODY = {

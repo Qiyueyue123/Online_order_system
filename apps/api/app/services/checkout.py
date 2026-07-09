@@ -170,25 +170,54 @@ def create_pending_order(
     return order, guest_token
 
 
+def _adjust_stock(
+    db: Session,
+    order: Order,
+    *,
+    on_hand_delta_sign: int,
+    reserved_delta_sign: int,
+    reason: str,
+) -> None:
+    """Apply a per-item stock_on_hand/stock_reserved delta (each item's quantity
+    times the given sign) across every line of `order`, writing one
+    InventoryMovement per item. Shared by every stock-adjusting transition
+    (consuming a reservation, releasing a reservation, restocking a cancelled
+    pay-at-pickup order) -- only the signs and the movement `reason` differ.
+
+    Bulk-fetches and locks all variants referenced by the order in one query
+    instead of one `db.get` per item.
+    """
+    variant_ids = [item.variant_id for item in order.items]
+    variants = {
+        variant.id: variant
+        for variant in db.scalars(
+            select(Variant).where(Variant.id.in_(variant_ids)).with_for_update()
+        ).all()
+    }
+    for item in order.items:
+        variant = variants[item.variant_id]
+        on_hand_delta = on_hand_delta_sign * item.quantity
+        reserved_delta = reserved_delta_sign * item.quantity
+        variant.stock_on_hand += on_hand_delta
+        variant.stock_reserved += reserved_delta
+        db.add(
+            InventoryMovement(
+                variant_id=variant.id,
+                quantity_delta=on_hand_delta,
+                reserved_delta=reserved_delta,
+                reason=reason,
+                reference=str(order.id),
+            )
+        )
+
+
 def _consume_reserved_stock(db: Session, order: Order, *, reason: str) -> None:
     """Turn a reservation into a firm stock deduction: reserved stock is released
     and the same quantity is permanently removed from stock_on_hand. Shared by
     mark_order_paid (online payment succeeded) and the pay-at-pickup path in
     create_pending_order (order is a firm commitment from the moment it's placed).
     """
-    for item in order.items:
-        variant = db.get(Variant, item.variant_id)
-        variant.stock_reserved -= item.quantity
-        variant.stock_on_hand -= item.quantity
-        db.add(
-            InventoryMovement(
-                variant_id=variant.id,
-                quantity_delta=-item.quantity,
-                reserved_delta=-item.quantity,
-                reason=reason,
-                reference=str(order.id),
-            )
-        )
+    _adjust_stock(db, order, on_hand_delta_sign=-1, reserved_delta_sign=-1, reason=reason)
 
 
 def mark_order_paid(db: Session, order: Order) -> None:
@@ -209,18 +238,7 @@ def _release_reservation(db: Session, order: Order, reason: str) -> None:
     (cancel_order) so both paths keep stock_reserved and InventoryMovement bookkeeping
     consistent; only the terminal status and movement `reason` differ.
     """
-    for item in order.items:
-        variant = db.get(Variant, item.variant_id)
-        variant.stock_reserved -= item.quantity
-        db.add(
-            InventoryMovement(
-                variant_id=variant.id,
-                quantity_delta=0,
-                reserved_delta=-item.quantity,
-                reason=reason,
-                reference=str(order.id),
-            )
-        )
+    _adjust_stock(db, order, on_hand_delta_sign=0, reserved_delta_sign=-1, reason=reason)
 
 
 def cancel_order(db: Session, order: Order) -> None:
@@ -243,18 +261,9 @@ def cancel_confirmed_order(db: Session, order: Order) -> None:
     """
     if order.status != OrderStatus.CONFIRMED:
         raise ValueError(f"Cannot cancel order in state {order.status}")
-    for item in order.items:
-        variant = db.get(Variant, item.variant_id)
-        variant.stock_on_hand += item.quantity
-        db.add(
-            InventoryMovement(
-                variant_id=variant.id,
-                quantity_delta=item.quantity,
-                reserved_delta=0,
-                reason="admin_cancelled_confirmed",
-                reference=str(order.id),
-            )
-        )
+    _adjust_stock(
+        db, order, on_hand_delta_sign=1, reserved_delta_sign=0, reason="admin_cancelled_confirmed"
+    )
     order.status = OrderStatus.CANCELLED
     order.payment.status = PaymentStatus.FAILED
 

@@ -162,9 +162,6 @@ def merge_guest_cart(
     db.commit()
 
 
-PICKUP_CATEGORY_SLUG = "drinks"
-
-
 def classify_cart(cart: Cart) -> tuple[bool, bool]:
     """(needs_pickup, needs_shipping): drinks are made at the dorm and picked up,
     everything else ships. A mixed cart needs both."""
@@ -172,7 +169,7 @@ def classify_cart(cart: Cart) -> tuple[bool, bool]:
     needs_shipping = False
     for item in cart.items:
         category = item.variant.product.category
-        if category is not None and category.slug == PICKUP_CATEGORY_SLUG:
+        if category is not None and category.slug == DRINKS_CATEGORY_SLUG:
             needs_pickup = True
         else:
             needs_shipping = True

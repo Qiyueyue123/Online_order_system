@@ -1,4 +1,4 @@
-from test_checkout import add_product
+from conftest import add_product
 
 from app.models import Category, Product, Variant
 

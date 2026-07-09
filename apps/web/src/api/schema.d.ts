@@ -927,6 +927,8 @@ export interface components {
             description: string;
             /** Category */
             category: string | null;
+            /** Category Slug */
+            category_slug: string | null;
             /** Variants */
             variants: components["schemas"]["VariantOut"][];
             /** Images */

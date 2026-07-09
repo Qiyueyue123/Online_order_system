@@ -108,7 +108,7 @@ class Product(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    category: Mapped[Category | None] = relationship()
+    category: Mapped[Category | None] = relationship(lazy="joined")
     variants: Mapped[list["Variant"]] = relationship(
         back_populates="product", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -143,7 +143,7 @@ class Variant(TimestampMixin, Base):
     stock_on_hand: Mapped[int] = mapped_column(Integer, default=0)
     stock_reserved: Mapped[int] = mapped_column(Integer, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    product: Mapped[Product] = relationship(back_populates="variants")
+    product: Mapped[Product] = relationship(back_populates="variants", lazy="joined")
 
     @property
     def available_stock(self) -> int:

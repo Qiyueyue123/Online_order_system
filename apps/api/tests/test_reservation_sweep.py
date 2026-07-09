@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from test_checkout import add_product
+from conftest import add_product
 
 from app.models import Order, OrderItem, OrderStatus, Payment, PaymentStatus
 from app.services.checkout import expire_stale_orders

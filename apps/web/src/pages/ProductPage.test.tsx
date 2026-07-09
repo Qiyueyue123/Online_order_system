@@ -25,6 +25,7 @@ const drink: Product = {
   name: "Ajisai 2.0 Matcha Latte",
   description: "Whisked to order.",
   category: "Drinks",
+  category_slug: "drinks",
   variants: [
     { id: "var-iced", sku: "SKU-D1", name: "Iced", weight_grams: 0, price_cents: 4000, available_stock: 10 },
   ],
@@ -37,6 +38,7 @@ const retail: Product = {
   name: "Ceremonial Matcha",
   description: "A stone-ground matcha.",
   category: "Matcha tins",
+  category_slug: "matcha",
   variants: [
     { id: "var-tin", sku: "SKU-1", name: "30g tin", weight_grams: 30, price_cents: 3800, available_stock: 10 },
   ],

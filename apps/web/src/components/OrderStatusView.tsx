@@ -1,4 +1,4 @@
-import { formatPickup, money, Order } from "../api/client";
+import { formatDrinkOptions, formatPickup, money, Order } from "../api/client";
 
 // Live statuses form a straight-line progression; the rest are terminal
 // end-states that replace the timeline with a single explanatory note.
@@ -12,16 +12,6 @@ const TERMINAL_NOTES: Record<string, string> = {
   expired: "This order expired before payment was completed.",
   refunded: "This order was refunded.",
 };
-
-function formatItemOptions(options: Order["items"][number]["options"]): string | null {
-  if (!options) return null;
-  const whisk = (options as Record<string, unknown>).whisk;
-  const sugar = (options as Record<string, unknown>).sugar_g;
-  const parts: string[] = [];
-  if (typeof whisk === "string") parts.push(`${whisk} whisk`);
-  if (typeof sugar === "number") parts.push(`${sugar} g sugar`);
-  return parts.length ? parts.join(" · ") : null;
-}
 
 export function OrderStatusView({ order }: { order: Order }) {
   const terminalNote = TERMINAL_NOTES[order.status];
@@ -57,7 +47,7 @@ export function OrderStatusView({ order }: { order: Order }) {
 
       <div className="order-items">
         {order.items.map((item, index) => {
-          const options = formatItemOptions(item.options);
+          const options = formatDrinkOptions(item.options);
           return (
             <article className="cart-row" key={`${item.sku}-${index}`}>
               <div>

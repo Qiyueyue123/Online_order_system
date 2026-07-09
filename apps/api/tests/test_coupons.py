@@ -1,6 +1,6 @@
 import uuid
 
-from test_checkout import add_product
+from conftest import add_product
 
 from app.models import Coupon, Order
 

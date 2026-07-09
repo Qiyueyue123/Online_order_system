@@ -71,3 +71,26 @@ export const formatPickup = (iso: string) => {
   const time = part({ hour: "2-digit", minute: "2-digit", hour12: false });
   return `${part({ day: "numeric" })}/${part({ month: "numeric" })}, ${time}`;
 };
+
+// Time-only label for a pickup slot chip, e.g. "16:15". Slot instants are UTC;
+// always render café wall-clock time.
+export const formatSlotTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], {
+    timeZone: CAFE_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+// Shared by CartPage and OrderStatusView: a drink line's whisk/sugar options
+// summarised as "oat whisk · 6 g sugar", or null when there's nothing to show
+// (non-drink items, or drinks with no options recorded).
+export const formatDrinkOptions = (options: Record<string, unknown> | null | undefined) => {
+  if (!options) return null;
+  const whisk = options.whisk;
+  const sugar = options.sugar_g;
+  const parts: string[] = [];
+  if (typeof whisk === "string") parts.push(`${whisk} whisk`);
+  if (typeof sugar === "number") parts.push(`${sugar} g sugar`);
+  return parts.length ? parts.join(" · ") : null;
+};

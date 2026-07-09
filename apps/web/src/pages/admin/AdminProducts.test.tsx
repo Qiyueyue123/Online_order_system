@@ -18,6 +18,7 @@ const productsPage: ProductPage = {
       name: "Ceremonial Matcha",
       description: "Stone-ground matcha.",
       category: "tea",
+      category_slug: "tea",
       images: [],
       variants: [
         {

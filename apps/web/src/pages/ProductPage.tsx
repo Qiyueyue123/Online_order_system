@@ -57,8 +57,7 @@ export function ProductPage() {
   if (product.isLoading) return <div className="page"><p role="status">Loading product…</p></div>;
   if (!product.data) return <div className="page"><p role="alert">Product not found.</p></div>;
   const selected = variantId || product.data.variants[0]?.id;
-  // ProductOut.category carries the display name ("Drinks"), not the slug.
-  const isDrink = product.data.category?.toLowerCase() === "drinks";
+  const isDrink = product.data.category_slug === "drinks";
   return (
     <div className="page product-detail">
       <ProductGallery product={product.data} />

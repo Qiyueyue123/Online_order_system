@@ -1,16 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api, Cart, CartItem, money } from "../api/client";
-
-function formatOptions(options: CartItem["options"]): string | null {
-  if (!options) return null;
-  const whisk = (options as Record<string, unknown>).whisk;
-  const sugar = (options as Record<string, unknown>).sugar_g;
-  const parts: string[] = [];
-  if (typeof whisk === "string") parts.push(`${whisk} whisk`);
-  if (typeof sugar === "number") parts.push(`${sugar} g sugar`);
-  return parts.length ? parts.join(" · ") : null;
-}
+import { api, Cart, formatDrinkOptions, money } from "../api/client";
 
 export function CartPage() {
   const cart = useQuery({ queryKey: ["cart"], queryFn: () => api<Cart>("/cart") });
@@ -20,7 +10,7 @@ export function CartPage() {
       {cart.isLoading && <p role="status">Loading bag…</p>}
       {cart.data?.items.length === 0 && <div className="empty"><p>Your bag is empty.</p><Link className="button" to="/">Browse matcha</Link></div>}
       {cart.data?.items.map((item) => {
-        const options = formatOptions(item.options);
+        const options = formatDrinkOptions(item.options);
         return (
           <article className="cart-row" key={item.variant_id}>
             <div>

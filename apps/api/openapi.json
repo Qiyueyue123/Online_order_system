@@ -2809,6 +2809,17 @@
             ],
             "title": "Category"
           },
+          "category_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Slug"
+          },
           "variants": {
             "items": {
               "$ref": "#/components/schemas/VariantOut"
@@ -2831,6 +2842,7 @@
           "name",
           "description",
           "category",
+          "category_slug",
           "variants",
           "images"
         ],

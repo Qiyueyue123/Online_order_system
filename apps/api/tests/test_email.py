@@ -1,4 +1,4 @@
-from test_checkout import add_product
+from conftest import add_product
 
 from app.config import get_settings
 from app.models import Order, OrderItem, OrderStatus, Payment, PaymentStatus

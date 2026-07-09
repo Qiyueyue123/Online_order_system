@@ -1,30 +1,9 @@
 import uuid
 
+from conftest import add_product
+
 from app.config import get_settings
-from app.models import Category, Order, Product, Variant
-
-
-def add_product(db, stock=3):
-    category = Category(name="Matcha", slug="matcha")
-    product = Product(
-        category=category,
-        name="Test Matcha",
-        slug="test-matcha",
-        description="A test product",
-        variants=[
-            Variant(
-                sku="TEST-30",
-                name="30 g",
-                weight_grams=30,
-                price_cents=3200,
-                stock_on_hand=stock,
-            )
-        ],
-    )
-    db.add(product)
-    db.commit()
-    db.refresh(product)
-    return product
+from app.models import Order
 
 
 def test_checkout_reprices_on_server_and_reserves_stock(client, db):

@@ -124,6 +124,7 @@ def _product_out(product) -> ProductOut:
         name=product.name,
         description=product.description,
         category=product.category.name if product.category else None,
+        category_slug=product.category.slug if product.category else None,
         variants=[
             {
                 "id": variant.id,

@@ -2,6 +2,8 @@ import itertools
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from conftest import ADDRESS, checkout, put_item
+
 from app.models import AdminAuditLog, Category, Order, OrderStatus, PickupDay, Product, Variant
 from app.services.email import _render_order_confirmation
 from tests.test_admin import admin_headers, customer_headers
@@ -92,37 +94,6 @@ def slot_iso(day, hour=16, minute=0):
 def utc_prefix(day, hour, minute):
     """The 'YYYY-MM-DDTHH:MM' UTC prefix the API serialises this café slot as."""
     return slot_dt(day, hour, minute).astimezone(UTC).strftime("%Y-%m-%dT%H:%M")
-
-
-ADDRESS = {
-    "recipient_name": "Guest",
-    "line1": "1 Tea Street",
-    "city": "Umea",
-    "postal_code": "90325",
-    "country_code": "SE",
-}
-
-
-def checkout(
-    client, *, pickup_at=None, address=None, email="guest@example.com", payment_method=None
-):
-    body = {"email": email}
-    if pickup_at is not None:
-        body["pickup_at"] = pickup_at
-    if address is not None:
-        body["shipping_address"] = address
-    if payment_method is not None:
-        body["payment_method"] = payment_method
-    return client.post("/api/v1/checkout", json=body)
-
-
-def put_item(client, variant, quantity=1, options=None):
-    body = {"variant_id": str(variant.id), "quantity": quantity}
-    if options is not None:
-        body["options"] = options
-    response = client.put("/api/v1/cart/items", json=body)
-    assert response.status_code == 200
-    return response
 
 
 # --- cart classification -------------------------------------------------

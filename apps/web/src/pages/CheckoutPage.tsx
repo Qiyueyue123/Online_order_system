@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ApiError, CAFE_TIMEZONE, api, Cart, CheckoutIn, CheckoutOut, PickupDay } from "../api/client";
+import { ApiError, api, Cart, CheckoutIn, CheckoutOut, formatSlotTime, PickupDay } from "../api/client";
 
 type Fields = {
   email: string;
@@ -158,13 +158,7 @@ export function CheckoutPage() {
                       setSlotConflict(false);
                     }}
                   >
-                    {/* Slot instants are UTC; always render café wall-clock time. */}
-                    {new Date(slot.time).toLocaleTimeString([], {
-                      timeZone: CAFE_TIMEZONE,
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false,
-                    })}
+                    {formatSlotTime(slot.time)}
                     {slot.remaining <= 2 && <span className="slot-remaining"> · {slot.remaining} left</span>}
                   </button>
                 ))}

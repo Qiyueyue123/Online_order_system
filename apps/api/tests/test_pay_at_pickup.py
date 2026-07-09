@@ -1,5 +1,6 @@
+from conftest import ADDRESS, checkout, put_item
 from test_admin import admin_headers
-from test_pickup import ADDRESS, add_drink, add_pickup_day, add_retail, checkout, put_item, slot_iso
+from test_pickup import add_drink, add_pickup_day, add_retail, slot_iso
 
 from app.config import get_settings
 from app.models import Order, OrderStatus

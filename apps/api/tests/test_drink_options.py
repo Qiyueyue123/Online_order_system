@@ -1,4 +1,5 @@
-from test_pickup import add_drink, add_pickup_day, checkout, put_item, slot_iso
+from conftest import checkout, put_item
+from test_pickup import add_drink, add_pickup_day, slot_iso
 
 from app.models import Order
 from app.services.email import _render_order_confirmation

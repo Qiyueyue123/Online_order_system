@@ -23,6 +23,7 @@ const productPage: ProductPage = {
       name: "Ceremonial Matcha",
       description: "A stone-ground matcha.",
       category: "matcha",
+      category_slug: "matcha",
       variants: [
         {
           id: "var-1",
@@ -41,6 +42,7 @@ const productPage: ProductPage = {
       name: "Bamboo Whisk",
       description: "A hand-carved whisk.",
       category: "tools",
+      category_slug: "tools",
       variants: [
         {
           id: "var-2",

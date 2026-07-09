@@ -29,6 +29,7 @@ class ProductOut(ApiModel):
     name: str
     description: str
     category: str | None
+    category_slug: str | None
     variants: list[VariantOut]
     images: list[ImageOut]
 

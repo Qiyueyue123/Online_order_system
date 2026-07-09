@@ -1,6 +1,6 @@
 import uuid
 
-from test_checkout import add_product
+from conftest import add_product
 
 from app.models import Order as OrderModel
 from app.services.email import _render_order_confirmation

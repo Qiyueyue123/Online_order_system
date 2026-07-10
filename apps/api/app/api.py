@@ -8,11 +8,13 @@ from fastapi import (
     APIRouter,
     Cookie,
     Depends,
+    Form,
     Header,
     HTTPException,
     Query,
     Request,
     Response,
+    UploadFile,
     status,
 )
 from sqlalchemy import select
@@ -24,12 +26,12 @@ from .db import get_db
 from .models import (
     Cart,
     LoginSession,
+    Notice,
     Order,
     OrderStatus,
     PickupDay,
     ProcessedWebhook,
     Product,
-    Role,
     User,
     Variant,
 )
@@ -37,6 +39,9 @@ from .schemas import (
     AdminCatalogPage,
     AdminCatalogProductOut,
     AdminImageIn,
+    AdminNoticeIn,
+    AdminNoticeOut,
+    AdminNoticeUpdateIn,
     AdminOrderOut,
     AdminOrderPage,
     AdminOrderStatusIn,
@@ -54,6 +59,7 @@ from .schemas import (
     CheckoutIn,
     CheckoutOut,
     LoginIn,
+    NoticeOut,
     OrderOut,
     PickupDayPublicOut,
     ProductOut,
@@ -82,6 +88,7 @@ from .services.admin import (
     list_audit_log,
     list_orders_admin,
     remove_product_image,
+    update_notice,
     update_product,
     update_variant,
     write_audit,
@@ -96,6 +103,7 @@ from .services.cart import (
 from .services.catalog import list_products, list_products_admin
 from .services.checkout import create_pending_order, expire_order, mark_order_paid
 from .services.email import send_order_confirmation
+from .services.media import save_product_media
 from .services.pickup import available_days, slots_for_day, upcoming_days
 from .services.rate_limit import check_rate_limit
 
@@ -321,6 +329,16 @@ def delete_cart_item(
     return cart_payload(cart)
 
 
+@router.get("/notices", response_model=list[NoticeOut])
+def notices(db: Session = Depends(get_db)):
+    """Active notices for the homepage banner, newest first."""
+    return list(
+        db.scalars(
+            select(Notice).where(Notice.active.is_(True)).order_by(Notice.created_at.desc())
+        ).all()
+    )
+
+
 @router.get("/pickup-days", response_model=list[PickupDayPublicOut])
 def pickup_days(db: Session = Depends(get_db)):
     """Bookable pickup days for checkout: only future slots with seats left."""
@@ -351,10 +369,10 @@ def checkout(
         db.rollback()
         raise
     if order.status == OrderStatus.CONFIRMED:
-        # Pay-at-pickup: nothing to pay online, so the redirect goes straight to the
-        # order/tracking page instead of a payment provider.
-        token_qs = f"?token={guest_token}" if guest_token else ""
-        checkout_url = f"{settings.web_origin}/orders/{order.id}{token_qs}"
+        # Pay-at-pickup: nothing to pay online. The frontend navigates straight to the
+        # thank-you page itself; this URL is just a sane default if something ever
+        # follows checkout_url directly instead.
+        checkout_url = f"{settings.web_origin}/thanks?order={order.display_number}"
         # Sent after the commit inside create_pending_order: a slow SMTP call
         # holding row locks, or confirming an order a later rollback undoes, are
         # exactly the failure modes the identical note on the webhook avoids.
@@ -386,7 +404,7 @@ def checkout(
                     "quantity": 1,
                 }
             ],
-            success_url=f"{settings.web_origin}/orders/{order.id}",
+            success_url=f"{settings.web_origin}/thanks?order={order.display_number}",
             cancel_url=f"{settings.web_origin}/cart",
             metadata={"order_id": str(order.id)},
             expires_at=int(order.reservation_expires_at.timestamp()),
@@ -491,25 +509,6 @@ def complete_demo_payment(
             send_order_confirmation(order, settings)
         except Exception:
             logger.exception("failed to send order confirmation email for order %s", order.id)
-    return order
-
-
-@router.get("/orders/{order_id}", response_model=OrderOut)
-def get_order(
-    order_id: str,
-    lookup_token: str | None = Query(default=None),
-    login_session: LoginSession | None = Depends(optional_session),
-    db: Session = Depends(get_db),
-):
-    order = db.get(Order, _parse_uuid_or_404(order_id, "Order not found"))
-    if not order:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
-    account_access = login_session and (
-        login_session.user_id == order.user_id or login_session.user.role == Role.ADMIN
-    )
-    guest_access = lookup_token and order.lookup_token_hash == token_hash(lookup_token)
-    if not account_access and not guest_access:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     return order
 
 
@@ -667,6 +666,47 @@ def add_admin_product_image(
         entity_type="product",
         entity_id=product.id,
         detail={"image_id": str(image.id), "url": data.url, "media_type": data.media_type},
+    )
+    db.commit()
+    db.refresh(product)
+    return _admin_product_out(product)
+
+
+@router.post(
+    "/admin/products/{product_id}/images/upload",
+    response_model=AdminCatalogProductOut,
+    status_code=201,
+)
+def upload_admin_product_image(
+    product_id: str,
+    file: UploadFile,
+    alt_text: str = Form(default=""),
+    position: int = Form(default=0),
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    url, media_type = save_product_media(file, settings)
+    image = add_product_image(
+        db,
+        product,
+        AdminImageIn(url=url, alt_text=alt_text, position=position, media_type=media_type),
+    )
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_image_added",
+        entity_type="product",
+        entity_id=product.id,
+        detail={
+            "image_id": str(image.id),
+            "url": url,
+            "media_type": media_type,
+            "filename": file.filename,
+        },
     )
     db.commit()
     db.refresh(product)
@@ -841,6 +881,81 @@ def admin_update_pickup_day(
     db.commit()
     db.refresh(day)
     return day
+
+
+@router.get("/admin/notices", response_model=list[AdminNoticeOut])
+def admin_list_notices(
+    _: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    return list(db.scalars(select(Notice).order_by(Notice.created_at.desc())).all())
+
+
+@router.post("/admin/notices", response_model=AdminNoticeOut, status_code=201)
+def admin_create_notice(
+    data: AdminNoticeIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    notice = Notice(title=data.title, body=data.body)
+    db.add(notice)
+    db.flush()
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="notice_created",
+        entity_type="notice",
+        entity_id=notice.id,
+        detail={"title": notice.title},
+    )
+    db.commit()
+    db.refresh(notice)
+    return notice
+
+
+@router.patch("/admin/notices/{notice_id}", response_model=AdminNoticeOut)
+def admin_update_notice(
+    notice_id: str,
+    data: AdminNoticeUpdateIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    notice = db.get(Notice, _parse_uuid_or_404(notice_id, "Notice not found"))
+    if not notice:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notice not found")
+    changes = update_notice(db, notice, data)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="notice_updated",
+        entity_type="notice",
+        entity_id=notice.id,
+        detail=changes or None,
+    )
+    db.commit()
+    db.refresh(notice)
+    return notice
+
+
+@router.delete("/admin/notices/{notice_id}", status_code=204)
+def admin_delete_notice(
+    notice_id: str,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    notice = db.get(Notice, _parse_uuid_or_404(notice_id, "Notice not found"))
+    if not notice:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notice not found")
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="notice_deleted",
+        entity_type="notice",
+        entity_id=notice.id,
+        detail={"title": notice.title},
+    )
+    db.delete(notice)
+    db.commit()
 
 
 @router.get("/admin/audit-log", response_model=AuditLogPage)

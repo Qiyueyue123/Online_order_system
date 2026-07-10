@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import {
   ApiError,
   api,
@@ -11,6 +12,12 @@ import {
   humanizeError,
   PickupDay,
 } from "../api/client";
+import {
+  CONTACT_TELEGRAM_HANDLE,
+  CONTACT_TELEGRAM_URL,
+  CONTACT_WHATSAPP_HANDLE,
+  CONTACT_WHATSAPP_URL,
+} from "../contact";
 
 type Fields = {
   email: string;
@@ -25,6 +32,7 @@ const COUNTRY_SUGGESTIONS = ["SE", "NO", "DK", "FI", "DE", "GB", "SG", "MY", "JP
 
 export function CheckoutPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const cart = useQuery({ queryKey: ["cart"], queryFn: () => api<Cart>("/cart") });
   const needsPickup = !!cart.data?.needs_pickup;
   const needsShipping = !!cart.data?.needs_shipping;
@@ -56,6 +64,8 @@ export function CheckoutPage() {
     formState: { errors },
   } = useForm<Fields>({ defaultValues: { country_code: "SE" } });
 
+  const payingAtPickup = showPaymentChoice && paymentMethod === "pay_at_pickup";
+
   const checkout = useMutation({
     mutationFn: (values: Fields) => {
       const payload: CheckoutIn = {
@@ -78,6 +88,14 @@ export function CheckoutPage() {
     },
     onSuccess: (result) => {
       if (result.guest_lookup_token) sessionStorage.setItem("guestOrderToken", result.guest_lookup_token);
+      if (payingAtPickup) {
+        // Nothing to pay online — skip the redirect and land straight on the
+        // thank-you page instead of following checkout_url.
+        const params = new URLSearchParams({ order: result.display_number });
+        if (selectedSlot) params.set("pickup", selectedSlot);
+        navigate(`/thanks?${params.toString()}`);
+        return;
+      }
       window.location.assign(result.checkout_url);
     },
     onError: (error) => {
@@ -103,7 +121,6 @@ export function CheckoutPage() {
 
   const selectedDay = pickupDays.data?.find((day) => day.date === selectedDate);
   const canSubmit = !needsPickup || !!selectedSlot;
-  const payingAtPickup = showPaymentChoice && paymentMethod === "pay_at_pickup";
 
   return (
     <div className="page checkout">
@@ -132,48 +149,64 @@ export function CheckoutPage() {
           <div className="pickup-picker">
             <h2>Pickup time</h2>
             {pickupDays.isLoading && <p role="status">Loading pickup times…</p>}
-            <div className="pickup-days" role="group" aria-label="Pickup day">
-              {pickupDays.data?.map((day) => (
-                <button
-                  type="button"
-                  key={day.date}
-                  className={`chip${day.date === selectedDate ? " active" : ""}`}
-                  onClick={() => {
-                    setSelectedDate(day.date);
-                    setSelectedSlot(null);
-                  }}
-                >
-                  {/* day.date is date-only; new Date() parses it as UTC midnight, so
-                      format in UTC to keep the weekday from shifting for viewers
-                      west of Greenwich. */}
-                  {new Date(day.date).toLocaleDateString(undefined, {
-                    timeZone: "UTC",
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </button>
-              ))}
-            </div>
-            {selectedDay && (
-              <div className="pickup-slots" role="group" aria-label="Pickup time slot">
-                {selectedDay.slots.map((slot) => (
-                  <button
-                    type="button"
-                    key={slot.time}
-                    className={`chip${slot.time === selectedSlot ? " active" : ""}`}
-                    onClick={() => {
-                      setSelectedSlot(slot.time);
-                      setSlotConflict(false);
-                    }}
-                  >
-                    {formatSlotTime(slot.time)}
-                    {slot.remaining <= 2 && <span className="slot-remaining"> · {slot.remaining} left</span>}
-                  </button>
-                ))}
-              </div>
+            {!pickupDays.isLoading && pickupDays.data?.length === 0 && (
+              <p className="pickup-empty">
+                No pickup times are open right now — check back soon, or message us.
+              </p>
             )}
-            {slotConflict && <p role="alert">That time just filled up — pick another.</p>}
+            {!!pickupDays.data?.length && (
+              <>
+                <div className="pickup-days" role="group" aria-label="Pickup day">
+                  {pickupDays.data.map((day) => (
+                    <button
+                      type="button"
+                      key={day.date}
+                      className={`chip${day.date === selectedDate ? " active" : ""}`}
+                      onClick={() => {
+                        setSelectedDate(day.date);
+                        setSelectedSlot(null);
+                      }}
+                    >
+                      {/* day.date is date-only; new Date() parses it as UTC midnight, so
+                          format in UTC to keep the weekday from shifting for viewers
+                          west of Greenwich. */}
+                      {new Date(day.date).toLocaleDateString(undefined, {
+                        timeZone: "UTC",
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </button>
+                  ))}
+                </div>
+                {selectedDay && selectedDay.slots.length === 0 && (
+                  <p className="pickup-empty">No times left on this day — pick another day above.</p>
+                )}
+                {selectedDay && selectedDay.slots.length > 0 && (
+                  <div className="pickup-slots" role="group" aria-label="Pickup time slot">
+                    {selectedDay.slots.map((slot) => (
+                      <button
+                        type="button"
+                        key={slot.time}
+                        className={`chip${slot.time === selectedSlot ? " active" : ""}`}
+                        onClick={() => {
+                          setSelectedSlot(slot.time);
+                          setSlotConflict(false);
+                        }}
+                      >
+                        {formatSlotTime(slot.time)}
+                        {slot.remaining <= 2 && <span className="slot-remaining"> · {slot.remaining} left</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {slotConflict && (
+              <p role="alert">
+                That time just filled up — pick another. Times free up when unpaid orders expire, so check back soon.
+              </p>
+            )}
           </div>
         )}
 
@@ -240,6 +273,13 @@ export function CheckoutPage() {
           </>
         )}
 
+        <p className="contact-line">
+          Payment trouble? Message us on Telegram{" "}
+          <a href={CONTACT_TELEGRAM_URL} target="_blank" rel="noreferrer">{CONTACT_TELEGRAM_HANDLE}</a>{" "}
+          or WhatsApp{" "}
+          <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">{CONTACT_WHATSAPP_HANDLE}</a>.
+        </p>
+
         <button className="button full" disabled={checkout.isPending || !canSubmit}>
           {checkout.isPending
             ? "Just a moment…"
@@ -247,6 +287,9 @@ export function CheckoutPage() {
               ? "Confirm order — pay at pickup"
               : "Continue to Stripe test checkout"}
         </button>
+        {needsPickup && !selectedSlot && (
+          <p className="hint">Choose a pickup time above to continue.</p>
+        )}
         {checkout.isError && !slotConflict && <p role="alert">{humanizeError(checkout.error)}</p>}
       </form>
     </div>

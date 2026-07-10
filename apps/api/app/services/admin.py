@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..models import (
     AdminAuditLog,
     Category,
+    Notice,
     Order,
     OrderStatus,
     PaymentStatus,
@@ -16,7 +17,7 @@ from ..models import (
     User,
     Variant,
 )
-from ..schemas import AdminImageIn, AdminProductIn, AdminProductUpdateIn
+from ..schemas import AdminImageIn, AdminNoticeUpdateIn, AdminProductIn, AdminProductUpdateIn
 from .checkout import cancel_confirmed_order, cancel_order
 
 
@@ -214,3 +215,11 @@ def remove_product_image(db: Session, product_id: uuid.UUID, image_id: uuid.UUID
     if not image:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
     db.delete(image)
+
+
+def update_notice(db: Session, notice: Notice, data: AdminNoticeUpdateIn) -> dict:
+    changes: dict = {}
+    _set_if_changed(changes, notice, "title", data.title)
+    _set_if_changed(changes, notice, "body", data.body)
+    _set_if_changed(changes, notice, "active", data.active)
+    return changes

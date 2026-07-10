@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # Shown in the pay-at-pickup confirmation email as a Revolut/Swish handle;
     # empty means the email falls back to a generic "cash at pickup" line.
     pickup_payment_note: str = ""
+    # Contact handles shown on the confirmation email and site for questions or
+    # payment issues; kept in settings rather than hardcoded in the template.
+    contact_telegram: str = "@notqiyue"
+    contact_whatsapp: str = "+65 9788 8146"
+    # Where uploaded product photos/videos land after processing. Relative is
+    # fine for dev/tests; docker-compose points this at a mounted volume.
+    uploads_dir: str = "uploads"
+    max_image_upload_mb: int = 15
+    max_video_upload_mb: int = 100
 
     @field_validator("shipping_countries", mode="before")
     @classmethod

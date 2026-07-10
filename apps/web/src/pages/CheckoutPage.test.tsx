@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Cart, PickupDay } from "../api/client";
 import { CheckoutPage } from "./CheckoutPage";
@@ -330,5 +330,90 @@ describe("CheckoutPage", () => {
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     }
+  });
+
+  it("navigates to /thanks (not checkout_url) after a successful pay-at-pickup order", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/pickup-days")) {
+        return Promise.resolve(new Response(JSON.stringify(pickupDays), { status: 200 }));
+      }
+      if (url.includes("/cart")) {
+        return Promise.resolve(new Response(JSON.stringify(pickupOnlyCart), { status: 200 }));
+      }
+      if (url.includes("/checkout") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              order_id: "order-1",
+              display_number: "M-0001",
+              checkout_url: "http://localhost:5173/orders/order-1",
+              guest_lookup_token: "guest-token",
+              reservation_expires_at: null,
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const assignSpy = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, assign: assignSpy },
+    });
+
+    try {
+      const { container } = render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <MemoryRouter initialEntries={["/checkout"]}>
+            <Routes>
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/thanks" element={<div>Thanks page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+      fireEvent.change(await screen.findByLabelText(/Email/), { target: { value: "shopper@example.com" } });
+      const slotGroup = await screen.findByRole("group", { name: "Pickup time slot" });
+      fireEvent.click(within(slotGroup).getAllByRole("button")[0]);
+      fireEvent.click(screen.getByLabelText(/Pay at pickup/));
+      submitForm(container);
+
+      expect(await screen.findByText("Thanks page")).toBeInTheDocument();
+      expect(assignSpy).not.toHaveBeenCalled();
+      expect(sessionStorage.getItem("guestOrderToken")).toBe("guest-token");
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    }
+  });
+
+  it("shows a friendly message when no pickup times are open at all", async () => {
+    stubFetch(pickupOnlyCart, []);
+
+    renderWithProviders(<CheckoutPage />);
+
+    expect(
+      await screen.findByText("No pickup times are open right now — check back soon, or message us."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Pickup day" })).not.toBeInTheDocument();
+    const button = screen.getByRole("button", { name: /Continue to Stripe test checkout/ });
+    expect(button).toBeDisabled();
+  });
+
+  it("shows a hint under the submit button when no pickup slot is chosen yet", async () => {
+    stubFetch(pickupOnlyCart);
+
+    renderWithProviders(<CheckoutPage />);
+
+    await screen.findByRole("group", { name: "Pickup day" });
+    expect(screen.getByText("Choose a pickup time above to continue.")).toBeInTheDocument();
+
+    const slotGroup = await screen.findByRole("group", { name: "Pickup time slot" });
+    fireEvent.click(within(slotGroup).getAllByRole("button")[0]);
+
+    expect(screen.queryByText("Choose a pickup time above to continue.")).not.toBeInTheDocument();
   });
 });

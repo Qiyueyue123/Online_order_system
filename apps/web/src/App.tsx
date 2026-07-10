@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet } from "react-router-dom";
 import { api, ApiError, Cart, Session } from "./api/client";
+import {
+  CONTACT_TELEGRAM_HANDLE,
+  CONTACT_TELEGRAM_URL,
+  CONTACT_WHATSAPP_HANDLE,
+  CONTACT_WHATSAPP_URL,
+} from "./contact";
 
 export function App() {
   const { data: cart } = useQuery({ queryKey: ["cart"], queryFn: () => api<Cart>("/cart") });
@@ -64,6 +70,12 @@ export function App() {
             )}
           </ul>
         </div>
+        <p className="footer-contact">
+          Questions or payment issues? Telegram{" "}
+          <a href={CONTACT_TELEGRAM_URL} target="_blank" rel="noreferrer">{CONTACT_TELEGRAM_HANDLE}</a>
+          {" · "}WhatsApp{" "}
+          <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">{CONTACT_WHATSAPP_HANDLE}</a>
+        </p>
         <p className="footer-disclaimer">Taxes, import duties and currency conversion are outside this demonstration. Payments run through Stripe test mode; no real charge is ever made.</p>
       </footer>
     </>

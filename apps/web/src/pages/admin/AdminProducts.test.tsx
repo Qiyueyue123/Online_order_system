@@ -181,6 +181,43 @@ describe("AdminProducts", () => {
     });
   });
 
+  it("uploads a photo file via the media manager", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "POST" && url.includes("/images/upload")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage.items[0]), { status: 201 }));
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    const fileInput = await screen.findByLabelText("Ceremonial Matcha upload file");
+    const file = new File(["fake-image-bytes"], "photo.jpg", { type: "image/jpeg" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/products/product-1/images/upload",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token-1" }),
+        }),
+      ),
+    );
+    const uploadCall = fetchMock.mock.calls.find(([input]) =>
+      (typeof input === "string" ? input : input.toString()).includes("/images/upload"),
+    );
+    const body = uploadCall![1]!.body as FormData;
+    expect(body instanceof FormData).toBe(true);
+    expect(body.get("file")).toBe(file);
+  });
+
   it("removes a photo from the media manager", async () => {
     const productWithImage: AdminCatalogPage = {
       ...productsPage,

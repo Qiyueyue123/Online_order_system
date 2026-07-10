@@ -309,6 +309,29 @@ class AdminPickupDayIn(BaseModel):
     slot_capacity: int = Field(default=2, gt=0, le=100)
 
 
+class NoticeOut(ApiModel):
+    id: uuid.UUID
+    title: str
+    body: str
+    created_at: datetime
+
+
+class AdminNoticeOut(NoticeOut):
+    active: bool
+    updated_at: datetime
+
+
+class AdminNoticeIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1)
+
+
+class AdminNoticeUpdateIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    body: str | None = Field(default=None, min_length=1)
+    active: bool | None = None
+
+
 class AdminPickupDayUpdateIn(BaseModel):
     start_time: time | None = None
     end_time: time | None = None

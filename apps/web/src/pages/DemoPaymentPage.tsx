@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api, formatPickup, humanizeError, money, Order } from "../api/client";
 
+
 export function DemoPaymentPage() {
   const { orderId = "" } = useParams();
   const lookupToken = sessionStorage.getItem("guestOrderToken");
@@ -29,12 +30,6 @@ export function DemoPaymentPage() {
           <h1>Payment completed.</h1>
           <p>Order <strong>{payment.data.display_number}</strong> is paid for {money(payment.data.total_cents)}.</p>
           {payment.data.pickup_at && <p>Pickup {formatPickup(payment.data.pickup_at)}</p>}
-          <Link
-            className="button"
-            to={`/orders/${orderId}${lookupToken ? `?token=${encodeURIComponent(lookupToken)}` : ""}`}
-          >
-            View your order
-          </Link>
           <Link className="button" to="/">Continue shopping</Link>
         </>
       )}

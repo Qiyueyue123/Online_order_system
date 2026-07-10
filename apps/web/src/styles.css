@@ -157,6 +157,14 @@ footer {
 }
 .footer-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.65rem; }
 .footer-col a:hover { color: var(--paper); }
+.footer-contact {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+  color: #8ea187;
+  font-size: 0.82rem;
+}
+.footer-contact a { color: #cddcc6; }
+.footer-contact a:hover { color: var(--paper); }
 .footer-disclaimer {
   grid-column: 1 / -1;
   margin-top: 2rem;
@@ -275,6 +283,26 @@ footer {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* -------------------------------------------------------------- */
+/* Noticeboard                                                     */
+/* -------------------------------------------------------------- */
+.noticeboard {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem clamp(1.25rem, 6vw, 6rem) 0;
+}
+.notice-card {
+  padding: 1.1rem 1.4rem;
+  background: var(--paper-panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pine);
+  border-radius: 0.75rem;
+}
+.notice-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.notice-heading h3 { margin: 0; font-size: 1.15rem; }
+.notice-date { flex: none; color: var(--ink-soft); font-size: 0.78rem; white-space: nowrap; }
+.notice-card p { margin: 0.4rem 0 0; color: var(--ink-soft); }
 
 /* -------------------------------------------------------------- */
 /* Collection / catalog                                            */
@@ -518,6 +546,16 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 .chip.active .slot-remaining { color: var(--paper); }
 
 .pickup-time { color: var(--ink-soft); font-size: 0.85rem; margin: 0.3rem 0 0; }
+.pickup-empty {
+  padding: 0.9rem 1.1rem;
+  border: 1px dashed var(--line-strong);
+  background: var(--paper-panel);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+.hint { margin-top: 0.6rem; font-size: 0.82rem; color: var(--ink-soft); }
+.contact-line { margin-top: 1rem; font-size: 0.85rem; color: var(--ink-soft); }
+.contact-line a { color: inherit; }
 
 .payment-choice { margin-top: 1.5rem; }
 .payment-choice h2 {
@@ -595,37 +633,6 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 .status--expired { background: #e5e1d6; color: #5c5847; }
 
 /* -------------------------------------------------------------- */
-/* Order status / tracking                                         */
-/* -------------------------------------------------------------- */
-.order-status-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; margin-bottom: 1.5rem; }
-.order-status-heading h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0.35rem 0 0; }
-.order-timeline {
-  display: flex;
-  gap: 0.75rem;
-  margin: 0 0 1.75rem;
-  padding: 0;
-  list-style: none;
-}
-.order-timeline li {
-  flex: 1;
-  padding: 0.75rem 0.5rem;
-  border: 1px solid var(--line-strong);
-  border-bottom: 3px solid var(--line-strong);
-  text-align: center;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-}
-.order-timeline li.done { border-bottom-color: var(--pine); color: var(--pine); font-weight: 600; }
-.order-terminal-note {
-  margin: 0 0 1.75rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--line-strong);
-  background: var(--paper-panel);
-  color: var(--ink-soft);
-}
-.order-items { margin-top: 1rem; }
-
-/* -------------------------------------------------------------- */
 /* Demo payment simulator                                          */
 /* -------------------------------------------------------------- */
 .demo-payment {
@@ -662,6 +669,19 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 .admin tbody tr:hover { background: rgba(28, 68, 51, 0.04); }
 .admin td input { width: 6rem; padding: 0.4rem; }
 .admin td input[type="checkbox"] { width: auto; }
+
+.notice-admin-list { display: grid; gap: 1rem; margin: 1.5rem 0; }
+.notice-admin-card {
+  padding: 1.1rem 1.4rem;
+  background: var(--paper-panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pine);
+  border-radius: 0.75rem;
+}
+.notice-admin-card--hidden { border-left-color: var(--line-strong); opacity: 0.7; }
+.notice-admin-card textarea { width: 100%; min-height: 5rem; margin-top: 0.4rem; }
+.notice-admin-card .notice-heading input { width: 100%; }
+.notice-admin-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .stock-reserved-note { display: block; margin-top: 0.25rem; font-size: 0.72rem; color: var(--ink-soft); }
 .checkbox-label { display: flex !important; flex-direction: row !important; align-items: center; gap: 0.5rem; text-transform: none !important; font-weight: 400 !important; letter-spacing: normal !important; }
 .admin-product-group {
@@ -695,7 +715,8 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
   text-transform: uppercase;
   cursor: pointer;
 }
-.admin-media-form label { margin-top: 0; }
+.admin-media-form label, .admin-media-upload-form label { margin-top: 0; }
+.field-hint { font-size: 0.8rem; color: var(--ink-soft); margin: 0.4rem 0 0; }
 .admin td button, .admin form button {
   margin-right: 0.4rem;
   padding: 0.5rem 0.9rem;

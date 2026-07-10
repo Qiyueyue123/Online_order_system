@@ -37,6 +37,10 @@ export type PickupSlot = components["schemas"]["PickupSlotOut"];
 export type AdminPickupDay = components["schemas"]["AdminPickupDayOut"];
 export type AdminPickupDayIn = components["schemas"]["AdminPickupDayIn"];
 export type AdminPickupDayUpdateIn = components["schemas"]["AdminPickupDayUpdateIn"];
+export type Notice = components["schemas"]["NoticeOut"];
+export type AdminNotice = components["schemas"]["AdminNoticeOut"];
+export type AdminNoticeIn = components["schemas"]["AdminNoticeIn"];
+export type AdminNoticeUpdateIn = components["schemas"]["AdminNoticeUpdateIn"];
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -55,6 +59,30 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: "Request failed" }));
     const detail = body.detail ?? "Request failed";
+    throw new ApiError(response.status, typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+// Like api(), but for multipart form uploads: no Content-Type header (the
+// browser sets the multipart boundary itself), body is FormData rather than
+// a JSON string. Shares the same credentials/CSRF/error handling as api()
+// so callers get the same ApiError/humanizeError behaviour either way.
+export async function apiUpload<T>(
+  path: string,
+  body: FormData,
+  options?: Omit<RequestInit, "body">,
+): Promise<T> {
+  const response = await fetch(`/api/v1${path}`, {
+    method: "POST",
+    credentials: "include",
+    ...options,
+    body,
+  });
+  if (!response.ok) {
+    const responseBody = await response.json().catch(() => ({ detail: "Request failed" }));
+    const detail = responseBody.detail ?? "Request failed";
     throw new ApiError(response.status, typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   if (response.status === 204) return undefined as T;
@@ -105,6 +133,22 @@ export const formatSlotTime = (iso: string) =>
     minute: "2-digit",
     hour12: false,
   });
+
+// Friendly "posted" label for a notice: relative for the first day ("just now",
+// "3 hours ago"), then a short date so an old notice doesn't read as "9 days
+// ago" forever.
+export const formatNoticeDate = (iso: string) => {
+  const date = new Date(iso);
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(date);
+};
 
 // The standard recipe every drink option defaults to; only deviations from
 // this are worth showing back to the customer on a cart/order line.

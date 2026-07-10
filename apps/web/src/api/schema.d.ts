@@ -157,6 +157,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notices
+         * @description Active notices for the homepage banner, newest first.
+         */
+        get: operations["notices_api_v1_notices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pickup-days": {
         parameters: {
             query?: never;
@@ -239,23 +259,6 @@ export interface paths {
         put?: never;
         /** Complete Demo Payment */
         post: operations["complete_demo_payment_api_v1_demo_orders__order_id__pay_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/orders/{order_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Order */
-        get: operations["get_order_api_v1_orders__order_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -355,6 +358,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/products/{product_id}/images/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Admin Product Image */
+        post: operations["upload_admin_product_image_api_v1_admin_products__product_id__images_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/products/{product_id}/images/{image_id}": {
         parameters: {
             query?: never;
@@ -439,6 +459,42 @@ export interface paths {
         head?: never;
         /** Admin Update Pickup Day */
         patch: operations["admin_update_pickup_day_api_v1_admin_pickup_days__pickup_day_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin List Notices */
+        get: operations["admin_list_notices_api_v1_admin_notices_get"];
+        put?: never;
+        /** Admin Create Notice */
+        post: operations["admin_create_notice_api_v1_admin_notices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/notices/{notice_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Admin Delete Notice */
+        delete: operations["admin_delete_notice_api_v1_admin_notices__notice_id__delete"];
+        options?: never;
+        head?: never;
+        /** Admin Update Notice */
+        patch: operations["admin_update_notice_api_v1_admin_notices__notice_id__patch"];
         trace?: never;
     };
     "/api/v1/admin/audit-log": {
@@ -573,6 +629,46 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /** AdminNoticeIn */
+        AdminNoticeIn: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+        };
+        /** AdminNoticeOut */
+        AdminNoticeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Active */
+            active: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AdminNoticeUpdateIn */
+        AdminNoticeUpdateIn: {
+            /** Title */
+            title?: string | null;
+            /** Body */
+            body?: string | null;
+            /** Active */
+            active?: boolean | null;
         };
         /** AdminOrderOut */
         AdminOrderOut: {
@@ -825,6 +921,24 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Body_upload_admin_product_image_api_v1_admin_products__product_id__images_upload_post */
+        Body_upload_admin_product_image_api_v1_admin_products__product_id__images_upload_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+            /**
+             * Alt Text
+             * @default
+             */
+            alt_text: string;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+        };
         /** CartItemIn */
         CartItemIn: {
             /**
@@ -989,6 +1103,23 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** NoticeOut */
+        NoticeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** OrderItemOut */
         OrderItemOut: {
@@ -1465,6 +1596,26 @@ export interface operations {
             };
         };
     };
+    notices_api_v1_notices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeOut"][];
+                };
+            };
+        };
+    };
     pickup_days_api_v1_pickup_days_get: {
         parameters: {
             query?: never;
@@ -1582,41 +1733,6 @@ export interface operations {
         };
     };
     complete_demo_payment_api_v1_demo_orders__order_id__pay_post: {
-        parameters: {
-            query?: {
-                lookup_token?: string | null;
-            };
-            header?: never;
-            path: {
-                order_id: string;
-            };
-            cookie?: {
-                matcha_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrderOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_order_api_v1_orders__order_id__get: {
         parameters: {
             query?: {
                 lookup_token?: string | null;
@@ -1874,6 +1990,45 @@ export interface operations {
             };
         };
     };
+    upload_admin_product_image_api_v1_admin_products__product_id__images_upload_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_admin_product_image_api_v1_admin_products__product_id__images_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCatalogProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_admin_product_image_api_v1_admin_products__product_id__images__image_id__delete: {
         parameters: {
             query?: never;
@@ -2078,6 +2233,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminPickupDayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_notices_api_v1_admin_notices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNoticeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_create_notice_api_v1_admin_notices_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminNoticeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNoticeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_delete_notice_api_v1_admin_notices__notice_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                notice_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_update_notice_api_v1_admin_notices__notice_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                notice_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminNoticeUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNoticeOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,3 +1,5 @@
+import json
+
 from conftest import checkout, put_item
 from test_pickup import add_drink, add_pickup_day, slot_iso
 
@@ -115,11 +117,7 @@ def test_options_flow_to_order_item_and_email(client, db):
 
     order = db.query(Order).one()
     assert order.items[0].options is not None
-    body = client.get(
-        f"/api/v1/orders/{order.id}",
-        params={"lookup_token": response.json()["guest_lookup_token"]},
-    ).json()
-    assert body["items"][0]["options"] == {**DEFAULT_OPTIONS, "whisk": "oat", "sugar_g": 6}
+    assert json.loads(order.items[0].options) == {**DEFAULT_OPTIONS, "whisk": "oat", "sugar_g": 6}
 
     email_body = _render_order_confirmation(order)
     assert f"{drink.name} (Iced) x1" in email_body

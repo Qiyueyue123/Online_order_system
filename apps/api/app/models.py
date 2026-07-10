@@ -334,6 +334,16 @@ class RateLimitEvent(Base):
     )
 
 
+class Notice(TimestampMixin, Base):
+    """Admin-authored update shown at the top of the homepage while active."""
+
+    __tablename__ = "notices"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
 class AdminAuditLog(Base):
     """One row per admin mutation, written in the same transaction as the change.
 

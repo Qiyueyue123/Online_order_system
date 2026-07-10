@@ -9,9 +9,9 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
 import { AuthPage } from "./pages/AuthPage";
 import { DemoPaymentPage } from "./pages/DemoPaymentPage";
-import { OrderStatusPage } from "./pages/OrderStatusPage";
 import { ProductPage } from "./pages/ProductPage";
 import { StorePage } from "./pages/StorePage";
+import { ThankYouPage } from "./pages/ThankYouPage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import "./styles.css";
 
@@ -30,7 +30,7 @@ const router = createBrowserRouter([
       { path: "/signin", element: <AuthPage /> },
       { path: "/account", element: <AccountPage /> },
       { path: "/demo-payment/:orderId", element: <DemoPaymentPage /> },
-      { path: "/orders/:id", element: <OrderStatusPage /> },
+      { path: "/thanks", element: <ThankYouPage /> },
       { path: "/admin", element: <AdminPage /> },
     ],
   },

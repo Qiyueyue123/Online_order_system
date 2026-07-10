@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   AdminCatalogPage,
@@ -11,6 +11,7 @@ import {
   AdminVariantUpdateIn,
   Product,
   api,
+  apiUpload,
   humanizeError,
 } from "../../api/client";
 
@@ -142,17 +143,23 @@ function ProductEditor({
 function MediaManager({
   product,
   disabled,
+  uploading,
   onAdd,
   onRemove,
+  onUpload,
 }: {
   product: AdminCatalogProduct;
   disabled: boolean;
+  uploading: boolean;
   onAdd: (productId: string, body: AdminImageIn) => void;
   onRemove: (productId: string, imageId: string) => void;
+  onUpload: (productId: string, file: File) => void;
 }) {
   const [url, setUrl] = useState("");
   const [altText, setAltText] = useState("");
   const [mediaType, setMediaType] = useState<AdminImageIn["media_type"]>("image");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -166,6 +173,14 @@ function MediaManager({
     setUrl("");
     setAltText("");
     setMediaType("image");
+  }
+
+  function submitUpload(event: FormEvent) {
+    event.preventDefault();
+    if (!uploadFile) return;
+    onUpload(product.id, uploadFile);
+    setUploadFile(null);
+    if (uploadInputRef.current) uploadInputRef.current.value = "";
   }
 
   return (
@@ -225,6 +240,24 @@ function MediaManager({
           Add
         </button>
       </form>
+      <form className="admin-media-upload-form field-pair" onSubmit={submitUpload}>
+        <label>
+          Upload a photo or video
+          <input
+            ref={uploadInputRef}
+            aria-label={`${product.name} upload file`}
+            type="file"
+            accept="image/*,video/*"
+            onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        <button type="submit" disabled={disabled || uploading || !uploadFile}>
+          {uploading ? "Uploading…" : "Upload"}
+        </button>
+      </form>
+      <p className="field-hint">
+        Photos up to 15 MB, videos up to 100 MB / 90 seconds — most formats accepted.
+      </p>
     </div>
   );
 }
@@ -265,6 +298,17 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         headers: { "X-CSRF-Token": csrfToken },
         body: JSON.stringify(body),
       }),
+    onSuccess: invalidate,
+  });
+
+  const uploadImage = useMutation({
+    mutationFn: ({ productId, file }: { productId: string; file: File }) => {
+      const body = new FormData();
+      body.append("file", file);
+      return apiUpload<AdminCatalogProduct>(`/admin/products/${productId}/images/upload`, body, {
+        headers: { "X-CSRF-Token": csrfToken },
+      });
+    },
     onSuccess: invalidate,
   });
 
@@ -323,6 +367,10 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     removeImage.mutate({ productId, imageId });
   }
 
+  function uploadProductImage(productId: string, file: File) {
+    uploadImage.mutate({ productId, file });
+  }
+
   function submitNewProduct(fields: NewProductFields) {
     createProduct.mutate({
       slug: fields.slug,
@@ -346,6 +394,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
       {updateVariant.isError && <p role="alert">{humanizeError(updateVariant.error)}</p>}
       {updateProduct.isError && <p role="alert">{humanizeError(updateProduct.error)}</p>}
       {addImage.isError && <p role="alert">{humanizeError(addImage.error)}</p>}
+      {uploadImage.isError && <p role="alert">{humanizeError(uploadImage.error)}</p>}
       {removeImage.isError && <p role="alert">{humanizeError(removeImage.error)}</p>}
       {products.isLoading && <p role="status">Loading products…</p>}
       {products.data?.items.map((product) => (
@@ -357,9 +406,11 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
           />
           <MediaManager
             product={product}
-            disabled={addImage.isPending || removeImage.isPending}
+            disabled={addImage.isPending || uploadImage.isPending || removeImage.isPending}
+            uploading={uploadImage.isPending}
             onAdd={addProductImage}
             onRemove={removeProductImage}
+            onUpload={uploadProductImage}
           />
           <table>
             <thead>

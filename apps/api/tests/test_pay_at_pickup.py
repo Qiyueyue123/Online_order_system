@@ -17,7 +17,7 @@ def test_pay_at_pickup_confirms_order_and_consumes_stock_immediately(client, db)
     response = checkout(client, pickup_at=slot_iso(day), payment_method="pay_at_pickup")
     assert response.status_code == 201
     body = response.json()
-    assert "/orders/" in body["checkout_url"]
+    assert "/thanks" in body["checkout_url"]
     assert body["reservation_expires_at"] is None
 
     order = db.query(Order).one()

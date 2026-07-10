@@ -81,30 +81,3 @@ def test_no_coupon_charges_full_price(client, db):
     assert order.total_cents == subtotal + shipping
 
 
-def test_get_order_by_id_accepts_string_path_param(client, db):
-    """GET /api/v1/orders/{order_id} (app/api.py get_order) receives the
-    order id as a plain string path parameter and must coerce it to
-    uuid.UUID itself before calling db.get(Order, ...), since SQLAlchemy's
-    Uuid column type requires an actual uuid.UUID instance on dialects
-    without native UUID support (e.g. SQLite, used by this test DB).
-    """
-    product = add_product(db, stock=5)
-    variant = product.variants[0]
-    client.put("/api/v1/cart/items", json={"variant_id": str(variant.id), "quantity": 1})
-    response = _checkout(client)
-    order_id = response.json()["order_id"]
-
-    lookup = client.get(
-        f"/api/v1/orders/{order_id}",
-        params={"lookup_token": response.json()["guest_lookup_token"]},
-    )
-    assert lookup.status_code == 200
-    assert lookup.json()["id"] == order_id
-
-
-def test_get_order_by_invalid_id_returns_404(client, db):
-    response = client.get(
-        "/api/v1/orders/not-a-uuid",
-        params={"lookup_token": "whatever"},
-    )
-    assert response.status_code == 404

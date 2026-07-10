@@ -42,8 +42,11 @@ services:
       EMAIL_BACKEND: smtp
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
+      UPLOADS_DIR: /app/uploads
     ports:
       - "8001:8001"
+    volumes:
+      - media-uploads:/app/uploads
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -87,3 +90,4 @@ services:
 
 volumes:
   postgres-data:
+  media-uploads:

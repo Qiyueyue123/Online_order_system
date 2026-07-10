@@ -77,6 +77,17 @@ def test_render_order_confirmation_includes_line_items_and_money_formatting(db):
     assert "demonstration store" in body
 
 
+def test_render_order_confirmation_includes_contact_line(db):
+    order = build_order(db)
+    settings = get_settings().model_copy(
+        update={"contact_telegram": "@notqiyue", "contact_whatsapp": "+65 9788 8146"}
+    )
+    body = _render_order_confirmation(order, settings)
+
+    assert "Telegram @notqiyue" in body
+    assert "WhatsApp +65 9788 8146" in body
+
+
 def product_line(order):
     item = order.items[0]
     return f"{item.product_name} ({item.variant_name}) x{item.quantity} @ 32.00 SEK"

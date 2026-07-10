@@ -6,8 +6,9 @@ import { AdminOrders } from "./AdminOrders";
 import { AdminProducts } from "./AdminProducts";
 import { AdminAuditLog } from "./AdminAuditLog";
 import { AdminPickupDays } from "./AdminPickupDays";
+import { AdminNotices } from "./AdminNotices";
 
-type Tab = "orders" | "products" | "pickup" | "audit";
+type Tab = "orders" | "products" | "pickup" | "notices" | "audit";
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>("orders");
@@ -92,6 +93,14 @@ export function AdminPage() {
         </button>
         <button
           role="tab"
+          aria-selected={tab === "notices"}
+          className={tab === "notices" ? "active" : ""}
+          onClick={() => setTab("notices")}
+        >
+          Noticeboard
+        </button>
+        <button
+          role="tab"
           aria-selected={tab === "audit"}
           className={tab === "audit" ? "active" : ""}
           onClick={() => setTab("audit")}
@@ -102,6 +111,7 @@ export function AdminPage() {
       {tab === "orders" && <AdminOrders csrfToken={csrfToken} />}
       {tab === "products" && <AdminProducts csrfToken={csrfToken} />}
       {tab === "pickup" && <AdminPickupDays csrfToken={csrfToken} />}
+      {tab === "notices" && <AdminNotices csrfToken={csrfToken} />}
       {tab === "audit" && <AdminAuditLog />}
     </div>
   );

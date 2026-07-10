@@ -129,6 +129,9 @@ def _render_order_confirmation(order: Order, settings: Settings | None = None) -
     lines += [
         "",
         "This is a demonstration store; no real payment or shipment has taken place.",
+        "",
+        f"Questions or payment issues? Telegram {settings.contact_telegram} or "
+        f"WhatsApp {settings.contact_whatsapp}.",
     ]
     return "\n".join(lines)
 

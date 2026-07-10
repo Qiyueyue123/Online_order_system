@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { api, Session } from "../../api/client";
 import { AdminOrders } from "./AdminOrders";
 import { AdminProducts } from "./AdminProducts";
@@ -10,10 +11,24 @@ type Tab = "orders" | "products" | "pickup" | "audit";
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>("orders");
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const session = useQuery({
     queryKey: ["session"],
     queryFn: () => api<Session>("/auth/session"),
     retry: false,
+  });
+  const logout = useMutation({
+    mutationFn: () =>
+      api<void>("/auth/logout", {
+        method: "POST",
+        headers: { "X-CSRF-Token": session.data?.csrf_token ?? "" },
+      }),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ["session"] });
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+      navigate("/");
+    },
   });
 
   if (session.isLoading) {
@@ -29,11 +44,15 @@ export function AdminPage() {
   // The API is the real gate: every /admin/* endpoint re-checks the
   // session server-side and returns 401 (no session) or 403 (non-admin)
   // regardless of what this component renders.
-  if (!session.data || session.data.user.role !== "admin") {
+  if (!session.data) {
+    return <Navigate to="/signin" replace />;
+  }
+  if (session.data.user.role !== "admin") {
     return (
       <div className="page narrow">
-        <h1>Not authorized</h1>
-        <p>You need an administrator account to view this page.</p>
+        <h1>Nothing to see here</h1>
+        <p>This page is just for the café team — there's nothing here for a customer account.</p>
+        <Link className="button" to="/">Back to the menu</Link>
       </div>
     );
   }
@@ -42,8 +61,10 @@ export function AdminPage() {
 
   return (
     <div className="page admin">
-      <p className="eyebrow">ADMIN</p>
-      <h1>Admin console</h1>
+      <div className="admin-heading">
+        <div><p className="eyebrow">ADMIN</p><h1>Admin console</h1></div>
+        <button className="text-button" onClick={() => logout.mutate()}>Sign out</button>
+      </div>
       <div className="admin-tabs" role="tablist">
         <button
           role="tab"

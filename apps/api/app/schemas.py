@@ -21,6 +21,11 @@ class VariantOut(ApiModel):
 class ImageOut(ApiModel):
     url: str
     alt_text: str
+    media_type: Literal["image", "video"] = "image"
+
+
+class AdminImageOut(ImageOut):
+    id: uuid.UUID
 
 
 class ProductOut(ApiModel):
@@ -36,6 +41,39 @@ class ProductOut(ApiModel):
 
 class ProductPage(BaseModel):
     items: list[ProductOut]
+    page: int
+    page_size: int
+    total: int
+
+
+class AdminVariantOut(VariantOut):
+    active: bool
+    # The public VariantOut only exposes available_stock (on_hand - reserved);
+    # admin needs the true on-hand figure to edit it without silently
+    # shrinking stock out from under active reservations.
+    stock_on_hand: int
+    stock_reserved: int
+
+
+class AdminCatalogProductOut(ApiModel):
+    """Like ProductOut, but includes inactive products/variants and their
+    active flag -- the public ProductOut/VariantOut deliberately hide both, so
+    the admin catalog view needs its own shape to manage a deactivated
+    listing back to active."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    description: str
+    active: bool
+    category: str | None
+    category_slug: str | None
+    variants: list[AdminVariantOut]
+    images: list[AdminImageOut]
+
+
+class AdminCatalogPage(BaseModel):
+    items: list[AdminCatalogProductOut]
     page: int
     page_size: int
     total: int
@@ -72,7 +110,10 @@ class DrinkOptionsIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    matcha_g: Literal[4, 6] = 4
     whisk: Literal["water", "oat"] = "water"
+    base_milk: Literal["cow", "oat"] = "cow"
+    milk_ml: Literal[130, 160] = 130
     sugar_g: Literal[2, 4, 6, 8] = 4
 
 
@@ -83,6 +124,7 @@ class CartItemIn(BaseModel):
 
 
 class CartItemOut(BaseModel):
+    id: uuid.UUID
     variant_id: uuid.UUID
     product_slug: str
     product_name: str
@@ -188,6 +230,7 @@ class AdminImageIn(BaseModel):
     url: str = Field(min_length=1, max_length=1000)
     alt_text: str = Field(default="", max_length=240)
     position: int = Field(default=0, ge=0)
+    media_type: Literal["image", "video"] = "image"
 
 
 class AdminVariantCreateIn(BaseModel):
@@ -216,12 +259,14 @@ class AdminProductUpdateIn(BaseModel):
 class AdminVariantUpdateIn(BaseModel):
     price_cents: int | None = Field(default=None, ge=0)
     stock_on_hand: int | None = Field(default=None, ge=0)
+    active: bool | None = None
     reason: str = Field(min_length=3, max_length=80)
 
 
 class AuditLogOut(BaseModel):
     id: uuid.UUID
     actor_user_id: uuid.UUID
+    actor_name: str
     action: str
     entity_type: str
     entity_id: str

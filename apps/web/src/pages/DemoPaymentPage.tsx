@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { api, formatPickup, money, Order } from "../api/client";
+import { api, formatPickup, humanizeError, money, Order } from "../api/client";
 
 export function DemoPaymentPage() {
   const { orderId = "" } = useParams();
@@ -22,7 +22,7 @@ export function DemoPaymentPage() {
           <button className="button" disabled={payment.isPending} onClick={() => payment.mutate()}>
             {payment.isPending ? "Completing…" : "Complete test payment"}
           </button>
-          {payment.isError && <p role="alert">{payment.error.message}</p>}
+          {payment.isError && <p role="alert">{humanizeError(payment.error)}</p>}
         </>
       ) : (
         <>
@@ -33,7 +33,7 @@ export function DemoPaymentPage() {
             className="button"
             to={`/orders/${orderId}${lookupToken ? `?token=${encodeURIComponent(lookupToken)}` : ""}`}
           >
-            Track your order
+            View your order
           </Link>
           <Link className="button" to="/">Continue shopping</Link>
         </>

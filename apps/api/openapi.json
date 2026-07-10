@@ -479,6 +479,77 @@
         }
       }
     },
+    "/api/v1/cart/items/{item_id}": {
+      "delete": {
+        "summary": "Delete Cart Item",
+        "operationId": "delete_cart_item_api_v1_cart_items__item_id__delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "matcha_cart",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Cart"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/pickup-days": {
       "get": {
         "summary": "Pickup Days",
@@ -734,59 +805,6 @@
         }
       }
     },
-    "/api/v1/orders/track": {
-      "get": {
-        "summary": "Track Order",
-        "description": "Guest order tracking usable from any device: display_number + email, no\nstored token required (the raw checkout lookup_token is never persisted --\nonly its hash is -- so it can't be reconstructed server-side for the email).\n\nTradeoff: display_number + email is guessable by anyone who already knows\nboth, same as most real shops' guest-order-lookup pages. Rate-limited like\nthe auth endpoints to slow down enumeration.",
-        "operationId": "track_order_api_v1_orders_track_get",
-        "parameters": [
-          {
-            "name": "display_number",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 24,
-              "title": "Display Number"
-            }
-          },
-          {
-            "name": "email",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 320,
-              "title": "Email"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/orders/{order_id}": {
       "get": {
         "summary": "Get Order",
@@ -1008,6 +1026,73 @@
       }
     },
     "/api/v1/admin/products": {
+      "get": {
+        "summary": "Admin Products",
+        "operationId": "admin_products_api_v1_admin_products_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 48,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCatalogPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Create Admin Product",
         "operationId": "create_admin_product_api_v1_admin_products_post",
@@ -1143,6 +1228,167 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProductOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/products/{product_id}/images": {
+      "post": {
+        "summary": "Add Admin Product Image",
+        "operationId": "add_admin_product_image_api_v1_admin_products__product_id__images_post",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminImageIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCatalogProductOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/products/{product_id}/images/{image_id}": {
+      "delete": {
+        "summary": "Delete Admin Product Image",
+        "operationId": "delete_admin_product_image_api_v1_admin_products__product_id__images__image_id__delete",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCatalogProductOut"
                 }
               }
             }
@@ -1679,6 +1925,112 @@
         ],
         "title": "AddressIn"
       },
+      "AdminCatalogPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminCatalogProductOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "AdminCatalogPage"
+      },
+      "AdminCatalogProductOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "category_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Slug"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/AdminVariantOut"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/AdminImageOut"
+            },
+            "type": "array",
+            "title": "Images"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "active",
+          "category",
+          "category_slug",
+          "variants",
+          "images"
+        ],
+        "title": "AdminCatalogProductOut",
+        "description": "Like ProductOut, but includes inactive products/variants and their\nactive flag -- the public ProductOut/VariantOut deliberately hide both, so\nthe admin catalog view needs its own shape to manage a deactivated\nlisting back to active."
+      },
       "AdminImageIn": {
         "properties": {
           "url": {
@@ -1698,6 +2050,15 @@
             "minimum": 0.0,
             "title": "Position",
             "default": 0
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ],
+            "title": "Media Type",
+            "default": "image"
           }
         },
         "type": "object",
@@ -1705,6 +2066,39 @@
           "url"
         ],
         "title": "AdminImageIn"
+      },
+      "AdminImageOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "alt_text": {
+            "type": "string",
+            "title": "Alt Text"
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ],
+            "title": "Media Type",
+            "default": "image"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "alt_text",
+          "id"
+        ],
+        "title": "AdminImageOut"
       },
       "AdminOrderOut": {
         "properties": {
@@ -2177,6 +2571,60 @@
         ],
         "title": "AdminVariantCreateIn"
       },
+      "AdminVariantOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "weight_grams": {
+            "type": "integer",
+            "title": "Weight Grams"
+          },
+          "price_cents": {
+            "type": "integer",
+            "title": "Price Cents"
+          },
+          "available_stock": {
+            "type": "integer",
+            "title": "Available Stock"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "stock_on_hand": {
+            "type": "integer",
+            "title": "Stock On Hand"
+          },
+          "stock_reserved": {
+            "type": "integer",
+            "title": "Stock Reserved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "weight_grams",
+          "price_cents",
+          "available_stock",
+          "active",
+          "stock_on_hand",
+          "stock_reserved"
+        ],
+        "title": "AdminVariantOut"
+      },
       "AdminVariantUpdateIn": {
         "properties": {
           "price_cents": {
@@ -2203,6 +2651,17 @@
             ],
             "title": "Stock On Hand"
           },
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
           "reason": {
             "type": "string",
             "maxLength": 80,
@@ -2227,6 +2686,10 @@
             "type": "string",
             "format": "uuid",
             "title": "Actor User Id"
+          },
+          "actor_name": {
+            "type": "string",
+            "title": "Actor Name"
           },
           "action": {
             "type": "string",
@@ -2262,6 +2725,7 @@
         "required": [
           "id",
           "actor_user_id",
+          "actor_name",
           "action",
           "entity_type",
           "entity_id",
@@ -2334,6 +2798,11 @@
       },
       "CartItemOut": {
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
           "variant_id": {
             "type": "string",
             "format": "uuid",
@@ -2382,6 +2851,7 @@
         },
         "type": "object",
         "required": [
+          "id",
           "variant_id",
           "product_slug",
           "product_name",
@@ -2536,6 +3006,15 @@
       },
       "DrinkOptionsIn": {
         "properties": {
+          "matcha_g": {
+            "type": "integer",
+            "enum": [
+              4,
+              6
+            ],
+            "title": "Matcha G",
+            "default": 4
+          },
           "whisk": {
             "type": "string",
             "enum": [
@@ -2544,6 +3023,24 @@
             ],
             "title": "Whisk",
             "default": "water"
+          },
+          "base_milk": {
+            "type": "string",
+            "enum": [
+              "cow",
+              "oat"
+            ],
+            "title": "Base Milk",
+            "default": "cow"
+          },
+          "milk_ml": {
+            "type": "integer",
+            "enum": [
+              130,
+              160
+            ],
+            "title": "Milk Ml",
+            "default": 130
           },
           "sugar_g": {
             "type": "integer",
@@ -2584,6 +3081,15 @@
           "alt_text": {
             "type": "string",
             "title": "Alt Text"
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ],
+            "title": "Media Type",
+            "default": "image"
           }
         },
         "type": "object",

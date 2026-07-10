@@ -1,7 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ApiError, api, Cart, CheckoutIn, CheckoutOut, formatSlotTime, PickupDay } from "../api/client";
+import {
+  ApiError,
+  api,
+  Cart,
+  CheckoutIn,
+  CheckoutOut,
+  formatSlotTime,
+  humanizeError,
+  PickupDay,
+} from "../api/client";
 
 type Fields = {
   email: string;
@@ -233,12 +242,12 @@ export function CheckoutPage() {
 
         <button className="button full" disabled={checkout.isPending || !canSubmit}>
           {checkout.isPending
-            ? "Reserving stock…"
+            ? "Just a moment…"
             : payingAtPickup
               ? "Confirm order — pay at pickup"
               : "Continue to Stripe test checkout"}
         </button>
-        {checkout.isError && !slotConflict && <p role="alert">{checkout.error.message}</p>}
+        {checkout.isError && !slotConflict && <p role="alert">{humanizeError(checkout.error)}</p>}
       </form>
     </div>
   );

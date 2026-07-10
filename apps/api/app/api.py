@@ -34,6 +34,9 @@ from .models import (
     Variant,
 )
 from .schemas import (
+    AdminCatalogPage,
+    AdminCatalogProductOut,
+    AdminImageIn,
     AdminOrderOut,
     AdminOrderPage,
     AdminOrderStatusIn,
@@ -73,16 +76,24 @@ from .security import (
     verify_password,
 )
 from .services.admin import (
+    add_product_image,
     apply_order_transition,
     create_product,
     list_audit_log,
     list_orders_admin,
+    remove_product_image,
     update_product,
     update_variant,
     write_audit,
 )
-from .services.cart import cart_payload, get_or_create_cart, merge_guest_cart, set_item
-from .services.catalog import list_products
+from .services.cart import (
+    cart_payload,
+    get_or_create_cart,
+    merge_guest_cart,
+    remove_item,
+    set_item,
+)
+from .services.catalog import list_products, list_products_admin
 from .services.checkout import create_pending_order, expire_order, mark_order_paid
 from .services.email import send_order_confirmation
 from .services.pickup import available_days, slots_for_day, upcoming_days
@@ -136,6 +147,33 @@ def _product_out(product) -> ProductOut:
             }
             for variant in product.variants
             if variant.active
+        ],
+        images=product.images,
+    )
+
+
+def _admin_product_out(product) -> AdminCatalogProductOut:
+    return AdminCatalogProductOut(
+        id=product.id,
+        slug=product.slug,
+        name=product.name,
+        description=product.description,
+        active=product.active,
+        category=product.category.name if product.category else None,
+        category_slug=product.category.slug if product.category else None,
+        variants=[
+            {
+                "id": variant.id,
+                "sku": variant.sku,
+                "name": variant.name,
+                "weight_grams": variant.weight_grams,
+                "price_cents": variant.price_cents,
+                "available_stock": variant.available_stock,
+                "active": variant.active,
+                "stock_on_hand": variant.stock_on_hand,
+                "stock_reserved": variant.stock_reserved,
+            }
+            for variant in product.variants
         ],
         images=product.images,
     )
@@ -265,6 +303,20 @@ def put_cart_item(
 ):
     cart = _cart(response, db, cart_token, login_session)
     set_item(db, cart, data.variant_id, data.quantity, data.options)
+    db.refresh(cart)
+    return cart_payload(cart)
+
+
+@router.delete("/cart/items/{item_id}", response_model=CartOut)
+def delete_cart_item(
+    item_id: str,
+    response: Response,
+    cart_token: str | None = Cookie(default=None, alias=CART_COOKIE),
+    login_session: LoginSession | None = Depends(optional_session),
+    db: Session = Depends(get_db),
+):
+    cart = _cart(response, db, cart_token, login_session)
+    remove_item(db, cart, _parse_uuid_or_404(item_id, "Cart item not found"))
     db.refresh(cart)
     return cart_payload(cart)
 
@@ -442,39 +494,6 @@ def complete_demo_payment(
     return order
 
 
-TRACK_RATE_LIMIT = 10
-TRACK_RATE_WINDOW_SECONDS = 3600
-
-
-@router.get("/orders/track", response_model=OrderOut)
-def track_order(
-    request: Request,
-    display_number: str = Query(..., min_length=1, max_length=24),
-    email: str = Query(..., min_length=1, max_length=320),
-    db: Session = Depends(get_db),
-):
-    """Guest order tracking usable from any device: display_number + email, no
-    stored token required (the raw checkout lookup_token is never persisted --
-    only its hash is -- so it can't be reconstructed server-side for the email).
-
-    Tradeoff: display_number + email is guessable by anyone who already knows
-    both, same as most real shops' guest-order-lookup pages. Rate-limited like
-    the auth endpoints to slow down enumeration.
-    """
-    ip = request.client.host if request.client else "unknown"
-    if not check_rate_limit(db, f"track:{ip}", TRACK_RATE_LIMIT, TRACK_RATE_WINDOW_SECONDS):
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Try again later")
-    order = db.scalar(
-        select(Order).where(
-            Order.display_number == display_number,
-            Order.email == email.lower(),
-        )
-    )
-    if not order:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
-    return order
-
-
 @router.get("/orders/{order_id}", response_model=OrderOut)
 def get_order(
     order_id: str,
@@ -540,7 +559,7 @@ def patch_variant(
     session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
 ):
-    if data.price_cents is None and data.stock_on_hand is None:
+    if data.price_cents is None and data.stock_on_hand is None and data.active is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to update")
     variant = db.get(Variant, _parse_uuid_or_404(variant_id, "Variant not found"))
     if not variant:
@@ -550,6 +569,7 @@ def patch_variant(
         variant,
         price_cents=data.price_cents,
         stock_on_hand=data.stock_on_hand,
+        active=data.active,
         reason=data.reason,
     )
     write_audit(
@@ -561,6 +581,22 @@ def patch_variant(
         detail=changes or None,
     )
     db.commit()
+
+
+@router.get("/admin/products", response_model=AdminCatalogPage)
+def admin_products(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=48, ge=1, le=100),
+    _: LoginSession = Depends(admin_session),
+    db: Session = Depends(get_db),
+):
+    rows, total = list_products_admin(db, page=page, page_size=page_size)
+    return AdminCatalogPage(
+        items=[_admin_product_out(row) for row in rows],
+        page=page,
+        page_size=page_size,
+        total=total,
+    )
 
 
 @router.post("/admin/products", response_model=ProductOut, status_code=201)
@@ -609,6 +645,60 @@ def patch_admin_product(
     db.commit()
     db.refresh(product)
     return _product_out(product)
+
+
+@router.post(
+    "/admin/products/{product_id}/images", response_model=AdminCatalogProductOut, status_code=201
+)
+def add_admin_product_image(
+    product_id: str,
+    data: AdminImageIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    image = add_product_image(db, product, data)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_image_added",
+        entity_type="product",
+        entity_id=product.id,
+        detail={"image_id": str(image.id), "url": data.url, "media_type": data.media_type},
+    )
+    db.commit()
+    db.refresh(product)
+    return _admin_product_out(product)
+
+
+@router.delete(
+    "/admin/products/{product_id}/images/{image_id}", response_model=AdminCatalogProductOut
+)
+def delete_admin_product_image(
+    product_id: str,
+    image_id: str,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    remove_product_image(
+        db, product.id, _parse_uuid_or_404(image_id, "Image not found")
+    )
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_image_removed",
+        entity_type="product",
+        entity_id=product.id,
+        detail={"image_id": image_id},
+    )
+    db.commit()
+    db.refresh(product)
+    return _admin_product_out(product)
 
 
 @router.get("/admin/orders", response_model=AdminOrderPage)
@@ -766,13 +856,14 @@ def admin_audit_log(
             AuditLogOut(
                 id=row.id,
                 actor_user_id=row.actor_user_id,
+                actor_name=actor_name,
                 action=row.action,
                 entity_type=row.entity_type,
                 entity_id=row.entity_id,
                 detail=json.loads(row.detail) if row.detail else None,
                 created_at=row.created_at,
             )
-            for row in rows
+            for row, actor_name in rows
         ],
         page=page,
         page_size=page_size,

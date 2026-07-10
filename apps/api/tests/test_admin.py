@@ -75,6 +75,18 @@ ADMIN_ROUTES = [
         {"stock_on_hand": 1, "reason": "test adjustment"},
     ),
     ("GET", "/api/v1/admin/audit-log", None),
+    ("GET", "/api/v1/admin/products", None),
+    (
+        "POST",
+        "/api/v1/admin/products/00000000-0000-0000-0000-000000000000/images",
+        {"url": "https://example.com/photo.jpg"},
+    ),
+    (
+        "DELETE",
+        "/api/v1/admin/products/00000000-0000-0000-0000-000000000000/images/"
+        "00000000-0000-0000-0000-000000000000",
+        None,
+    ),
 ]
 
 
@@ -113,6 +125,42 @@ def test_admin_create_product_rejects_duplicate_slug(client, db):
     assert second.status_code == 409
 
 
+def test_admin_products_list_includes_deactivated_listings(client, db):
+    """The public /products endpoint hides inactive products/variants (by
+    design), so admin needs its own listing or a deactivated product becomes
+    permanently invisible -- including to the admin who deactivated it."""
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    variant = product.variants[0]
+
+    active_only = client.get("/api/v1/admin/products", headers=headers).json()
+    assert any(item["slug"] == product.slug for item in active_only["items"])
+
+    client.patch(
+        f"/api/v1/admin/products/{product.id}",
+        json={"active": False},
+        headers=headers,
+    )
+    client.patch(
+        f"/api/v1/admin/variants/{variant.id}",
+        json={"active": False, "reason": "discontinued"},
+        headers=headers,
+    )
+
+    public_list = client.get("/api/v1/products").json()
+    assert not any(item["slug"] == product.slug for item in public_list["items"])
+
+    admin_list = client.get("/api/v1/admin/products", headers=headers).json()
+    entry = next(item for item in admin_list["items"] if item["slug"] == product.slug)
+    assert entry["active"] is False
+    assert entry["variants"][0]["active"] is False
+
+
+def test_admin_products_list_requires_admin_role(client):
+    response = client.get("/api/v1/admin/products")
+    assert response.status_code == 401
+
+
 def test_admin_can_update_product(client, db):
     headers = admin_headers(client, db)
     product = add_product(db)
@@ -147,6 +195,85 @@ def test_admin_can_update_variant_price_and_stock(client, db):
     admin = db.query(User).filter_by(email="admin@example.com").one()
     log = db.query(AdminAuditLog).filter_by(action="variant_updated").one()
     assert log.actor_user_id == admin.id
+
+
+def test_admin_can_deactivate_and_reactivate_a_variant(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    variant = product.variants[0]
+    response = client.patch(
+        f"/api/v1/admin/variants/{variant.id}",
+        json={"active": False, "reason": "discontinuing this listing"},
+        headers=headers,
+    )
+    assert response.status_code == 204
+    db.refresh(variant)
+    assert variant.active is False
+
+    response = client.patch(
+        f"/api/v1/admin/variants/{variant.id}",
+        json={"active": True, "reason": "back in stock"},
+        headers=headers,
+    )
+    assert response.status_code == 204
+    db.refresh(variant)
+    assert variant.active is True
+
+
+def test_admin_can_add_and_remove_a_product_image(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+
+    added = client.post(
+        f"/api/v1/admin/products/{product.id}/images",
+        json={"url": "https://example.com/photo.jpg", "alt_text": "A jar of matcha", "position": 0},
+        headers=headers,
+    )
+    assert added.status_code == 201
+    body = added.json()
+    assert len(body["images"]) == 1
+    image = body["images"][0]
+    assert image["url"] == "https://example.com/photo.jpg"
+    assert image["media_type"] == "image"
+
+    log = db.query(AdminAuditLog).filter_by(action="product_image_added").one()
+    assert log.entity_id == str(product.id)
+
+    removed = client.delete(
+        f"/api/v1/admin/products/{product.id}/images/{image['id']}",
+        headers=headers,
+    )
+    assert removed.status_code == 200
+    assert removed.json()["images"] == []
+
+    db.query(AdminAuditLog).filter_by(action="product_image_removed").one()
+
+
+def test_admin_can_add_a_video(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+
+    response = client.post(
+        f"/api/v1/admin/products/{product.id}/images",
+        json={
+            "url": "https://example.com/clip.mp4",
+            "alt_text": "Pouring the drink",
+            "media_type": "video",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["images"][0]["media_type"] == "video"
+
+
+def test_admin_remove_unknown_image_is_404(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    response = client.delete(
+        f"/api/v1/admin/products/{product.id}/images/00000000-0000-0000-0000-000000000000",
+        headers=headers,
+    )
+    assert response.status_code == 404
 
 
 def test_admin_variant_update_rejects_stock_below_reservations(client, db):
@@ -326,3 +453,4 @@ def test_audit_log_is_paginated_newest_first(client, db):
     assert body["total"] == 2
     assert body["items"][0]["detail"]["name"]["to"] == "Second rename"
     assert body["items"][1]["detail"]["name"]["to"] == "First rename"
+    assert body["items"][0]["actor_name"] == "Admin"

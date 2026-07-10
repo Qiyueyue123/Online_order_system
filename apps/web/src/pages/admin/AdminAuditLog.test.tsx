@@ -15,6 +15,7 @@ const auditLogPage: AuditLogPage = {
     {
       id: "log-2",
       actor_user_id: "admin-1",
+      actor_name: "Administrator",
       action: "order.status_changed",
       entity_type: "order",
       entity_id: "order-1",
@@ -24,6 +25,7 @@ const auditLogPage: AuditLogPage = {
     {
       id: "log-1",
       actor_user_id: "admin-1",
+      actor_name: "Administrator",
       action: "variant.updated",
       entity_type: "variant",
       entity_id: "variant-1",
@@ -51,6 +53,8 @@ describe("AdminAuditLog", () => {
 
     expect(await screen.findByText("order.status_changed")).toBeInTheDocument();
     expect(screen.getByText("variant.updated")).toBeInTheDocument();
+    expect(screen.getAllByText("Administrator").length).toBeGreaterThan(0);
+    expect(screen.queryByText("admin-1")).not.toBeInTheDocument();
     const rows = screen.getAllByRole("row");
     // header row + 2 data rows, newest (order.status_changed) first
     expect(rows[1]).toHaveTextContent("order.status_changed");

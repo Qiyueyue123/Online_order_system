@@ -54,6 +54,22 @@ describe("AdminOrders", () => {
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
+  it("shows fulfil and cancel actions for a confirmed (pay-at-pickup) order", async () => {
+    const confirmedOrder = { ...ordersPage.items[0], status: "confirmed", payment_method: "pay_at_pickup" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ...ordersPage, items: [confirmedOrder] }), { status: 200 }),
+      ),
+    );
+
+    renderWithProviders(<AdminOrders csrfToken="csrf-token-1" />);
+
+    expect(await screen.findByText("MO-1001")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark fulfilled" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
   it("calls PATCH with the CSRF header when a valid transition button is clicked", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -85,6 +101,47 @@ describe("AdminOrders", () => {
     );
     const patchCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
     expect(JSON.parse(patchCall![1]!.body as string)).toEqual({ status: "fulfilled" });
+  });
+
+  it("does not cancel/refund when the confirm prompt is dismissed", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(ordersPage), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderWithProviders(<AdminOrders csrfToken="csrf-token-1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Refund" }));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("MO-1001"));
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
+  });
+
+  it("cancels/refunds once the confirm prompt is accepted", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ...ordersPage.items[0], status: "refunded" }), { status: 200 }),
+        );
+      }
+      if (url.includes("/admin/orders")) {
+        return Promise.resolve(new Response(JSON.stringify(ordersPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderWithProviders(<AdminOrders csrfToken="csrf-token-1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Refund" }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/orders/order-1",
+        expect.objectContaining({ method: "PATCH" }),
+      ),
+    );
   });
 
   it("shows the API error detail when a transition fails", async () => {

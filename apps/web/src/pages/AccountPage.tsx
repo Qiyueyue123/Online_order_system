@@ -33,11 +33,18 @@ export function AccountPage() {
     <div className="page narrow account">
       <div className="account-heading">
         <div><p className="eyebrow">ACCOUNT</p><h1>Hello, {session.data.user.name}.</h1></div>
-        <button className="text-button" onClick={() => logout.mutate()}>Sign out</button>
+        <button className="text-button" disabled={logout.isPending} onClick={() => logout.mutate()}>
+          {logout.isPending ? "Signing out…" : "Sign out"}
+        </button>
       </div>
       <h2>Your orders</h2>
       {orders.isLoading && <p role="status">Loading orders…</p>}
-      {orders.data?.length === 0 && <p>You have no account orders yet.</p>}
+      {orders.data?.length === 0 && (
+        <div className="empty">
+          <p>You haven&rsquo;t ordered with us yet — your first cup is one click away.</p>
+          <Link className="button" to="/">Browse the menu</Link>
+        </div>
+      )}
       {orders.data?.map((order) => (
         <article className="order-card" key={order.id}>
           <div>

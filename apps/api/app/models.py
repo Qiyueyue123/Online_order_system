@@ -124,6 +124,9 @@ class ProductImage(Base):
     url: Mapped[str] = mapped_column(String(1000))
     alt_text: Mapped[str] = mapped_column(String(240))
     position: Mapped[int] = mapped_column(Integer, default=0)
+    # "image" or "video" -- lets the product gallery render a <video> instead
+    # of an <img> for the same slot (e.g. a short clip of the drink being made).
+    media_type: Mapped[str] = mapped_column(String(10), default="image", server_default="image")
 
 
 class Variant(TimestampMixin, Base):
@@ -183,7 +186,8 @@ class CartItem(Base):
     # SQLite/Postgres portability), canonicalised with sort_keys so two lines with
     # the same options always compare equal as strings. NULL means "no options
     # chosen" (non-drink items). A drink's normalised shape is
-    # {"whisk": "water"|"oat", "sugar_g": 2|4|6|8}.
+    # {"matcha_g": 4|6, "whisk": "water"|"oat", "base_milk": "cow"|"oat",
+    # "milk_ml": 130|160, "sugar_g": 2|4|6|8}.
     options: Mapped[str | None] = mapped_column(Text)
     variant: Mapped[Variant] = relationship(lazy="joined")
 

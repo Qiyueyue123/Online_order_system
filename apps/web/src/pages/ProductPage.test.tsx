@@ -65,16 +65,37 @@ describe("ProductPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders whisk and sugar option chips for a drink and defaults to water / 4 g", async () => {
+  it("renders drink option chips, defaults to the standard recipe, and hides the redundant single-variant picker", async () => {
     stubFetch(drink);
     renderWithProviders(<ProductPage />, ["/products/ajisai-latte"]);
 
     expect(await screen.findByText("Ajisai 2.0 Matcha Latte")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText(/Served iced/)).toBeInTheDocument();
+
+    const matchaGroup = screen.getByRole("group", { name: "Matcha amount" });
+    expect(within(matchaGroup).getByRole("button", { name: /4 g \(standard\)/ })).toHaveClass("active");
     const whiskGroup = screen.getByRole("group", { name: "Whisked with" });
     expect(within(whiskGroup).getByRole("button", { name: /Water \(standard\)/ })).toHaveClass("active");
+    const milkGroup = screen.getByRole("group", { name: "Base milk" });
+    expect(within(milkGroup).getByRole("button", { name: /Cow.s milk \(standard\)/ })).toHaveClass("active");
+    const milkVolumeGroup = screen.getByRole("group", { name: "Milk amount" });
+    expect(within(milkVolumeGroup).getByRole("button", { name: /130 ml \(standard\)/ })).toHaveClass("active");
     const sugarGroup = screen.getByRole("group", { name: "Sugar" });
     expect(within(sugarGroup).getByRole("button", { name: /4 g \(standard\)/ })).toHaveClass("active");
-    expect(screen.getByText(/Every latte: 4 g Ajisai 2.0/)).toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: /Add to bag — 40,00\s*kr/ })).toBeInTheDocument();
+  });
+
+  it("reflects the 6 g matcha upgrade surcharge in the add-to-bag price", async () => {
+    stubFetch(drink);
+    renderWithProviders(<ProductPage />, ["/products/ajisai-latte"]);
+
+    await screen.findByText("Ajisai 2.0 Matcha Latte");
+    const matchaGroup = screen.getByRole("group", { name: "Matcha amount" });
+    fireEvent.click(within(matchaGroup).getByRole("button", { name: /6 g/ }));
+
+    expect(screen.getByRole("button", { name: /Add to bag — 55,00\s*kr/ })).toBeInTheDocument();
   });
 
   it("sends the chosen drink options in the add-to-bag PUT body", async () => {
@@ -84,9 +105,13 @@ describe("ProductPage", () => {
     await screen.findByText("Ajisai 2.0 Matcha Latte");
     const whiskGroup = screen.getByRole("group", { name: "Whisked with" });
     fireEvent.click(within(whiskGroup).getByRole("button", { name: /Oat milk/ }));
+    const milkGroup = screen.getByRole("group", { name: "Base milk" });
+    fireEvent.click(within(milkGroup).getByRole("button", { name: "Oat milk" }));
+    const milkVolumeGroup = screen.getByRole("group", { name: "Milk amount" });
+    fireEvent.click(within(milkVolumeGroup).getByRole("button", { name: /160 ml/ }));
     const sugarGroup = screen.getByRole("group", { name: "Sugar" });
     fireEvent.click(within(sugarGroup).getByRole("button", { name: "6 g" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+    fireEvent.click(screen.getByRole("button", { name: /Add to bag/ }));
 
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -99,7 +124,7 @@ describe("ProductPage", () => {
     expect(body).toEqual({
       variant_id: "var-iced",
       quantity: 1,
-      options: { whisk: "oat", sugar_g: 6 },
+      options: { matcha_g: 4, whisk: "oat", base_milk: "oat", milk_ml: 160, sugar_g: 6 },
     });
   });
 
@@ -110,8 +135,9 @@ describe("ProductPage", () => {
     await screen.findByText("Ceremonial Matcha");
     expect(screen.queryByRole("group", { name: "Whisked with" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Sugar" })).not.toBeInTheDocument();
+    expect(screen.getByText(/30g tin/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+    fireEvent.click(screen.getByRole("button", { name: /Add to bag/ }));
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/v1/cart/items",

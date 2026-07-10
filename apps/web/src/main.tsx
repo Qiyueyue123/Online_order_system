@@ -12,7 +12,6 @@ import { DemoPaymentPage } from "./pages/DemoPaymentPage";
 import { OrderStatusPage } from "./pages/OrderStatusPage";
 import { ProductPage } from "./pages/ProductPage";
 import { StorePage } from "./pages/StorePage";
-import { TrackOrderPage } from "./pages/TrackOrderPage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import "./styles.css";
 
@@ -32,7 +31,6 @@ const router = createBrowserRouter([
       { path: "/account", element: <AccountPage /> },
       { path: "/demo-payment/:orderId", element: <DemoPaymentPage /> },
       { path: "/orders/:id", element: <OrderStatusPage /> },
-      { path: "/track", element: <TrackOrderPage /> },
       { path: "/admin", element: <AdminPage /> },
     ],
   },

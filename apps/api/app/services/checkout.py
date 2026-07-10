@@ -1,9 +1,10 @@
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, lazyload
 
 from ..config import Settings
 from ..models import (
@@ -20,13 +21,34 @@ from ..models import (
 )
 from ..schemas import CheckoutIn
 from ..security import token_hash
-from .cart import classify_cart
+from .cart import classify_cart, option_surcharge_cents
 from .pickup import validate_and_lock_slot
 
 # Domestic pickup-origin shipping is free; everywhere else pays one flat
 # international rate (no carrier integration yet).
 SHIPPING_RATES = {"SE": 0}
 INTERNATIONAL_FLAT_RATE_CENTS = 79_00
+
+
+def _lock_variants(db: Session, variant_ids: list[uuid.UUID]) -> dict[uuid.UUID, Variant]:
+    """Row-lock every variant in variant_ids and return them keyed by id.
+
+    Variant.product (and Product.category) are lazy="joined" by default, which
+    turns a plain SELECT into a LEFT OUTER JOIN. Postgres rejects FOR UPDATE on
+    the nullable side of an outer join ("FOR UPDATE cannot be applied to the
+    nullable side of an outer join"), so the eager load must be switched off
+    for this query specifically -- we only need the Variant columns to lock
+    and mutate stock, not the joined product/category.
+    """
+    return {
+        variant.id: variant
+        for variant in db.scalars(
+            select(Variant)
+            .where(Variant.id.in_(variant_ids))
+            .options(lazyload(Variant.product))
+            .with_for_update()
+        ).all()
+    }
 
 
 def create_pending_order(
@@ -65,18 +87,17 @@ def create_pending_order(
             )
 
     variant_ids = [item.variant_id for item in cart.items]
-    variants = {
-        variant.id: variant
-        for variant in db.scalars(
-            select(Variant).where(Variant.id.in_(variant_ids)).with_for_update()
-        ).all()
-    }
+    variants = _lock_variants(db, variant_ids)
     subtotal = 0
     for item in cart.items:
         variant = variants[item.variant_id]
         if not variant.active or item.quantity > variant.available_stock:
-            raise HTTPException(status.HTTP_409_CONFLICT, f"{variant.sku} is unavailable")
-        subtotal += variant.price_cents * item.quantity
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"{variant.product.name} ({variant.name}) just sold out — "
+                "remove it from your bag and try another option.",
+            )
+        subtotal += (variant.price_cents + option_surcharge_cents(item.options)) * item.quantity
 
     discount = 0
     if data.coupon_code:
@@ -138,7 +159,7 @@ def create_pending_order(
                 product_name=variant.product.name,
                 variant_name=variant.name,
                 sku=variant.sku,
-                unit_price_cents=variant.price_cents,
+                unit_price_cents=variant.price_cents + option_surcharge_cents(cart_item.options),
                 quantity=cart_item.quantity,
                 options=cart_item.options,
             )
@@ -188,12 +209,7 @@ def _adjust_stock(
     instead of one `db.get` per item.
     """
     variant_ids = [item.variant_id for item in order.items]
-    variants = {
-        variant.id: variant
-        for variant in db.scalars(
-            select(Variant).where(Variant.id.in_(variant_ids)).with_for_update()
-        ).all()
-    }
+    variants = _lock_variants(db, variant_ids)
     for item in order.items:
         variant = variants[item.variant_id]
         on_hand_delta = on_hand_delta_sign * item.quantity

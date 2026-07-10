@@ -140,6 +140,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cart/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Cart Item */
+        delete: operations["delete_cart_item_api_v1_cart_items__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pickup-days": {
         parameters: {
             query?: never;
@@ -228,32 +245,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/orders/track": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Track Order
-         * @description Guest order tracking usable from any device: display_number + email, no
-         *     stored token required (the raw checkout lookup_token is never persisted --
-         *     only its hash is -- so it can't be reconstructed server-side for the email).
-         *
-         *     Tradeoff: display_number + email is guessable by anyone who already knows
-         *     both, same as most real shops' guest-order-lookup pages. Rate-limited like
-         *     the auth endpoints to slow down enumeration.
-         */
-        get: operations["track_order_api_v1_orders_track_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/orders/{order_id}": {
         parameters: {
             query?: never;
@@ -319,7 +310,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Admin Products */
+        get: operations["admin_products_api_v1_admin_products_get"];
         put?: never;
         /** Create Admin Product */
         post: operations["create_admin_product_api_v1_admin_products_post"];
@@ -344,6 +336,40 @@ export interface paths {
         head?: never;
         /** Patch Admin Product */
         patch: operations["patch_admin_product_api_v1_admin_products__product_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/products/{product_id}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Admin Product Image */
+        post: operations["add_admin_product_image_api_v1_admin_products__product_id__images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/products/{product_id}/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Admin Product Image */
+        delete: operations["delete_admin_product_image_api_v1_admin_products__product_id__images__image_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/orders": {
@@ -468,6 +494,47 @@ export interface components {
             /** Country Code */
             country_code: string;
         };
+        /** AdminCatalogPage */
+        AdminCatalogPage: {
+            /** Items */
+            items: components["schemas"]["AdminCatalogProductOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /**
+         * AdminCatalogProductOut
+         * @description Like ProductOut, but includes inactive products/variants and their
+         *     active flag -- the public ProductOut/VariantOut deliberately hide both, so
+         *     the admin catalog view needs its own shape to manage a deactivated
+         *     listing back to active.
+         */
+        AdminCatalogProductOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Active */
+            active: boolean;
+            /** Category */
+            category: string | null;
+            /** Category Slug */
+            category_slug: string | null;
+            /** Variants */
+            variants: components["schemas"]["AdminVariantOut"][];
+            /** Images */
+            images: components["schemas"]["AdminImageOut"][];
+        };
         /** AdminImageIn */
         AdminImageIn: {
             /** Url */
@@ -482,6 +549,30 @@ export interface components {
              * @default 0
              */
             position: number;
+            /**
+             * Media Type
+             * @default image
+             * @enum {string}
+             */
+            media_type: "image" | "video";
+        };
+        /** AdminImageOut */
+        AdminImageOut: {
+            /** Url */
+            url: string;
+            /** Alt Text */
+            alt_text: string;
+            /**
+             * Media Type
+             * @default image
+             * @enum {string}
+             */
+            media_type: "image" | "video";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
         };
         /** AdminOrderOut */
         AdminOrderOut: {
@@ -658,12 +749,38 @@ export interface components {
              */
             stock_on_hand: number;
         };
+        /** AdminVariantOut */
+        AdminVariantOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sku */
+            sku: string;
+            /** Name */
+            name: string;
+            /** Weight Grams */
+            weight_grams: number;
+            /** Price Cents */
+            price_cents: number;
+            /** Available Stock */
+            available_stock: number;
+            /** Active */
+            active: boolean;
+            /** Stock On Hand */
+            stock_on_hand: number;
+            /** Stock Reserved */
+            stock_reserved: number;
+        };
         /** AdminVariantUpdateIn */
         AdminVariantUpdateIn: {
             /** Price Cents */
             price_cents?: number | null;
             /** Stock On Hand */
             stock_on_hand?: number | null;
+            /** Active */
+            active?: boolean | null;
             /** Reason */
             reason: string;
         };
@@ -679,6 +796,8 @@ export interface components {
              * Format: uuid
              */
             actor_user_id: string;
+            /** Actor Name */
+            actor_name: string;
             /** Action */
             action: string;
             /** Entity Type */
@@ -719,6 +838,11 @@ export interface components {
         };
         /** CartItemOut */
         CartItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
             /**
              * Variant Id
              * Format: uuid
@@ -808,11 +932,29 @@ export interface components {
          */
         DrinkOptionsIn: {
             /**
+             * Matcha G
+             * @default 4
+             * @enum {integer}
+             */
+            matcha_g: 4 | 6;
+            /**
              * Whisk
              * @default water
              * @enum {string}
              */
             whisk: "water" | "oat";
+            /**
+             * Base Milk
+             * @default cow
+             * @enum {string}
+             */
+            base_milk: "cow" | "oat";
+            /**
+             * Milk Ml
+             * @default 130
+             * @enum {integer}
+             */
+            milk_ml: 130 | 160;
             /**
              * Sugar G
              * @default 4
@@ -831,6 +973,12 @@ export interface components {
             url: string;
             /** Alt Text */
             alt_text: string;
+            /**
+             * Media Type
+             * @default image
+             * @enum {string}
+             */
+            media_type: "image" | "video";
         };
         /** LoginIn */
         LoginIn: {
@@ -1283,6 +1431,40 @@ export interface operations {
             };
         };
     };
+    delete_cart_item_api_v1_cart_items__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: {
+                matcha_cart?: string | null;
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pickup_days_api_v1_pickup_days_get: {
         parameters: {
             query?: never;
@@ -1434,38 +1616,6 @@ export interface operations {
             };
         };
     };
-    track_order_api_v1_orders_track_get: {
-        parameters: {
-            query: {
-                display_number: string;
-                email: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrderOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_order_api_v1_orders__order_id__get: {
         parameters: {
             query?: {
@@ -1575,6 +1725,40 @@ export interface operations {
             };
         };
     };
+    admin_products_api_v1_admin_products_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCatalogPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_admin_product_api_v1_admin_products_post: {
         parameters: {
             query?: never;
@@ -1638,6 +1822,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_admin_product_image_api_v1_admin_products__product_id__images_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminImageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCatalogProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_admin_product_image_api_v1_admin_products__product_id__images__image_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                product_id: string;
+                image_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCatalogProductOut"];
                 };
             };
             /** @description Validation Error */

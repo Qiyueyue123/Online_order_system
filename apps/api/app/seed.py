@@ -63,10 +63,10 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
                 slug="ajisai-latte",
                 name="Ajisai 2.0 Matcha Latte",
                 description=(
-                    "The one drink on the menu: a standard 4 g of Niko Neko "
-                    "Ajisai 2.0, whisked and poured over cow's milk. Choose Iced "
-                    "or Hot, and customise the whisk liquid and sugar at "
-                    "checkout."
+                    "The one drink on the menu, served iced: a standard 4 g of "
+                    "Niko Neko Ajisai 2.0, whisked and poured over cow's milk. "
+                    "Customise the matcha strength, whisk liquid, base milk, "
+                    "and sugar at checkout."
                 ),
                 variants=[
                     Variant(
@@ -76,30 +76,30 @@ def _catalog(drinks: Category, matcha: Category) -> list[tuple[str, Callable[[],
                         price_cents=4000,
                         stock_on_hand=30,
                     ),
-                    Variant(
-                        sku="AJISAI-LATTE-HOT",
-                        name="Hot",
-                        weight_grams=300,
-                        price_cents=4000,
-                        stock_on_hand=30,
-                    ),
                 ],
                 images=[
                     ProductImage(
-                        url="/media/sayaka-latte-real-1.webp",
-                        alt_text="Ajisai 2.0 Matcha Latte",
+                        url="/media/ajisai-05-1.jpg",
+                        alt_text="Niko Neko's Ajisai 2.0 matcha syrup measured for a latte",
+                        position=0,
                     ),
                     ProductImage(
-                        url="/media/sayaka-latte-real-2.png",
-                        alt_text="Ajisai 2.0 Matcha Latte top view",
+                        url="/media/ajisai-06-1.jpg",
+                        alt_text=(
+                            "A bamboo whisk drizzling freshly whisked Ajisai 2.0 matcha "
+                            "into a mixing cup"
+                        ),
+                        position=1,
                     ),
                     ProductImage(
-                        url="/media/ikuyo-latte-real-1.webp",
-                        alt_text="Ajisai 2.0 Matcha Latte close-up",
+                        url="/media/ajisai-07-1.jpg",
+                        alt_text="A barista pouring whisked Ajisai 2.0 matcha over milk and ice",
+                        position=2,
                     ),
                     ProductImage(
-                        url="/media/ikuyo-latte-real-2.png",
-                        alt_text="Ajisai 2.0 Matcha Latte, second angle",
+                        url="/media/ajisai-08-1.jpg",
+                        alt_text="Ajisai 2.0 matcha being poured over milk and ice",
+                        position=3,
                     ),
                 ],
             ),

@@ -77,7 +77,7 @@ describe("AdminPickupDays", () => {
     });
   });
 
-  it("toggles availability with the X-CSRF-Token header", async () => {
+  it("toggles availability with the X-CSRF-Token header once confirmed", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (init?.method === "PATCH") {
@@ -89,6 +89,7 @@ describe("AdminPickupDays", () => {
       throw new Error(`Unexpected fetch to ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderWithProviders(<AdminPickupDays csrfToken="csrf-token-1" />);
     await screen.findByText("2026-07-09");
@@ -106,5 +107,19 @@ describe("AdminPickupDays", () => {
     );
     const patchCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
     expect(JSON.parse(patchCall![1]!.body as string)).toEqual({ is_available: false });
+  });
+
+  it("does not disable a pickup day when the confirm prompt is dismissed", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(days), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderWithProviders(<AdminPickupDays csrfToken="csrf-token-1" />);
+    await screen.findByText("2026-07-09");
+
+    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
   });
 });

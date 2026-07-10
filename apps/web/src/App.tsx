@@ -21,10 +21,13 @@ export function App() {
           <Link to="/">Drinks</Link>
           <Link to="/store">Store</Link>
           <Link to="/#story">Our story</Link>
-          <Link to={session ? "/account" : "/signin"}>
-            {session ? session.user.name : "Sign in"}
-          </Link>
-          {session?.user.role === "admin" && <Link to="/admin">Admin</Link>}
+          {session?.user.role === "admin" ? (
+            <Link to="/admin">Admin</Link>
+          ) : (
+            <Link to={session ? "/account" : "/signin"}>
+              {session ? session.user.name : "Sign in"}
+            </Link>
+          )}
           <Link className="cart-link" to="/cart">
             Bag <span aria-label={`${itemCount} items`}>{itemCount}</span>
           </Link>
@@ -54,8 +57,11 @@ export function App() {
         <div className="footer-col">
           <h4>Account</h4>
           <ul>
-            <li><Link to={session ? "/account" : "/signin"}>{session ? "Your account" : "Sign in"}</Link></li>
-            <li><Link to="/track">Track order</Link></li>
+            {session?.user.role === "admin" ? (
+              <li><Link to="/admin">Admin console</Link></li>
+            ) : (
+              <li><Link to={session ? "/account" : "/signin"}>{session ? "Your account" : "Sign in"}</Link></li>
+            )}
           </ul>
         </div>
         <p className="footer-disclaimer">Taxes, import duties and currency conversion are outside this demonstration. Payments run through Stripe test mode; no real charge is ever made.</p>

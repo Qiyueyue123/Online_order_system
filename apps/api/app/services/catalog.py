@@ -23,3 +23,19 @@ def list_products(
         .limit(page_size)
     ).all()
     return list(products), total
+
+
+def list_products_admin(db: Session, *, page: int, page_size: int) -> tuple[list[Product], int]:
+    """Every product regardless of active status, with every variant
+    regardless of active status -- unlike list_products, which is scoped to
+    what a shopper should see. Admin needs the full picture to reactivate a
+    deactivated listing."""
+    total = db.scalar(select(func.count(Product.id))) or 0
+    products = db.scalars(
+        select(Product)
+        .options(selectinload(Product.variants), selectinload(Product.images))
+        .order_by(Product.name)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return list(products), total

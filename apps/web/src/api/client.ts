@@ -5,6 +5,7 @@ import type { components } from "./schema";
 // the frontend can't silently drift from the API contract.
 export type Variant = components["schemas"]["VariantOut"];
 export type Product = components["schemas"]["ProductOut"];
+export type ProductImage = components["schemas"]["ImageOut"];
 export type ProductPage = components["schemas"]["ProductPage"];
 export type CartItem = components["schemas"]["CartItemOut"];
 export type CartItemIn = components["schemas"]["CartItemIn"];
@@ -21,6 +22,11 @@ export type AdminProductIn = components["schemas"]["AdminProductIn"];
 export type AdminProductUpdateIn = components["schemas"]["AdminProductUpdateIn"];
 export type AdminVariantCreateIn = components["schemas"]["AdminVariantCreateIn"];
 export type AdminVariantUpdateIn = components["schemas"]["AdminVariantUpdateIn"];
+export type AdminVariant = components["schemas"]["AdminVariantOut"];
+export type AdminCatalogProduct = components["schemas"]["AdminCatalogProductOut"];
+export type AdminCatalogPage = components["schemas"]["AdminCatalogPage"];
+export type AdminImage = components["schemas"]["AdminImageOut"];
+export type AdminImageIn = components["schemas"]["AdminImageIn"];
 export type AuditLogEntry = components["schemas"]["AuditLogOut"];
 export type AuditLogPage = components["schemas"]["AuditLogPage"];
 export type AddressIn = components["schemas"]["AddressIn"];
@@ -55,6 +61,24 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+// Turns a thrown error into copy safe to show a user. Business-specific 4xx
+// messages (404 "not found", 409 conflicts like sold-out stock) are already
+// written in plain English server-side, so those pass through unchanged;
+// everything else (auth, rate limits, validation, server errors, or a non-API
+// error like a network failure) gets a human fallback instead of a raw status
+// code, stack-shaped message, or a JSON.stringify'd validation array.
+export const humanizeError = (error: unknown): string => {
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Check your email and password and try again.";
+    if (error.status === 403) return "You don't have permission to do that.";
+    if (error.status === 422) return "That doesn't look right — check the highlighted fields and try again.";
+    if (error.status === 429) return "Too many attempts — please wait a moment and try again.";
+    if (error.status >= 500) return "Something went wrong on our end — please try again in a moment.";
+    return error.message;
+  }
+  return "Something went wrong. Please try again.";
+};
+
 export const money = (cents: number) =>
   new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK" }).format(cents / 100);
 
@@ -82,15 +106,26 @@ export const formatSlotTime = (iso: string) =>
     hour12: false,
   });
 
-// Shared by CartPage and OrderStatusView: a drink line's whisk/sugar options
-// summarised as "oat whisk · 6 g sugar", or null when there's nothing to show
-// (non-drink items, or drinks with no options recorded).
+// The standard recipe every drink option defaults to; only deviations from
+// this are worth showing back to the customer on a cart/order line.
+const STANDARD_OPTIONS = { matcha_g: 4, whisk: "water", base_milk: "cow", milk_ml: 130, sugar_g: 4 };
+
+// Shared by CartPage and OrderStatusView: summarises only the customisations
+// that differ from the standard recipe (e.g. "6 g matcha · oat milk · 6 g
+// sugar"), so a default drink shows no clutter at all. Returns null when
+// there's nothing to show (non-drink items, or an all-standard drink).
 export const formatDrinkOptions = (options: Record<string, unknown> | null | undefined) => {
   if (!options) return null;
-  const whisk = options.whisk;
-  const sugar = options.sugar_g;
+  // Keys are only pushed when present and non-standard, so orders placed
+  // before a given option existed (missing key -> undefined) render as
+  // standard rather than as a spurious "undefined ..." customisation.
+  const nonStandard = (key: keyof typeof STANDARD_OPTIONS) =>
+    options[key] != null && options[key] !== STANDARD_OPTIONS[key];
   const parts: string[] = [];
-  if (typeof whisk === "string") parts.push(`${whisk} whisk`);
-  if (typeof sugar === "number") parts.push(`${sugar} g sugar`);
+  if (nonStandard("matcha_g")) parts.push(`${options.matcha_g} g matcha`);
+  if (nonStandard("whisk")) parts.push(`${options.whisk} whisk`);
+  if (nonStandard("base_milk")) parts.push(`${options.base_milk} milk`);
+  if (nonStandard("milk_ml")) parts.push(`${options.milk_ml} ml milk`);
+  if (nonStandard("sugar_g")) parts.push(`${options.sugar_g} g sugar`);
   return parts.length ? parts.join(" · ") : null;
 };

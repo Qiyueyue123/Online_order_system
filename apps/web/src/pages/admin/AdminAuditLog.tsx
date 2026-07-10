@@ -30,7 +30,7 @@ export function AdminAuditLog() {
           {auditLog.data?.items.map((entry) => (
             <tr key={entry.id}>
               <td>{new Date(entry.created_at).toLocaleString()}</td>
-              <td>{entry.actor_user_id}</td>
+              <td>{entry.actor_name}</td>
               <td>{entry.action}</td>
               <td>{entry.entity_type} · {entry.entity_id}</td>
             </tr>

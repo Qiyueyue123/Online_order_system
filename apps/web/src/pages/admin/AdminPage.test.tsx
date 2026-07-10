@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminPage } from "./AdminPage";
 
@@ -29,7 +29,7 @@ describe("AdminPage access control", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows a not-authorized state and fires no admin requests for a non-admin session", async () => {
+  it("shows a friendly not-for-you state and fires no admin requests for a non-admin session", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/auth/session")) return Promise.resolve(sessionResponse("customer"));
@@ -39,9 +39,31 @@ describe("AdminPage access control", () => {
 
     renderWithProviders(<AdminPage />);
 
-    expect(await screen.findByText("Not authorized")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing to see here")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls.every(([input]) => !String(input).includes("/admin"))).toBe(true);
+  });
+
+  it("redirects a signed-out visitor to sign in", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/auth/session")) return Promise.resolve(new Response(null, { status: 401 }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={["/admin"]}>
+          <Routes>
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/signin" element={<p>Sign in page</p>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("Sign in page")).toBeInTheDocument();
   });
 
   it("renders the admin tabs and defaults to the Orders view for an admin session", async () => {
@@ -63,5 +85,37 @@ describe("AdminPage access control", () => {
     expect(screen.getByRole("tab", { name: "Products" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Pickup days" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Audit log" })).toBeInTheDocument();
+  });
+
+  it("signs out via the console's own sign-out button", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/auth/session")) return Promise.resolve(sessionResponse("admin"));
+      if (url.includes("/admin/orders")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [], page: 1, page_size: 50, total: 0 }), { status: 200 }),
+        );
+      }
+      if (url.includes("/auth/logout") && init?.method === "POST") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminPage />);
+
+    const signOut = await screen.findByRole("button", { name: "Sign out" });
+    fireEvent.click(signOut);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/auth/logout",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token-1" }),
+        }),
+      ),
+    );
   });
 });

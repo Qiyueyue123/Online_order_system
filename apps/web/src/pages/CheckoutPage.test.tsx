@@ -18,6 +18,7 @@ function renderWithProviders(ui: ReactElement) {
 const pickupOnlyCart: Cart = {
   items: [
     {
+      id: "item-1",
       variant_id: "var-1",
       product_slug: "ajisai-latte",
       product_name: "Ajisai 2.0 Matcha Latte",
@@ -37,6 +38,7 @@ const pickupOnlyCart: Cart = {
 const retailOnlyCart: Cart = {
   items: [
     {
+      id: "item-2",
       variant_id: "var-2",
       product_slug: "ceremonial-matcha",
       product_name: "Ceremonial Matcha",

@@ -4,7 +4,6 @@ import smtplib
 from dataclasses import dataclass
 from datetime import UTC
 from email.message import EmailMessage as MimeEmailMessage
-from urllib.parse import quote
 
 from ..config import Settings, get_settings
 from ..models import Order
@@ -64,9 +63,15 @@ def _format_options_suffix(raw_options: str | None) -> str:
     if not raw_options:
         return ""
     options = json.loads(raw_options)
+    matcha_g = options.get("matcha_g", 4)
     whisk = options.get("whisk", "water")
+    base_milk = options.get("base_milk", "cow")
+    milk_ml = options.get("milk_ml", 130)
     sugar_g = options.get("sugar_g", 4)
-    return f" — {whisk} whisk, {sugar_g} g sugar"
+    return (
+        f" — {matcha_g} g matcha, {whisk} whisk, {base_milk} milk {milk_ml} ml, "
+        f"{sugar_g} g sugar"
+    )
 
 
 def _render_order_confirmation(order: Order, settings: Settings | None = None) -> str:
@@ -121,18 +126,7 @@ def _render_order_confirmation(order: Order, settings: Settings | None = None) -
             f"  {order.shipping_city} {order.shipping_postal_code}",
             f"  {order.shipping_country_code}",
         ]
-    # Guest tracking: display_number + email is guessable in principle (an attacker
-    # who already knows both could look up the order), but it's the same tradeoff
-    # every guest-checkout shop makes, and it needs no server-side token storage --
-    # the raw checkout lookup_token is deliberately never persisted (only its hash
-    # is), so this is the only link we can always reconstruct from the order alone.
-    track_url = (
-        f"{settings.web_origin}/track"
-        f"?order={quote(order.display_number)}&email={quote(order.email)}"
-    )
     lines += [
-        "",
-        f"Track your order: {track_url}",
         "",
         "This is a demonstration store; no real payment or shipment has taken place.",
     ]

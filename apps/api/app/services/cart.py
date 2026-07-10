@@ -12,6 +12,20 @@ from ..security import CART_COOKIE, token_hash
 
 DRINKS_CATEGORY_SLUG = "drinks"
 
+# The 6 g matcha upgrade is the only option that changes price; 130ml/160ml
+# base milk and the whisk/sugar choices are all included at the listed price.
+MATCHA_UPGRADE_SURCHARGE_CENTS = 1500
+
+
+def option_surcharge_cents(raw_options: str | None) -> int:
+    """Extra cost on top of variant.price_cents implied by a line's options
+    (e.g. the 6 g matcha upgrade). Shared by cart_payload and checkout so the
+    two never compute a line's price differently."""
+    if not raw_options:
+        return 0
+    options = json.loads(raw_options)
+    return MATCHA_UPGRADE_SURCHARGE_CENTS if options.get("matcha_g") == 6 else 0
+
 
 def _canonical_options(variant: Variant, options: DrinkOptionsIn | None) -> str | None:
     """Normalise incoming cart-item options to the stable string stored on
@@ -114,6 +128,16 @@ def set_item(
     db.commit()
 
 
+def remove_item(db: Session, cart: Cart, item_id) -> None:
+    item = db.scalar(
+        select(CartItem).where(CartItem.id == item_id, CartItem.cart_id == cart.id)
+    )
+    if not item:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cart item not found")
+    db.delete(item)
+    db.commit()
+
+
 def merge_guest_cart(
     db: Session,
     user_id,
@@ -177,20 +201,23 @@ def classify_cart(cart: Cart) -> tuple[bool, bool]:
 
 
 def cart_payload(cart: Cart) -> dict:
-    items = [
-        {
-            "variant_id": item.variant.id,
-            "product_slug": item.variant.product.slug,
-            "product_name": item.variant.product.name,
-            "variant_name": item.variant.name,
-            "sku": item.variant.sku,
-            "quantity": item.quantity,
-            "unit_price_cents": item.variant.price_cents,
-            "line_total_cents": item.quantity * item.variant.price_cents,
-            "options": json.loads(item.options) if item.options else None,
-        }
-        for item in cart.items
-    ]
+    items = []
+    for item in cart.items:
+        unit_price_cents = item.variant.price_cents + option_surcharge_cents(item.options)
+        items.append(
+            {
+                "id": item.id,
+                "variant_id": item.variant.id,
+                "product_slug": item.variant.product.slug,
+                "product_name": item.variant.product.name,
+                "variant_name": item.variant.name,
+                "sku": item.variant.sku,
+                "quantity": item.quantity,
+                "unit_price_cents": unit_price_cents,
+                "line_total_cents": item.quantity * unit_price_cents,
+                "options": json.loads(item.options) if item.options else None,
+            }
+        )
     needs_pickup, needs_shipping = classify_cart(cart)
     return {
         "items": items,

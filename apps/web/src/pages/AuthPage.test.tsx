@@ -94,7 +94,7 @@ describe("AuthPage", () => {
     fireEvent.change(screen.getByLabelText(/Password/), { target: { value: "wrong-password" } });
     submitForm(container);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Check your email and password and try again.");
     expect(navigateMock).not.toHaveBeenCalled();
   });
 });

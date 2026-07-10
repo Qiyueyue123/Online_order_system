@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
+  AdminCatalogPage,
+  AdminCatalogProduct,
+  AdminImageIn,
   AdminProductIn,
+  AdminProductUpdateIn,
+  AdminVariant,
   AdminVariantUpdateIn,
-  api,
   Product,
-  ProductPage,
-  Variant,
+  api,
+  humanizeError,
 } from "../../api/client";
 
 type NewProductFields = {
@@ -23,22 +27,20 @@ type NewProductFields = {
 };
 
 function VariantRow({
-  productName,
   variant,
   disabled,
   onSave,
 }: {
-  productName: string;
-  variant: Variant;
+  variant: AdminVariant;
   disabled: boolean;
-  onSave: (variantId: string, priceCents: number, stock: number) => void;
+  onSave: (variantId: string, priceCents: number, stock: number, active: boolean) => void;
 }) {
   const [price, setPrice] = useState(String(variant.price_cents / 100));
-  const [stock, setStock] = useState(String(variant.available_stock));
+  const [stock, setStock] = useState(String(variant.stock_on_hand));
+  const [active, setActive] = useState(variant.active);
 
   return (
     <tr>
-      <td>{productName}</td>
       <td>{variant.name}</td>
       <td>
         <input
@@ -54,15 +56,29 @@ function VariantRow({
         <input
           aria-label={`${variant.name} stock`}
           type="number"
-          min="0"
+          min={variant.stock_reserved}
           value={stock}
           onChange={(event) => setStock(event.target.value)}
         />
+        {variant.stock_reserved > 0 && (
+          <span className="stock-reserved-note">{variant.stock_reserved} reserved</span>
+        )}
+      </td>
+      <td>
+        <label className="checkbox-label">
+          <input
+            aria-label={`${variant.name} active`}
+            type="checkbox"
+            checked={active}
+            onChange={(event) => setActive(event.target.checked)}
+          />
+          Active
+        </label>
       </td>
       <td>
         <button
           disabled={disabled}
-          onClick={() => onSave(variant.id, Math.round(Number(price) * 100), Number(stock))}
+          onClick={() => onSave(variant.id, Math.round(Number(price) * 100), Number(stock), active)}
         >
           Save
         </button>
@@ -71,12 +87,156 @@ function VariantRow({
   );
 }
 
+function ProductEditor({
+  product,
+  disabled,
+  onSave,
+}: {
+  product: AdminCatalogProduct;
+  disabled: boolean;
+  onSave: (productId: string, body: AdminProductUpdateIn) => void;
+}) {
+  const [name, setName] = useState(product.name);
+  const [description, setDescription] = useState(product.description);
+  const [active, setActive] = useState(product.active);
+
+  return (
+    <div className="admin-product-header">
+      <div className="field-pair">
+        <label>
+          Name
+          <input
+            aria-label={`${product.name} name`}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label className="checkbox-label">
+          <input
+            aria-label={`${product.name} active`}
+            type="checkbox"
+            checked={active}
+            onChange={(event) => setActive(event.target.checked)}
+          />
+          Active (visible to customers)
+        </label>
+      </div>
+      <label>
+        Description
+        <textarea
+          aria-label={`${product.name} description`}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </label>
+      <button
+        disabled={disabled}
+        onClick={() => onSave(product.id, { name, description, active })}
+      >
+        Save product
+      </button>
+    </div>
+  );
+}
+
+function MediaManager({
+  product,
+  disabled,
+  onAdd,
+  onRemove,
+}: {
+  product: AdminCatalogProduct;
+  disabled: boolean;
+  onAdd: (productId: string, body: AdminImageIn) => void;
+  onRemove: (productId: string, imageId: string) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [altText, setAltText] = useState("");
+  const [mediaType, setMediaType] = useState<AdminImageIn["media_type"]>("image");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!url.trim()) return;
+    onAdd(product.id, {
+      url: url.trim(),
+      alt_text: altText.trim(),
+      media_type: mediaType,
+      position: product.images.length,
+    });
+    setUrl("");
+    setAltText("");
+    setMediaType("image");
+  }
+
+  return (
+    <div className="admin-media-manager">
+      <p className="option-label">Photos &amp; videos</p>
+      {product.images.length > 0 && (
+        <div className="admin-media-list">
+          {product.images.map((image) => (
+            <div className="admin-media-item" key={image.id}>
+              {image.media_type === "video" ? (
+                <video src={image.url} muted playsInline />
+              ) : (
+                <img src={image.url} alt="" loading="lazy" />
+              )}
+              <button
+                type="button"
+                aria-label={`Remove ${image.alt_text || (image.media_type === "video" ? "video" : "photo")}`}
+                disabled={disabled}
+                onClick={() => onRemove(product.id, image.id)}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <form className="admin-media-form field-pair" onSubmit={submit}>
+        <label>
+          Photo or video URL
+          <input
+            aria-label={`${product.name} new media URL`}
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://…"
+          />
+        </label>
+        <label>
+          Alt text
+          <input
+            aria-label={`${product.name} new media alt text`}
+            value={altText}
+            onChange={(event) => setAltText(event.target.value)}
+          />
+        </label>
+        <label>
+          Type
+          <select
+            aria-label={`${product.name} new media type`}
+            value={mediaType}
+            onChange={(event) => setMediaType(event.target.value as AdminImageIn["media_type"])}
+          >
+            <option value="image">Photo</option>
+            <option value="video">Video</option>
+          </select>
+        </label>
+        <button type="submit" disabled={disabled || !url.trim()}>
+          Add
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export function AdminProducts({ csrfToken }: { csrfToken: string }) {
   const queryClient = useQueryClient();
   const products = useQuery({
     queryKey: ["admin", "products"],
-    queryFn: () => api<ProductPage>("/products?page_size=100"),
+    queryFn: () => api<AdminCatalogPage>("/admin/products?page_size=100"),
   });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
 
   const updateVariant = useMutation({
     mutationFn: ({ variantId, body }: { variantId: string; body: AdminVariantUpdateIn }) =>
@@ -85,7 +245,36 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         headers: { "X-CSRF-Token": csrfToken },
         body: JSON.stringify(body),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+    onSuccess: invalidate,
+  });
+
+  const updateProduct = useMutation({
+    mutationFn: ({ productId, body }: { productId: string; body: AdminProductUpdateIn }) =>
+      api<Product>(`/admin/products/${productId}`, {
+        method: "PATCH",
+        headers: { "X-CSRF-Token": csrfToken },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: invalidate,
+  });
+
+  const addImage = useMutation({
+    mutationFn: ({ productId, body }: { productId: string; body: AdminImageIn }) =>
+      api<AdminCatalogProduct>(`/admin/products/${productId}/images`, {
+        method: "POST",
+        headers: { "X-CSRF-Token": csrfToken },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: invalidate,
+  });
+
+  const removeImage = useMutation({
+    mutationFn: ({ productId, imageId }: { productId: string; imageId: string }) =>
+      api<AdminCatalogProduct>(`/admin/products/${productId}/images/${imageId}`, {
+        method: "DELETE",
+        headers: { "X-CSRF-Token": csrfToken },
+      }),
+    onSuccess: invalidate,
   });
 
   const createProduct = useMutation({
@@ -96,7 +285,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      invalidate();
       reset();
     },
   });
@@ -110,15 +299,28 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     defaultValues: { weight_grams: 100, price_cents: 0, stock_on_hand: 0 },
   });
 
-  function saveVariant(variantId: string, priceCents: number, stock: number) {
+  function saveVariant(variantId: string, priceCents: number, stock: number, active: boolean) {
     updateVariant.mutate({
       variantId,
       body: {
         price_cents: priceCents,
         stock_on_hand: stock,
+        active,
         reason: "Admin update via storefront",
       },
     });
+  }
+
+  function saveProduct(productId: string, body: AdminProductUpdateIn) {
+    updateProduct.mutate({ productId, body });
+  }
+
+  function addProductImage(productId: string, body: AdminImageIn) {
+    addImage.mutate({ productId, body });
+  }
+
+  function removeProductImage(productId: string, imageId: string) {
+    removeImage.mutate({ productId, imageId });
   }
 
   function submitNewProduct(fields: NewProductFields) {
@@ -141,32 +343,47 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
 
   return (
     <div className="admin-products">
-      {updateVariant.isError && <p role="alert">{updateVariant.error.message}</p>}
+      {updateVariant.isError && <p role="alert">{humanizeError(updateVariant.error)}</p>}
+      {updateProduct.isError && <p role="alert">{humanizeError(updateProduct.error)}</p>}
+      {addImage.isError && <p role="alert">{humanizeError(addImage.error)}</p>}
+      {removeImage.isError && <p role="alert">{humanizeError(removeImage.error)}</p>}
       {products.isLoading && <p role="status">Loading products…</p>}
-      <table>
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Variant</th>
-            <th>Price (SEK)</th>
-            <th>Stock</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.data?.items.flatMap((product) =>
-            product.variants.map((variant) => (
-              <VariantRow
-                key={variant.id}
-                productName={product.name}
-                variant={variant}
-                disabled={updateVariant.isPending}
-                onSave={saveVariant}
-              />
-            )),
-          )}
-        </tbody>
-      </table>
+      {products.data?.items.map((product) => (
+        <div className="admin-product-group" key={product.id}>
+          <ProductEditor
+            product={product}
+            disabled={updateProduct.isPending}
+            onSave={saveProduct}
+          />
+          <MediaManager
+            product={product}
+            disabled={addImage.isPending || removeImage.isPending}
+            onAdd={addProductImage}
+            onRemove={removeProductImage}
+          />
+          <table>
+            <thead>
+              <tr>
+                <th>Variant</th>
+                <th>Price (SEK)</th>
+                <th>Stock</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {product.variants.map((variant) => (
+                <VariantRow
+                  key={variant.id}
+                  variant={variant}
+                  disabled={updateVariant.isPending}
+                  onSave={saveVariant}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
 
       <h2>Add a new product</h2>
       <form onSubmit={handleSubmit(submitNewProduct)}>
@@ -176,12 +393,12 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         </label>
         {errors.name && <span role="alert">Name is required.</span>}
         <label>
-          Slug
+          Web address (e.g. iced-hojicha)
           <input {...register("slug", { required: true })} />
         </label>
-        {errors.slug && <span role="alert">Slug is required.</span>}
+        {errors.slug && <span role="alert">Web address is required.</span>}
         <label>
-          Category slug
+          Category
           <input {...register("category_slug")} />
         </label>
         <label>
@@ -191,7 +408,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         {errors.description && <span role="alert">Description is required.</span>}
         <div className="field-pair">
           <label>
-            Variant SKU
+            Product code (SKU)
             <input {...register("sku", { required: true })} />
           </label>
           <label>
@@ -221,7 +438,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         <button className="button" disabled={createProduct.isPending}>
           {createProduct.isPending ? "Creating…" : "Create product"}
         </button>
-        {createProduct.isError && <p role="alert">{createProduct.error.message}</p>}
+        {createProduct.isError && <p role="alert">{humanizeError(createProduct.error)}</p>}
       </form>
     </div>
   );

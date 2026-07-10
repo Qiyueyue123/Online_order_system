@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +18,7 @@ function renderWithProviders(ui: ReactElement) {
 const cart: Cart = {
   items: [
     {
+      id: "item-1",
       variant_id: "var-1",
       product_slug: "ceremonial-matcha",
       product_name: "Ceremonial Matcha",
@@ -28,6 +29,7 @@ const cart: Cart = {
       line_total_cents: 7600,
     },
     {
+      id: "item-2",
       variant_id: "var-2",
       product_slug: "matcha-whisk",
       product_name: "Bamboo Whisk",
@@ -64,6 +66,66 @@ describe("CartPage", () => {
     expect(screen.getByText(/76,00\s*kr/)).toBeInTheDocument();
     expect(screen.getByText(/45,00\s*kr/)).toBeInTheDocument();
     expect(screen.getByText(/121,00\s*kr/)).toBeInTheDocument();
+  });
+
+  it("hides the line and offers Undo when Remove is clicked, without deleting yet", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(cart), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<CartPage />);
+
+    const row = (await screen.findByText("Ceremonial Matcha")).closest("article")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText(/Removed Ceremonial Matcha/)).toBeInTheDocument();
+    expect(screen.queryByText("Ceremonial Matcha")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+  });
+
+  it("restores the line with no API call when Undo is clicked", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(cart), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<CartPage />);
+
+    const row = (await screen.findByText("Ceremonial Matcha")).closest("article")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Remove" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+
+    expect(await screen.findByText("Ceremonial Matcha")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+  });
+
+  it("actually deletes the line once the undo window lapses", async () => {
+    const cartAfterRemoval = { ...cart, items: [cart.items[1]], subtotal_cents: 4500 };
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        return Promise.resolve(new Response(JSON.stringify(cartAfterRemoval), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(cart), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    // Avoid vitest's fake timers here: they fight with testing-library's
+    // internal polling. Instead, spy on the real setTimeout and invoke the
+    // captured callback directly once we've confirmed the delay is correct.
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
+
+    renderWithProviders(<CartPage />);
+
+    const row = (await screen.findByText("Ceremonial Matcha")).closest("article")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Remove" }));
+
+    const scheduled = setTimeoutSpy.mock.calls.find(([, delay]) => delay === 5000);
+    expect(scheduled).toBeDefined();
+    (scheduled![0] as () => void)();
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/cart/items/item-1",
+        expect.objectContaining({ method: "DELETE" }),
+      ),
+    );
+    setTimeoutSpy.mockRestore();
   });
 
   it("shows an empty state when the bag has no items", async () => {

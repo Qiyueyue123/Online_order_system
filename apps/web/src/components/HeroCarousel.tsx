@@ -80,6 +80,10 @@ export function HeroCarousel() {
         );
       })}
       <div className="hero-scrim" />
+      <p className="hero-credit">
+        Photos &amp; video:{" "}
+        <a href="https://www.nikonekomatcha.com/" target="_blank" rel="noreferrer">Niko Neko Matcha</a>
+      </p>
       {!reducedMotion && (
         <button
           type="button"

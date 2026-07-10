@@ -6,6 +6,7 @@ import {
   AdminPickupDayIn,
   AdminPickupDayUpdateIn,
   api,
+  humanizeError,
 } from "../../api/client";
 
 type NewDayFields = {
@@ -107,8 +108,8 @@ export function AdminPickupDays({ csrfToken }: { csrfToken: string }) {
 
   return (
     <div className="admin-pickup-days">
-      {updateDay.isError && <p role="alert">{updateDay.error.message}</p>}
-      {createDay.isError && <p role="alert">{createDay.error.message}</p>}
+      {updateDay.isError && <p role="alert">{humanizeError(updateDay.error)}</p>}
+      {createDay.isError && <p role="alert">{humanizeError(createDay.error)}</p>}
       {days.isLoading && <p role="status">Loading pickup days…</p>}
       <table>
         <thead>
@@ -127,9 +128,17 @@ export function AdminPickupDays({ csrfToken }: { csrfToken: string }) {
               key={day.id}
               day={day}
               disabled={updateDay.isPending}
-              onToggle={(target) =>
-                updateDay.mutate({ id: target.id, body: { is_available: !target.is_available } })
-              }
+              onToggle={(target) => {
+                if (
+                  target.is_available &&
+                  !window.confirm(
+                    "Turn off pickup on this day? Orders already booked for this date will keep their time.",
+                  )
+                ) {
+                  return;
+                }
+                updateDay.mutate({ id: target.id, body: { is_available: !target.is_available } });
+              }}
               onUpdateCapacity={(id, capacity) => updateDay.mutate({ id, body: { slot_capacity: capacity } })}
             />
           ))}

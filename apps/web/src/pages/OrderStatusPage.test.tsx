@@ -38,7 +38,7 @@ const order: Order = {
       sku: "SKU-D1",
       unit_price_cents: 4000,
       quantity: 1,
-      options: { whisk: "oat", sugar_g: 6 },
+      options: { matcha_g: 4, whisk: "oat", base_milk: "cow", milk_ml: 130, sugar_g: 6 },
     },
   ],
 };

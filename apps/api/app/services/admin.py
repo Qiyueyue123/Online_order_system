@@ -13,9 +13,10 @@ from ..models import (
     PaymentStatus,
     Product,
     ProductImage,
+    User,
     Variant,
 )
-from ..schemas import AdminProductIn, AdminProductUpdateIn
+from ..schemas import AdminImageIn, AdminProductIn, AdminProductUpdateIn
 from .checkout import cancel_confirmed_order, cancel_order
 
 
@@ -61,9 +62,22 @@ def list_orders_admin(
     return _paginate(db, stmt, page=page, page_size=page_size)
 
 
-def list_audit_log(db: Session, *, page: int, page_size: int) -> tuple[list[AdminAuditLog], int]:
+def list_audit_log(
+    db: Session, *, page: int, page_size: int
+) -> tuple[list[tuple[AdminAuditLog, str]], int]:
+    """Each row paired with its actor's display name -- a bare UUID means
+    nothing to the café owner reading this log, so we resolve it here with
+    one bulk lookup rather than leaving the raw id for the API to render."""
     stmt = select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc())
-    return _paginate(db, stmt, page=page, page_size=page_size)
+    rows, total = _paginate(db, stmt, page=page, page_size=page_size)
+    actor_ids = {row.actor_user_id for row in rows}
+    actor_names = (
+        dict(db.execute(select(User.id, User.name).where(User.id.in_(actor_ids))).all())
+        if actor_ids
+        else {}
+    )
+    annotated = [(row, actor_names.get(row.actor_user_id, "Deleted user")) for row in rows]
+    return annotated, total
 
 
 # Explicit map of allowed order-status transitions. Anything not listed here (including
@@ -151,12 +165,14 @@ def update_variant(
     *,
     price_cents: int | None,
     stock_on_hand: int | None,
+    active: bool | None = None,
     reason: str,
 ) -> dict:
     from ..models import InventoryMovement
 
     changes: dict = {}
     _set_if_changed(changes, variant, "price_cents", price_cents)
+    _set_if_changed(changes, variant, "active", active)
     if stock_on_hand is not None and stock_on_hand != variant.stock_on_hand:
         if stock_on_hand < variant.stock_reserved:
             raise HTTPException(
@@ -174,3 +190,27 @@ def update_variant(
             )
         )
     return changes
+
+
+def add_product_image(db: Session, product: Product, data: AdminImageIn) -> ProductImage:
+    image = ProductImage(
+        product_id=product.id,
+        url=data.url,
+        alt_text=data.alt_text,
+        position=data.position,
+        media_type=data.media_type,
+    )
+    db.add(image)
+    db.flush()
+    return image
+
+
+def remove_product_image(db: Session, product_id: uuid.UUID, image_id: uuid.UUID) -> None:
+    image = db.scalar(
+        select(ProductImage).where(
+            ProductImage.id == image_id, ProductImage.product_id == product_id
+        )
+    )
+    if not image:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+    db.delete(image)

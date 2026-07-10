@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { api, Session } from "../api/client";
+import { api, humanizeError, Session } from "../api/client";
 
 type Fields = { name: string; email: string; password: string };
 
@@ -54,7 +54,7 @@ export function AuthPage() {
         <button className="button full" disabled={auth.isPending}>
           {auth.isPending ? "Please wait…" : mode === "login" ? "Sign in" : "Register"}
         </button>
-        {auth.isError && <p role="alert">{auth.error.message}</p>}
+        {auth.isError && <p role="alert">{humanizeError(auth.error)}</p>}
         <button
           className="text-button"
           type="button"

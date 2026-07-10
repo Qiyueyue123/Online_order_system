@@ -20,6 +20,7 @@ export function StorePage() {
       <div className="section-heading">
         <div><p className="eyebrow">FOR HOME</p><h2>Take-home shelf</h2></div>
       </div>
+      <p className="food-safety-note">Good to know: we use store-bought packaged ice, and every drink comes sealed in a plastic cup with a lid.</p>
       {products.isLoading && <p role="status">Loading the shelf…</p>}
       {products.isError && <p role="alert">The shelf could not be loaded. Please try again.</p>}
       <div className="product-grid retail-grid">

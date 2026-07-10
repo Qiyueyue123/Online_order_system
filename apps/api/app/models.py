@@ -223,6 +223,9 @@ class Order(TimestampMixin, Base):
     display_number: Mapped[str] = mapped_column(String(24), unique=True, index=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     email: Mapped[str] = mapped_column(String(320), index=True)
+    # Optional Telegram/WhatsApp handle to fall back on if the confirmation
+    # email doesn't reach the customer -- for the shop's own use, never emailed.
+    contact_handle: Mapped[str | None] = mapped_column(String(120))
     lookup_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
     status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), index=True)
     subtotal_cents: Mapped[int] = mapped_column(Integer)

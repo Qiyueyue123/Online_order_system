@@ -123,6 +123,141 @@ def test_any_country_accepted_with_flat_international_rate(client, db):
     assert order.total_cents == 3200 + 7900
 
 
+def test_logged_in_checkout_uses_session_email_ignoring_payload(client, db):
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items", json={"variant_id": str(product.variants[0].id), "quantity": 1}
+    )
+    register = client.post(
+        "/api/v1/auth/register",
+        json={"email": "account@example.com", "password": "long-password", "name": "Shopper"},
+    )
+    assert register.status_code == 201
+
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "email": "someone-else@example.com",
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
+            },
+        },
+    )
+    assert response.status_code == 201
+    order = db.get(Order, uuid.UUID(response.json()["order_id"]))
+    assert order.email == "account@example.com"
+
+
+def test_logged_in_checkout_works_without_email_in_payload(client, db):
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items", json={"variant_id": str(product.variants[0].id), "quantity": 1}
+    )
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "noemail@example.com", "password": "long-password", "name": "Shopper"},
+    )
+
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
+            },
+        },
+    )
+    assert response.status_code == 201
+    order = db.get(Order, uuid.UUID(response.json()["order_id"]))
+    assert order.email == "noemail@example.com"
+
+
+def test_guest_checkout_without_email_is_rejected(client, db):
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items", json={"variant_id": str(product.variants[0].id), "quantity": 1}
+    )
+
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
+            },
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_contact_handle_persists_and_appears_in_admin_order_payload(client, db):
+    from test_admin import admin_headers
+
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items", json={"variant_id": str(product.variants[0].id), "quantity": 1}
+    )
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "email": "guest@example.com",
+            "contact_handle": "@guest_on_telegram",
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
+            },
+        },
+    )
+    assert response.status_code == 201
+    order = db.get(Order, uuid.UUID(response.json()["order_id"]))
+    assert order.contact_handle == "@guest_on_telegram"
+
+    headers = admin_headers(client, db)
+    admin_response = client.get("/api/v1/admin/orders", headers=headers)
+    assert admin_response.status_code == 200
+    payload = next(
+        item for item in admin_response.json()["items"] if item["id"] == str(order.id)
+    )
+    assert payload["contact_handle"] == "@guest_on_telegram"
+
+
+def test_empty_contact_handle_is_stored_as_null(client, db):
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items", json={"variant_id": str(product.variants[0].id), "quantity": 1}
+    )
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "email": "guest@example.com",
+            "contact_handle": "   ",
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
+            },
+        },
+    )
+    assert response.status_code == 201
+    order = db.get(Order, uuid.UUID(response.json()["order_id"]))
+    assert order.contact_handle is None
+
+
 def test_configured_shipping_countries_still_restrict(client, db):
     from app.main import app
 

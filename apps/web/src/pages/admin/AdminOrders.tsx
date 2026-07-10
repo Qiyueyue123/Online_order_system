@@ -91,7 +91,12 @@ export function AdminOrders({ csrfToken }: { csrfToken: string }) {
           {orders.data?.items.map((order) => (
             <tr key={order.id}>
               <td>{order.display_number}</td>
-              <td>{order.email}</td>
+              <td>
+                {order.email}
+                {order.contact_handle && (
+                  <div className="admin-order-contact">Backup contact: {order.contact_handle}</div>
+                )}
+              </td>
               <td>
                 <span className={`status status--${order.status}`}>{order.status.replace("_", " ")}</span>
               </td>

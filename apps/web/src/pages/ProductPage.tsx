@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, Cart, CartItemIn, DrinkOptions, humanizeError, money, Product } from "../api/client";
+import { MediaCarousel } from "../components/MediaCarousel";
 import { ProductArt } from "../components/ProductArt";
 
 const SUGAR_OPTIONS: DrinkOptions["sugar_g"][] = [2, 4, 6, 8];
@@ -22,15 +23,17 @@ function ProductGallery({ product }: { product: Product }) {
       </div>
     );
   }
-  const active = images[activeIndex] ?? images[0];
   return (
     <div className="detail-gallery">
       <div className="detail-art">
-        {active.media_type === "video" ? (
-          <video className="product-photo" src={active.url} controls aria-label={active.alt_text} />
-        ) : (
-          <img className="product-photo" src={active.url} alt={active.alt_text} />
-        )}
+        <MediaCarousel
+          items={images}
+          activeIndex={activeIndex}
+          onActiveIndexChange={setActiveIndex}
+          mediaClassName="detail-media"
+          label="Product photos"
+          eagerFirst
+        />
       </div>
       {images.length > 1 && (
         <div className="gallery-thumbs" role="group" aria-label="Product photos">
@@ -194,6 +197,7 @@ export function ProductPage() {
               ))}
             </div>
             <p className="recipe-line">Every latte is served iced: 4 g Ajisai 2.0, whisked, poured over 130 ml cow&rsquo;s milk (standard).</p>
+            <p className="food-safety-note">Good to know: we use store-bought packaged ice, and every drink comes sealed in a plastic cup with a lid.</p>
           </div>
         )}
         <button

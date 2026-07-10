@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
 type Slide =
   | { type: "image"; src: string; alt: string }
@@ -12,19 +13,6 @@ const SLIDES: Slide[] = [
 ];
 
 const ROTATE_MS = 5200;
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(query.matches);
-    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return reduced;
-}
 
 /**
  * Crossfading hero background: three real photos plus the pour video, cycled

@@ -371,6 +371,68 @@ footer {
 }
 .product-card:hover .product-photo { transform: scale(1.045); }
 
+/* Reusable photo/video carousel — see MediaCarousel component. Fills
+   whichever square/portrait frame it's dropped into (.product-art or
+   .detail-art both already give their content a defined height). */
+.media-carousel { position: relative; width: 100%; height: 100%; }
+.media-carousel-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+.media-carousel-slide.is-active { opacity: 1; z-index: 1; }
+.media-carousel-slide img, .media-carousel-slide video { width: 100%; height: 100%; }
+.media-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid rgba(244, 238, 221, 0.55);
+  border-radius: 50%;
+  color: #f4eedd;
+  background: rgba(15, 33, 24, 0.45);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 0.2s ease;
+}
+.media-carousel-arrow:hover { background: rgba(15, 33, 24, 0.7); }
+.media-carousel-arrow--prev { left: 0.6rem; }
+.media-carousel-arrow--next { right: 0.6rem; }
+.media-carousel-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 0.75rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.4rem;
+  transform: translateX(-50%);
+}
+.media-carousel-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  padding: 0;
+  border: 1px solid rgba(244, 238, 221, 0.7);
+  border-radius: 50%;
+  background: rgba(244, 238, 221, 0.35);
+  cursor: pointer;
+}
+.media-carousel-dot.active { background: #f4eedd; }
+@media (prefers-reduced-motion: reduce) {
+  .media-carousel-slide { transition: none; }
+}
+
+/* Product detail main media: show the whole photo/video (letterboxed on the
+   paper background) instead of the cropped .product-photo cover treatment
+   used for thumbnails and catalog cards. */
+.detail-media { object-fit: contain; background: var(--paper-panel); }
+
 .retail-grid { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 760px) { .retail-grid { grid-template-columns: 1fr 1fr; } }
 
@@ -464,6 +526,7 @@ footer {
 }
 .chip-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .recipe-line { margin-top: 1rem; color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
+.food-safety-note { margin-top: 0.5rem; color: var(--ink-soft); font-size: 0.78rem; }
 
 select, input {
   width: 100%;
@@ -556,6 +619,7 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
 .hint { margin-top: 0.6rem; font-size: 0.82rem; color: var(--ink-soft); }
 .contact-line { margin-top: 1rem; font-size: 0.85rem; color: var(--ink-soft); }
 .contact-line a { color: inherit; }
+.admin-order-contact { margin-top: 0.2rem; font-size: 0.8rem; color: var(--ink-soft); }
 
 .payment-choice { margin-top: 1.5rem; }
 .payment-choice h2 {

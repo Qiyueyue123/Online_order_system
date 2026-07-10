@@ -61,6 +61,16 @@ def create_pending_order(
     if not cart.items:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cart is empty")
 
+    # A signed-in order always uses the account's email -- never whatever the
+    # client happened to submit -- so the receipt can't drift from the login
+    # a customer will use to look the order up later. Guests must supply one.
+    if session:
+        email = session.user.email
+    elif data.email:
+        email = str(data.email).lower()
+    else:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Email is required")
+
     needs_pickup, needs_shipping = classify_cart(cart)
     if needs_pickup and data.pickup_at is None:
         raise HTTPException(
@@ -124,7 +134,8 @@ def create_pending_order(
     order = Order(
         display_number=f"M{datetime.now(UTC):%y%m%d}{secrets.randbelow(100000):05d}",
         user_id=session.user_id if session else None,
-        email=str(data.email).lower(),
+        email=email,
+        contact_handle=data.contact_handle,
         lookup_token_hash=token_hash(guest_token) if guest_token else None,
         status=OrderStatus.CONFIRMED if pay_at_pickup else OrderStatus.PENDING_PAYMENT,
         subtotal_cents=subtotal,

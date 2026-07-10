@@ -2579,6 +2579,17 @@
               }
             ],
             "title": "User Id"
+          },
+          "contact_handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Handle"
           }
         },
         "type": "object",
@@ -3326,8 +3337,15 @@
       "CheckoutIn": {
         "properties": {
           "email": {
-            "type": "string",
-            "format": "email",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Email"
           },
           "shipping_address": {
@@ -3372,12 +3390,21 @@
             ],
             "title": "Payment Method",
             "default": "online"
+          },
+          "contact_handle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Handle"
           }
         },
         "type": "object",
-        "required": [
-          "email"
-        ],
         "title": "CheckoutIn"
       },
       "CheckoutOut": {

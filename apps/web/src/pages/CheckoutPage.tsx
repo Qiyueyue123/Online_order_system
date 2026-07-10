@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ApiError,
   api,
@@ -11,6 +11,7 @@ import {
   formatSlotTime,
   humanizeError,
   PickupDay,
+  Session,
 } from "../api/client";
 import {
   CONTACT_TELEGRAM_HANDLE,
@@ -21,6 +22,7 @@ import {
 
 type Fields = {
   email: string;
+  contact_handle: string;
   recipient_name: string;
   line1: string;
   city: string;
@@ -34,6 +36,8 @@ export function CheckoutPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const cart = useQuery({ queryKey: ["cart"], queryFn: () => api<Cart>("/cart") });
+  const session = useQuery({ queryKey: ["session"], queryFn: () => api<Session>("/auth/session") });
+  const signedIn = !!session.data;
   const needsPickup = !!cart.data?.needs_pickup;
   const needsShipping = !!cart.data?.needs_shipping;
 
@@ -62,16 +66,21 @@ export function CheckoutPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<Fields>({ defaultValues: { country_code: "SE" } });
+  } = useForm<Fields>({ defaultValues: { country_code: "SE", contact_handle: "" } });
 
   const payingAtPickup = showPaymentChoice && paymentMethod === "pay_at_pickup";
 
   const checkout = useMutation({
     mutationFn: (values: Fields) => {
       const payload: CheckoutIn = {
-        email: values.email,
+        // Signed-in checkouts never send an email — the backend always uses
+        // the account's email on file and ignores this field anyway.
+        email: signedIn ? undefined : values.email,
         payment_method: showPaymentChoice ? paymentMethod : "online",
       };
+      if (values.contact_handle.trim()) {
+        payload.contact_handle = values.contact_handle.trim();
+      }
       if (needsShipping) {
         payload.shipping_address = {
           recipient_name: values.recipient_name,
@@ -139,11 +148,28 @@ export function CheckoutPage() {
         )}
       </section>
       <form onSubmit={handleSubmit((data) => checkout.mutate(data))}>
+        {signedIn ? (
+          <p className="checkout-note">
+            Receipt goes to {session.data!.user.email}.{" "}
+            <Link to="/account">Not you? Sign out</Link>
+          </p>
+        ) : (
+          <>
+            <label>
+              Email
+              <input type="email" {...register("email", { required: true })} />
+            </label>
+            {errors.email && <span role="alert">Email is required.</span>}
+          </>
+        )}
+
         <label>
-          Email
-          <input type="email" {...register("email", { required: true })} />
+          Telegram or WhatsApp (optional)
+          <input type="text" {...register("contact_handle")} />
         </label>
-        {errors.email && <span role="alert">Email is required.</span>}
+        <p className="hint">
+          If email doesn't reach you, we'll message you there about your order or payment.
+        </p>
 
         {needsPickup && (
           <div className="pickup-picker">

@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { api, formatNoticeDate, money, Notice, Product, ProductPage as ProductPageResult } from "../api/client";
 import { HeroCarousel } from "../components/HeroCarousel";
+import { MediaCarousel } from "../components/MediaCarousel";
 import { ProductArt } from "../components/ProductArt";
 
 function Noticeboard() {
@@ -30,7 +31,7 @@ function Noticeboard() {
 }
 
 export function ProductCard({ product, index }: { product: Product; index: number }) {
-  const photo = product.images[0];
+  const images = product.images;
   return (
     <Link
       className="product-card"
@@ -38,8 +39,8 @@ export function ProductCard({ product, index }: { product: Product; index: numbe
       style={{ animationDelay: `${index * 70}ms` }}
     >
       <div className="product-art">
-        {photo ? (
-          <img className="product-photo" src={photo.url} alt={photo.alt_text} loading="lazy" />
+        {images.length > 0 ? (
+          <MediaCarousel items={images} mediaClassName="product-photo" label={`${product.name} photos`} />
         ) : (
           <ProductArt slug={product.slug} category={product.category} name={product.name} tone={index} />
         )}

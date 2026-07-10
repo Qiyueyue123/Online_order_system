@@ -709,6 +709,8 @@ export interface components {
             created_at: string;
             /** User Id */
             user_id: string | null;
+            /** Contact Handle */
+            contact_handle?: string | null;
         };
         /** AdminOrderPage */
         AdminOrderPage: {
@@ -1005,11 +1007,8 @@ export interface components {
         };
         /** CheckoutIn */
         CheckoutIn: {
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
+            /** Email */
+            email?: string | null;
             shipping_address?: components["schemas"]["AddressIn"] | null;
             /** Pickup At */
             pickup_at?: string | null;
@@ -1021,6 +1020,8 @@ export interface components {
              * @enum {string}
              */
             payment_method: "online" | "pay_at_pickup";
+            /** Contact Handle */
+            contact_handle?: string | null;
         };
         /** CheckoutOut */
         CheckoutOut: {

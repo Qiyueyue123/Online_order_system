@@ -154,11 +154,26 @@ class AddressIn(BaseModel):
 
 
 class CheckoutIn(BaseModel):
-    email: EmailStr
+    # Optional because a logged-in checkout always uses the session user's
+    # email (see create_pending_order); guests still need one, enforced
+    # there rather than here so the error message can be friendlier than a
+    # generic field-required 422.
+    email: EmailStr | None = None
     shipping_address: AddressIn | None = None
     pickup_at: datetime | None = None
     coupon_code: str | None = Field(default=None, max_length=40)
     payment_method: Literal["online", "pay_at_pickup"] = "online"
+    # A Telegram/WhatsApp handle to fall back on if the confirmation email
+    # doesn't reach the customer. Purely for the shop's use -- never emailed.
+    contact_handle: str | None = Field(default=None, max_length=120)
+
+    @field_validator("contact_handle", mode="before")
+    @classmethod
+    def _blank_contact_handle_is_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
 
 
 class CheckoutOut(BaseModel):
@@ -212,6 +227,7 @@ class AdminStockIn(BaseModel):
 class AdminOrderOut(OrderOut):
     created_at: datetime
     user_id: uuid.UUID | None
+    contact_handle: str | None = None
 
 
 class AdminOrderPage(BaseModel):

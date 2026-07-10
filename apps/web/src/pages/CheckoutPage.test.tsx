@@ -77,9 +77,19 @@ const pickupDays: PickupDay[] = [
   },
 ];
 
-function stubFetch(cart: Cart, days: PickupDay[] = pickupDays) {
+const signedInSession = {
+  user: { id: "user-1", email: "account@example.com", name: "Ada", role: "customer", email_verified: true },
+  csrf_token: "csrf-token",
+};
+
+function stubFetch(cart: Cart, days: PickupDay[] = pickupDays, options: { signedIn?: boolean } = {}) {
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/auth/session")) {
+      return options.signedIn
+        ? Promise.resolve(new Response(JSON.stringify(signedInSession), { status: 200 }))
+        : Promise.resolve(new Response(JSON.stringify({ detail: "Authentication required" }), { status: 401 }));
+    }
     if (url.includes("/pickup-days")) {
       return Promise.resolve(new Response(JSON.stringify(days), { status: 200 }));
     }
@@ -401,6 +411,59 @@ describe("CheckoutPage", () => {
     expect(screen.queryByRole("group", { name: "Pickup day" })).not.toBeInTheDocument();
     const button = screen.getByRole("button", { name: /Continue to Stripe test checkout/ });
     expect(button).toBeDisabled();
+  });
+
+  it("hides the email input and shows a receipt line when signed in", async () => {
+    stubFetch(retailOnlyCart, pickupDays, { signedIn: true });
+
+    renderWithProviders(<CheckoutPage />);
+
+    expect(await screen.findByText(/Receipt goes to account@example.com/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Email/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Not you\? Sign out/ })).toHaveAttribute("href", "/account");
+  });
+
+  it("checks out while signed in without requiring the email field", async () => {
+    const fetchMock = stubFetch(retailOnlyCart, pickupDays, { signedIn: true });
+
+    const { container } = renderWithProviders(<CheckoutPage />);
+    await screen.findByText(/Receipt goes to account@example.com/);
+    fireEvent.change(screen.getByLabelText(/Recipient name/), { target: { value: "Ada Lovelace" } });
+    fireEvent.change(screen.getByLabelText(/Address/), { target: { value: "1 Analytical Engine Rd" } });
+    fireEvent.change(screen.getByLabelText(/^City/), { target: { value: "Umeå" } });
+    fireEvent.change(screen.getByLabelText(/Postal code/), { target: { value: "90325" } });
+    submitForm(container);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/v1/checkout", expect.objectContaining({ method: "POST" })),
+    );
+    const checkoutCall = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).includes("/checkout") && init?.method === "POST",
+    );
+    const body = JSON.parse(checkoutCall![1]!.body as string);
+    expect(body.email).toBeUndefined();
+  });
+
+  it("sends a trimmed contact_handle when filled in", async () => {
+    const fetchMock = stubFetch(retailOnlyCart);
+
+    const { container } = renderWithProviders(<CheckoutPage />);
+    fireEvent.change(await screen.findByLabelText(/Email/), { target: { value: "shopper@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Telegram or WhatsApp/), { target: { value: "  @shopper_tg  " } });
+    fireEvent.change(screen.getByLabelText(/Recipient name/), { target: { value: "Ada Lovelace" } });
+    fireEvent.change(screen.getByLabelText(/Address/), { target: { value: "1 Analytical Engine Rd" } });
+    fireEvent.change(screen.getByLabelText(/^City/), { target: { value: "Umeå" } });
+    fireEvent.change(screen.getByLabelText(/Postal code/), { target: { value: "90325" } });
+    submitForm(container);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/v1/checkout", expect.objectContaining({ method: "POST" })),
+    );
+    const checkoutCall = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).includes("/checkout") && init?.method === "POST",
+    );
+    const body = JSON.parse(checkoutCall![1]!.body as string);
+    expect(body.contact_handle).toBe("@shopper_tg");
   });
 
   it("shows a hint under the submit button when no pickup slot is chosen yet", async () => {

@@ -15,13 +15,13 @@ export function DemoPaymentPage() {
   });
   return (
     <div className="page narrow demo-payment">
-      <p className="eyebrow">LOCAL DEMONSTRATION</p>
+      <p className="eyebrow">PAYMENT</p>
       {!payment.data ? (
         <>
-          <h1>Simulate payment</h1>
-          <p>This page replaces Stripe while developing locally. It never charges a card.</p>
+          <h1>Confirm payment</h1>
+          <p>Review and confirm your payment to finish the order.</p>
           <button className="button" disabled={payment.isPending} onClick={() => payment.mutate()}>
-            {payment.isPending ? "Completing…" : "Complete test payment"}
+            {payment.isPending ? "Completing…" : "Complete payment"}
           </button>
           {payment.isError && <p role="alert">{humanizeError(payment.error)}</p>}
         </>

@@ -170,7 +170,7 @@ describe("CheckoutPage", () => {
 
     renderWithProviders(<CheckoutPage />);
 
-    const button = await screen.findByRole("button", { name: /Continue to Stripe test checkout/ });
+    const button = await screen.findByRole("button", { name: /Continue to payment/ });
     expect(button).toBeDisabled();
 
     const slotGroup = await screen.findByRole("group", { name: "Pickup time slot" });
@@ -409,7 +409,7 @@ describe("CheckoutPage", () => {
       await screen.findByText("No pickup times are open right now — check back soon, or message us."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Pickup day" })).not.toBeInTheDocument();
-    const button = screen.getByRole("button", { name: /Continue to Stripe test checkout/ });
+    const button = screen.getByRole("button", { name: /Continue to payment/ });
     expect(button).toBeDisabled();
   });
 

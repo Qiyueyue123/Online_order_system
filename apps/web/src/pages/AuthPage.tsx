@@ -32,7 +32,7 @@ export function AuthPage() {
       <section>
         <p className="eyebrow">YOUR ACCOUNT</p>
         <h1>{mode === "login" ? "Welcome back." : "Create an account."}</h1>
-        <p>Your account and orders are stored only in the local demonstration database.</p>
+        <p>We only use your account to keep your order history and send receipts.</p>
       </section>
       <form onSubmit={handleSubmit((values) => auth.mutate(values))}>
         {mode === "register" && (

@@ -74,7 +74,6 @@ def test_render_order_confirmation_includes_line_items_and_money_formatting(db):
     assert "Total: 69.00 SEK" in body
     assert "Guest Person" in body
     assert "Unit 02-03" in body
-    assert "demonstration store" in body
 
 
 def test_render_order_confirmation_includes_contact_line(db):

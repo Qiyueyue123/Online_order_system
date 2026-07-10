@@ -18,7 +18,7 @@ export function App() {
   const itemCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   return (
     <>
-      <div className="demo-strip">Portfolio demonstration · Stripe test mode · Prices in SEK · Pickup in Umeå</div>
+      <div className="demo-strip">Prices in SEK · Pickup in Umeå</div>
       <header>
         <Link className="brand" to="/" aria-label="QY &amp; YX's Cafe home">
           <span>抹茶</span> QY &amp; YX&rsquo;S CAFE
@@ -45,7 +45,7 @@ export function App() {
       <footer>
         <div className="footer-brand">
           <span className="brand"><span>抹茶</span> QY &amp; YX&rsquo;S CAFE</span>
-          <p>Matcha drinks whisked to order and picked up at our dorm kitchen in Umeå. A portfolio storefront—every order here is a demonstration.</p>
+          <p>Matcha drinks whisked to order and picked up at our dorm kitchen in Umeå.</p>
           <p className="photo-credit">
             Drink and product photography courtesy of{" "}
             <a href="https://www.nikonekomatcha.com/" target="_blank" rel="noreferrer">Niko Neko Matcha</a>.
@@ -76,7 +76,6 @@ export function App() {
           {" · "}WhatsApp{" "}
           <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">{CONTACT_WHATSAPP_HANDLE}</a>
         </p>
-        <p className="footer-disclaimer">Taxes, import duties and currency conversion are outside this demonstration. Payments run through Stripe test mode; no real charge is ever made.</p>
       </footer>
     </>
   );

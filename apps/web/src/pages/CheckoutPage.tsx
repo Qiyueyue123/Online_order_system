@@ -135,12 +135,12 @@ export function CheckoutPage() {
   return (
     <div className="page checkout">
       <section>
-        <p className="eyebrow">SECURE TEST CHECKOUT</p>
+        <p className="eyebrow">SECURE CHECKOUT</p>
         <h1>Where do we reach you?</h1>
         <p>
           {payingAtPickup
             ? "Pay in person when you collect your order — cash, Revolut, or Swish transfer."
-            : "Payments use Stripe test mode. No live charge will be made."}
+            : "Card payments are handled securely by Stripe."}
         </p>
         {needsPickup && (
           <p className="checkout-note">
@@ -248,7 +248,7 @@ export function CheckoutPage() {
                 checked={paymentMethod === "online"}
                 onChange={() => setPaymentMethod("online")}
               />
-              Pay online now (test mode)
+              Pay online now
             </label>
             <label className="radio-option">
               <input
@@ -312,7 +312,7 @@ export function CheckoutPage() {
             ? "Just a moment…"
             : payingAtPickup
               ? "Confirm order — pay at pickup"
-              : "Continue to Stripe test checkout"}
+              : "Continue to payment"}
         </button>
         {needsPickup && !selectedSlot && (
           <p className="hint">Choose a pickup time above to continue.</p>

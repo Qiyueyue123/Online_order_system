@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Matcha Demonstration Store API",
-    "description": "Matcha drinks cafe run from a dorm kitchen in Umea, Sweden. Test payments only; no real money changes hands.",
+    "title": "QY & YX's Cafe API",
+    "description": "Matcha drinks cafe in Ume\u00e5, Sweden \u2014 order online, pick up at the counter.",
     "version": "1.0.0"
   },
   "paths": {

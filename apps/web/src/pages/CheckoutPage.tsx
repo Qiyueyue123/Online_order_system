@@ -18,6 +18,7 @@ import {
   CONTACT_TELEGRAM_URL,
   CONTACT_WHATSAPP_HANDLE,
   CONTACT_WHATSAPP_URL,
+  PICKUP_ADDRESS,
 } from "../contact";
 
 type Fields = {
@@ -143,7 +144,7 @@ export function CheckoutPage() {
         </p>
         {needsPickup && (
           <p className="checkout-note">
-            Pickup at the dorm kitchen, Umeå — the exact address comes with your confirmation email.
+            Pickup at {PICKUP_ADDRESS} — the details come with your confirmation email too.
           </p>
         )}
       </section>

@@ -5,6 +5,7 @@ import {
   CONTACT_TELEGRAM_URL,
   CONTACT_WHATSAPP_HANDLE,
   CONTACT_WHATSAPP_URL,
+  PICKUP_ADDRESS,
 } from "../contact";
 
 // Static confirmation shown after checkout — no API calls. Order details
@@ -19,7 +20,7 @@ export function ThankYouPage() {
     <div className="page narrow thank-you">
       <p className="eyebrow">THANK YOU</p>
       <h1>{order ? <>Thanks — your order <strong>{order}</strong> is in.</> : "Thanks — your order is in."}</h1>
-      {pickup && <p className="pickup-time">Pickup {formatPickup(pickup)}</p>}
+      {pickup && <p className="pickup-time">Pickup {formatPickup(pickup)} at {PICKUP_ADDRESS}</p>}
       <p>A confirmation email with the details is on its way.</p>
       <p className="contact-line">
         Questions or payment issues? Telegram{" "}

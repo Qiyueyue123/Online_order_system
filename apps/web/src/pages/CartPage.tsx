@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, Cart, formatDrinkOptions, humanizeError, money } from "../api/client";
+import { PICKUP_ADDRESS } from "../contact";
 
 // How long "Removed. Undo" stays up before the line is actually deleted.
 const UNDO_WINDOW_MS = 5000;
@@ -84,7 +85,7 @@ export function CartPage() {
           <>
             <div className="cart-total"><span>Subtotal</span><strong>{money(visibleSubtotal)}</strong></div>
             {cart.data?.needs_pickup && (
-              <div className="cart-total cart-total--pickup"><span>Pickup · dorm kitchen, Umeå</span><strong>{money(0)}</strong></div>
+              <div className="cart-total cart-total--pickup"><span>Pickup · {PICKUP_ADDRESS}</span><strong>{money(0)}</strong></div>
             )}
             {cart.data?.needs_shipping && (
               <div className="cart-total cart-total--pickup"><span>Shipping</span><strong>Calculated at checkout</strong></div>

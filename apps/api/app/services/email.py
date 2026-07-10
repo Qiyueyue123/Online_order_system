@@ -111,7 +111,7 @@ def _render_order_confirmation(order: Order, settings: Settings | None = None) -
         local = pickup_at.astimezone(cafe_tz())
         lines += [
             "",
-            f"Pickup: {local:%a %d %b %Y, %H:%M} at the dorm kitchen, Umeå",
+            f"Pickup: {local:%a %d %b %Y, %H:%M} at {settings.pickup_address}",
         ]
     if order.shipping_line1:
         lines += [

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Shown in the pay-at-pickup confirmation email as a Revolut/Swish handle;
     # empty means the email falls back to a generic "cash at pickup" line.
     pickup_payment_note: str = ""
+    # Street address printed on confirmation emails and the storefront wherever
+    # the pickup spot is described.
+    pickup_address: str = "Stipendiegränd 10C, room 0202, Umeå"
     # Contact handles shown on the confirmation email and site for questions or
     # payment issues; kept in settings rather than hardcoded in the template.
     contact_telegram: str = "@notqiyue"

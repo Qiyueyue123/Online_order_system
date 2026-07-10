@@ -282,7 +282,7 @@ def test_receipt_shows_pickup_line_instead_of_shipping(client, db):
 
     order = db.query(Order).one()
     body = _render_order_confirmation(order)
-    assert "at the dorm kitchen, Umeå" in body
+    assert "at Stipendiegränd 10C, room 0202, Umeå" in body
     # The receipt shows café wall-clock time (16:00), not the stored UTC instant.
     assert "16:00" in body
     assert "14:00" not in body
@@ -297,7 +297,7 @@ def test_receipt_keeps_shipping_block_for_shipped_orders(client, db):
     order = db.query(Order).one()
     body = _render_order_confirmation(order)
     assert "Shipping to:" in body
-    assert "dorm kitchen" not in body
+    assert "Stipendiegränd" not in body
 
 
 # --- admin CRUD ----------------------------------------------------------

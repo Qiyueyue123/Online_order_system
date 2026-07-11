@@ -12,6 +12,7 @@ import {
   humanizeError,
   PickupDay,
   Session,
+  StorefrontConfig,
 } from "../api/client";
 import {
   CONTACT_TELEGRAM_HANDLE,
@@ -48,13 +49,25 @@ export function CheckoutPage() {
     enabled: needsPickup,
   });
 
+  // Online payments are off until the owner trusts an automated confirmation
+  // flow; if this call fails, default to disabled so the safe (pay-at-pickup
+  // only) path wins rather than silently offering an online option no one
+  // will process.
+  const storefrontConfig = useQuery({
+    queryKey: ["storefront-config"],
+    queryFn: () => api<StorefrontConfig>("/storefront-config"),
+    retry: false,
+  });
+  const onlinePaymentsEnabled = storefrontConfig.data?.online_payments_enabled === true;
+
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [slotConflict, setSlotConflict] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"online" | "pay_at_pickup">("online");
   // The API rejects pay_at_pickup whenever shipping is involved, so the choice
   // only makes sense — and is only offered — for a pickup-only cart.
-  const showPaymentChoice = needsPickup && !needsShipping;
+  const canChoosePayment = needsPickup && !needsShipping;
+  const showPaymentChoice = canChoosePayment && onlinePaymentsEnabled;
 
   // Default to the first available day once the pickup days load.
   useEffect(() => {
@@ -69,7 +82,19 @@ export function CheckoutPage() {
     formState: { errors },
   } = useForm<Fields>({ defaultValues: { country_code: "SE", contact_handle: "" } });
 
-  const payingAtPickup = showPaymentChoice && paymentMethod === "pay_at_pickup";
+  // When online payments are off, a pickup-only cart always pays at pickup —
+  // there's no radio group to read from. Carts that need shipping keep the
+  // old default (they were never offered pay-at-pickup) and will 422 if
+  // submitted while online payments are disabled, which is acceptable while
+  // shipped items are placeholders.
+  const effectivePaymentMethod: "online" | "pay_at_pickup" = !onlinePaymentsEnabled
+    ? canChoosePayment
+      ? "pay_at_pickup"
+      : "online"
+    : showPaymentChoice
+      ? paymentMethod
+      : "online";
+  const payingAtPickup = effectivePaymentMethod === "pay_at_pickup";
 
   const checkout = useMutation({
     mutationFn: (values: Fields) => {
@@ -77,7 +102,7 @@ export function CheckoutPage() {
         // Signed-in checkouts never send an email — the backend always uses
         // the account's email on file and ignores this field anyway.
         email: signedIn ? undefined : values.email,
-        payment_method: showPaymentChoice ? paymentMethod : "online",
+        payment_method: effectivePaymentMethod,
       };
       if (values.contact_handle.trim()) {
         payload.contact_handle = values.contact_handle.trim();
@@ -139,7 +164,7 @@ export function CheckoutPage() {
         <h1>Where do we reach you?</h1>
         <p>
           {payingAtPickup
-            ? "Pay in person when you collect your order — cash, Revolut, or Swish transfer."
+            ? "Pay in person when you collect your order — cash or a Revolut transfer."
             : "Card payments are handled securely by Stripe."}
         </p>
         {needsPickup && (
@@ -258,8 +283,22 @@ export function CheckoutPage() {
                 checked={paymentMethod === "pay_at_pickup"}
                 onChange={() => setPaymentMethod("pay_at_pickup")}
               />
-              Pay at pickup — cash or Revolut/Swish transfer
+              Pay at pickup — cash or Revolut transfer
             </label>
+          </div>
+        )}
+
+        {!onlinePaymentsEnabled && canChoosePayment && (
+          <div className="payment-choice">
+            <h2>Payment</h2>
+            <p>
+              Pay when you collect — cash, or send a Revolut transfer and message us on
+              Telegram{" "}
+              <a href={CONTACT_TELEGRAM_URL} target="_blank" rel="noreferrer">{CONTACT_TELEGRAM_HANDLE}</a>{" "}
+              or WhatsApp{" "}
+              <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">{CONTACT_WHATSAPP_HANDLE}</a>{" "}
+              so we can confirm it.
+            </p>
           </div>
         )}
 

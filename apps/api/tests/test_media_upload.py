@@ -116,8 +116,31 @@ def test_admin_upload_rejects_unsupported_file(client, db, uploads_dir_override)
     assert db.query(ProductImage).count() == 0
 
 
+def _video_probe(path):
+    probe = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name,width,height",
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    return json.loads(probe.stdout)["streams"][0]
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
-def test_admin_can_upload_and_transcode_a_video(client, db, uploads_dir_override):
+def test_admin_can_upload_and_remux_an_h264_video(client, db, uploads_dir_override):
+    """An already-h264 source should be remuxed losslessly, keeping the exact
+    source resolution (no more downscaling to 720p) and codec."""
     headers = admin_headers(client, db)
     product = add_product(db)
 
@@ -129,14 +152,18 @@ def test_admin_can_upload_and_transcode_a_video(client, db, uploads_dir_override
             "-f",
             "lavfi",
             "-i",
-            "testsrc=duration=1:size=320x240:rate=10",
+            "testsrc=duration=1:size=1280x960:rate=10",
             "-pix_fmt",
             "yuv420p",
+            "-c:v",
+            "libx264",
             str(clip),
         ],
         check=True,
         capture_output=True,
     )
+    source_probe = _video_probe(clip)
+    assert source_probe["codec_name"] == "h264"
 
     response = client.post(
         f"/api/v1/admin/products/{product.id}/images/upload",
@@ -148,3 +175,60 @@ def test_admin_can_upload_and_transcode_a_video(client, db, uploads_dir_override
     image = response.json()["images"][0]
     assert image["media_type"] == "video"
     assert image["url"].startswith("/uploads/")
+
+    stored = uploads_dir_override / image["url"].removeprefix("/uploads/")
+    stored_probe = _video_probe(stored)
+    assert stored_probe["codec_name"] == "h264"
+    # Remux path: resolution must exactly match the source -- no downscaling.
+    assert stored_probe["width"] == source_probe["width"]
+    assert stored_probe["height"] == source_probe["height"]
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_admin_upload_transcodes_non_h264_video_at_full_resolution(
+    client, db, uploads_dir_override
+):
+    """A non-h264 source (e.g. HEVC) must still be transcoded for browser
+    compatibility, but at full resolution rather than downscaled to 720p."""
+    headers = admin_headers(client, db)
+    product = add_product(db)
+
+    clip = uploads_dir_override / "clip.mp4"
+    encode = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc=duration=1:size=1280x960:rate=10",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "libx265",
+            "-tag:v",
+            "hvc1",
+            str(clip),
+        ],
+        capture_output=True,
+    )
+    if encode.returncode != 0:
+        pytest.skip("ffmpeg build has no libx265 encoder")
+    source_probe = _video_probe(clip)
+    assert source_probe["codec_name"] == "hevc"
+
+    response = client.post(
+        f"/api/v1/admin/products/{product.id}/images/upload",
+        headers=headers,
+        files={"file": ("clip.mp4", clip.read_bytes(), "video/mp4")},
+        data={"alt_text": "Pouring the drink"},
+    )
+    assert response.status_code == 201
+    image = response.json()["images"][0]
+    assert image["media_type"] == "video"
+
+    stored = uploads_dir_override / image["url"].removeprefix("/uploads/")
+    stored_probe = _video_probe(stored)
+    assert stored_probe["codec_name"] == "h264"
+    assert stored_probe["width"] == source_probe["width"]
+    assert stored_probe["height"] == source_probe["height"]

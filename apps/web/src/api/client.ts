@@ -43,6 +43,7 @@ export type Notice = components["schemas"]["NoticeOut"];
 export type AdminNotice = components["schemas"]["AdminNoticeOut"];
 export type AdminNoticeIn = components["schemas"]["AdminNoticeIn"];
 export type AdminNoticeUpdateIn = components["schemas"]["AdminNoticeUpdateIn"];
+export type StorefrontConfig = components["schemas"]["StorefrontConfigOut"];
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

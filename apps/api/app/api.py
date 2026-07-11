@@ -68,6 +68,7 @@ from .schemas import (
     ProductPage,
     RegisterIn,
     SessionOut,
+    StorefrontConfigOut,
     UserOut,
 )
 from .security import (
@@ -357,6 +358,17 @@ def pickup_days(db: Session = Depends(get_db)):
         if slots:
             days.append(PickupDayPublicOut(date=day.date, slots=slots))
     return days
+
+
+@router.get("/storefront-config", response_model=StorefrontConfigOut)
+def storefront_config(settings: Settings = Depends(get_settings)):
+    """Public feature flags the frontend needs before rendering checkout.
+
+    Single source of truth for whether online payment is offered right now;
+    the frontend falls back to "disabled" if this call fails, so the pay-at-
+    pickup-only path is always the safe default.
+    """
+    return StorefrontConfigOut(online_payments_enabled=settings.online_payments_enabled)
 
 
 @router.post("/checkout", response_model=CheckoutOut, status_code=201)

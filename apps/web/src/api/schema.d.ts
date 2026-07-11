@@ -197,6 +197,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/storefront-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storefront Config
+         * @description Public feature flags the frontend needs before rendering checkout.
+         *
+         *     Single source of truth for whether online payment is offered right now;
+         *     the frontend falls back to "disabled" if this call fails, so the pay-at-
+         *     pickup-only path is always the safe default.
+         */
+        get: operations["storefront_config_api_v1_storefront_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/checkout": {
         parameters: {
             query?: never;
@@ -1282,6 +1306,11 @@ export interface components {
             /** Csrf Token */
             csrf_token: string;
         };
+        /** StorefrontConfigOut */
+        StorefrontConfigOut: {
+            /** Online Payments Enabled */
+            online_payments_enabled: boolean;
+        };
         /** UserOut */
         UserOut: {
             /**
@@ -1672,6 +1701,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PickupDayPublicOut"][];
+                };
+            };
+        };
+    };
+    storefront_config_api_v1_storefront_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorefrontConfigOut"];
                 };
             };
         };

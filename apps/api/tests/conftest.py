@@ -5,6 +5,10 @@ from datetime import UTC, datetime
 os.environ["ENVIRONMENT"] = "test"
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["RESERVATION_SWEEP_INTERVAL_SECONDS"] = "0"
+# Online payments default off in production; most existing checkout tests
+# exercise the "online" payment_method path, so keep it on by default here
+# and let the specific disabled-flow tests override settings themselves.
+os.environ["ONLINE_PAYMENTS_ENABLED"] = "true"
 
 import pytest
 from fastapi.testclient import TestClient

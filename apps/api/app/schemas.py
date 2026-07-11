@@ -365,3 +365,7 @@ class AdminPickupDayUpdateIn(BaseModel):
     slot_minutes: int | None = Field(default=None, gt=0, le=240)
     slot_capacity: int | None = Field(default=None, gt=0, le=100)
     is_available: bool | None = None
+
+
+class StorefrontConfigOut(BaseModel):
+    online_payments_enabled: bool

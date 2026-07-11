@@ -94,7 +94,8 @@ def test_pay_at_pickup_email_uses_configured_payment_note(client, db):
 
     order = db.query(Order).one()
     body = _render_order_confirmation(order, settings)
-    assert "Revolut/Swish to @ajisai-cafe" in body
+    assert "Revolut transfer to @ajisai-cafe" in body
+    assert "message us on Telegram" in body
 
 
 def test_confirmed_order_immune_to_reservation_sweep(client, db):

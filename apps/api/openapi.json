@@ -596,6 +596,25 @@
         }
       }
     },
+    "/api/v1/storefront-config": {
+      "get": {
+        "summary": "Storefront Config",
+        "description": "Public feature flags the frontend needs before rendering checkout.\n\nSingle source of truth for whether online payment is offered right now;\nthe frontend falls back to \"disabled\" if this call fails, so the pay-at-\npickup-only path is always the safe default.",
+        "operationId": "storefront_config_api_v1_storefront_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontConfigOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/checkout": {
       "post": {
         "summary": "Checkout",
@@ -4234,6 +4253,19 @@
           "csrf_token"
         ],
         "title": "SessionOut"
+      },
+      "StorefrontConfigOut": {
+        "properties": {
+          "online_payments_enabled": {
+            "type": "boolean",
+            "title": "Online Payments Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "online_payments_enabled"
+        ],
+        "title": "StorefrontConfigOut"
       },
       "UserOut": {
         "properties": {

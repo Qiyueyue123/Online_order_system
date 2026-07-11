@@ -71,6 +71,12 @@ def create_pending_order(
     else:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Email is required")
 
+    if data.payment_method == "online" and not settings.online_payments_enabled:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Online payment is currently unavailable -- pay at pickup instead.",
+        )
+
     needs_pickup, needs_shipping = classify_cart(cart)
     if needs_pickup and data.pickup_at is None:
         raise HTTPException(

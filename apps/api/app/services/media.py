@@ -22,8 +22,8 @@ pillow_heif.register_heif_opener()
 pillow_heif.register_avif_opener()
 
 MAX_IMAGE_DIMENSION = 1600
-MAX_VIDEO_HEIGHT = 720
 MAX_VIDEO_DURATION_SECONDS = 90
+FFMPEG_TIMEOUT_SECONDS = 300
 _UNSUPPORTED_MESSAGE = (
     "That doesn't look like a supported photo or video -- try a JPEG, PNG, "
     "HEIC, MP4 or MOV file."
@@ -94,7 +94,8 @@ def _detect_kind(tmp_path: Path) -> str | None:
     return None
 
 
-def _has_video_stream(tmp_path: Path) -> bool:
+def _probe_streams(tmp_path: Path) -> list[dict] | None:
+    """Runs ffprobe once and returns the raw stream list, or None on failure."""
     try:
         probe = subprocess.run(
             ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams", str(tmp_path)],
@@ -103,14 +104,34 @@ def _has_video_stream(tmp_path: Path) -> bool:
             text=True,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+        return None
     if probe.returncode != 0:
-        return False
+        return None
     try:
         data = json.loads(probe.stdout)
     except json.JSONDecodeError:
+        return None
+    return data.get("streams", [])
+
+
+def _has_video_stream(tmp_path: Path) -> bool:
+    streams = _probe_streams(tmp_path)
+    if streams is None:
         return False
-    return any(stream.get("codec_type") == "video" for stream in data.get("streams", []))
+    return any(stream.get("codec_type") == "video" for stream in streams)
+
+
+def _stream_codecs(tmp_path: Path) -> tuple[str | None, str | None]:
+    """Returns (video_codec_name, audio_codec_name) for the first video and
+    audio streams found, or None for either that's absent/unreadable."""
+    streams = _probe_streams(tmp_path) or []
+    video_codec = next(
+        (s.get("codec_name") for s in streams if s.get("codec_type") == "video"), None
+    )
+    audio_codec = next(
+        (s.get("codec_name") for s in streams if s.get("codec_type") == "audio"), None
+    )
+    return video_codec, audio_codec
 
 
 def _process_image(tmp_path: Path, dest_dir: Path) -> str:
@@ -140,34 +161,53 @@ def _process_video(tmp_path: Path, dest_dir: Path) -> str:
 
     filename = f"{secrets.token_hex(8)}.mp4"
     dest = dest_dir / filename
+    video_codec, audio_codec = _stream_codecs(tmp_path)
+
+    if video_codec == "h264":
+        # Already browser-playable: remux into an mp4 container losslessly
+        # instead of re-encoding, so uploaded quality is preserved exactly.
+        # Audio is copied as-is when it's already aac; anything else (e.g.
+        # some phones ship mp3 or pcm in an h264 clip) needs a quick audio-only
+        # transcode since the container/codec pairing must be mp4-compatible.
+        audio_args = ["-c:a", "copy"] if audio_codec == "aac" else ["-c:a", "aac", "-b:a", "192k"]
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(tmp_path),
+            "-c:v",
+            "copy",
+            *audio_args,
+            "-movflags",
+            "+faststart",
+            str(dest),
+        ]
+    else:
+        # Non-h264 sources (HEVC from iPhones, VP9, etc.) aren't reliably
+        # playable in browsers, so a transcode is unavoidable here -- but we
+        # keep the original resolution (no more downscaling to 720p) and use
+        # crf 18, which is "visually lossless" (indistinguishable from the
+        # source to the eye) rather than the old, visibly-compressed crf 26.
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(tmp_path),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-c:a",
+            "aac",
+            "-movflags",
+            "+faststart",
+            str(dest),
+        ]
+
     try:
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(tmp_path),
-                # Scale to a max height of 720px, preserving aspect ratio;
-                # the -2 keeps the computed width even, which libx264 requires.
-                # The comma inside min(...) must be escaped -- ffmpeg's filter
-                # graph syntax otherwise reads it as a filter separator.
-                "-vf",
-                f"scale=-2:min({MAX_VIDEO_HEIGHT}\\,ih)",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-crf",
-                "26",
-                "-c:a",
-                "aac",
-                "-movflags",
-                "+faststart",
-                str(dest),
-            ],
-            capture_output=True,
-            timeout=120,
-        )
+        result = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT_SECONDS)
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "We couldn't process that video -- try again."

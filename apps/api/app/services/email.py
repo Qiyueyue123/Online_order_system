@@ -98,9 +98,16 @@ def _render_order_confirmation(order: Order, settings: Settings | None = None) -
         money = f"{_format_money(order.total_cents)} {order.currency}"
         payment_line = f"Pay {money} at pickup — "
         if settings.pickup_payment_note:
-            payment_line += f"cash, or transfer via Revolut/Swish to {settings.pickup_payment_note}"
+            payment_line += (
+                f"cash, or Revolut transfer to {settings.pickup_payment_note}. If you "
+                f"transfer, message us on Telegram {settings.contact_telegram} so we can "
+                "confirm it."
+            )
         else:
-            payment_line += "cash at pickup"
+            payment_line += (
+                f"cash, or Revolut transfer — message us on Telegram "
+                f"{settings.contact_telegram} so we can confirm it."
+            )
         lines += ["", payment_line]
     if order.pickup_at is not None:
         # Stored as UTC (naive when read back from SQLite); the receipt must show

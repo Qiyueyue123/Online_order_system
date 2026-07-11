@@ -283,3 +283,46 @@ def test_configured_shipping_countries_still_restrict(client, db):
         },
     )
     assert response.status_code == 422
+
+
+def test_storefront_config_reports_online_payments_flag(client):
+    response = client.get("/api/v1/storefront-config")
+    assert response.status_code == 200
+    assert response.json() == {"online_payments_enabled": True}
+
+    from app.main import app
+
+    settings = get_settings().model_copy(update={"online_payments_enabled": False})
+    app.dependency_overrides[get_settings] = lambda: settings
+    response = client.get("/api/v1/storefront-config")
+    assert response.status_code == 200
+    assert response.json() == {"online_payments_enabled": False}
+
+
+def test_online_checkout_rejected_when_online_payments_disabled(client, db):
+    from app.main import app
+
+    settings = get_settings().model_copy(update={"online_payments_enabled": False})
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    product = add_product(db)
+    client.put(
+        "/api/v1/cart/items",
+        json={"variant_id": str(product.variants[0].id), "quantity": 1},
+    )
+    response = client.post(
+        "/api/v1/checkout",
+        json={
+            "email": "guest@example.com",
+            "payment_method": "online",
+            "shipping_address": {
+                "recipient_name": "Guest",
+                "line1": "1 Tea Street",
+                "city": "Umea",
+                "postal_code": "90325",
+                "country_code": "SE",
+            },
+        },
+    )
+    assert response.status_code == 422
+    assert "Online payment is currently unavailable" in response.json()["detail"]

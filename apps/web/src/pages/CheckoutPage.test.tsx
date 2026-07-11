@@ -82,13 +82,23 @@ const signedInSession = {
   csrf_token: "csrf-token",
 };
 
-function stubFetch(cart: Cart, days: PickupDay[] = pickupDays, options: { signedIn?: boolean } = {}) {
+function stubFetch(
+  cart: Cart,
+  days: PickupDay[] = pickupDays,
+  options: { signedIn?: boolean; onlinePaymentsEnabled?: boolean } = {},
+) {
+  const onlinePaymentsEnabled = options.onlinePaymentsEnabled ?? true;
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/auth/session")) {
       return options.signedIn
         ? Promise.resolve(new Response(JSON.stringify(signedInSession), { status: 200 }))
         : Promise.resolve(new Response(JSON.stringify({ detail: "Authentication required" }), { status: 401 }));
+    }
+    if (url.includes("/storefront-config")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ online_payments_enabled: onlinePaymentsEnabled }), { status: 200 }),
+      );
     }
     if (url.includes("/pickup-days")) {
       return Promise.resolve(new Response(JSON.stringify(days), { status: 200 }));
@@ -225,6 +235,9 @@ describe("CheckoutPage", () => {
   it("shows an error state when checkout fails (e.g. insufficient stock)", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/storefront-config")) {
+        return Promise.resolve(new Response(JSON.stringify({ online_payments_enabled: true }), { status: 200 }));
+      }
       if (url.includes("/cart")) {
         return Promise.resolve(new Response(JSON.stringify(retailOnlyCart), { status: 200 }));
       }
@@ -252,6 +265,9 @@ describe("CheckoutPage", () => {
     let checkoutAttempt = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/storefront-config")) {
+        return Promise.resolve(new Response(JSON.stringify({ online_payments_enabled: true }), { status: 200 }));
+      }
       if (url.includes("/pickup-days")) {
         return Promise.resolve(new Response(JSON.stringify(pickupDays), { status: 200 }));
       }
@@ -345,6 +361,9 @@ describe("CheckoutPage", () => {
   it("navigates to /thanks (not checkout_url) after a successful pay-at-pickup order", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/storefront-config")) {
+        return Promise.resolve(new Response(JSON.stringify({ online_payments_enabled: true }), { status: 200 }));
+      }
       if (url.includes("/pickup-days")) {
         return Promise.resolve(new Response(JSON.stringify(pickupDays), { status: 200 }));
       }
@@ -478,5 +497,35 @@ describe("CheckoutPage", () => {
     fireEvent.click(within(slotGroup).getAllByRole("button")[0]);
 
     expect(screen.queryByText("Choose a pickup time above to continue.")).not.toBeInTheDocument();
+  });
+
+  it("hides the payment radio and shows pay-at-pickup info when online payments are disabled", async () => {
+    stubFetch(pickupOnlyCart, pickupDays, { onlinePaymentsEnabled: false });
+
+    renderWithProviders(<CheckoutPage />);
+
+    await screen.findByRole("group", { name: "Pickup day" });
+    expect(screen.queryByRole("radiogroup", { name: "Payment method" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Pay when you collect/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm order — pay at pickup" })).toBeInTheDocument();
+  });
+
+  it("submits payment_method: pay_at_pickup when online payments are disabled", async () => {
+    const fetchMock = stubFetch(pickupOnlyCart, pickupDays, { onlinePaymentsEnabled: false });
+
+    const { container } = renderWithProviders(<CheckoutPage />);
+    fireEvent.change(await screen.findByLabelText(/Email/), { target: { value: "shopper@example.com" } });
+    const slotGroup = await screen.findByRole("group", { name: "Pickup time slot" });
+    fireEvent.click(within(slotGroup).getAllByRole("button")[0]);
+    submitForm(container);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/v1/checkout", expect.objectContaining({ method: "POST" })),
+    );
+    const checkoutCall = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).includes("/checkout") && init?.method === "POST",
+    );
+    const body = JSON.parse(checkoutCall![1]!.body as string);
+    expect(body.payment_method).toBe("pay_at_pickup");
   });
 });

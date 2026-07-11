@@ -17,6 +17,7 @@ import {
   Product,
   ProductPage as ProductPageResult,
   Session,
+  StorefrontConfig,
 } from "../api/client";
 import {
   CONTACT_TELEGRAM_HANDLE,
@@ -141,6 +142,16 @@ export function OrderFlowPage() {
     enabled: step === "pickup" && needsPickup,
   });
 
+  // Online payments are off until the owner trusts an automated confirmation
+  // flow; if this call fails, default to disabled so the safe (pay-at-pickup
+  // only) path wins.
+  const storefrontConfig = useQuery({
+    queryKey: ["storefront-config"],
+    queryFn: () => api<StorefrontConfig>("/storefront-config"),
+    retry: false,
+  });
+  const onlinePaymentsEnabled = storefrontConfig.data?.online_payments_enabled === true;
+
   // Customise step state
   const [customiseSlug, setCustomiseSlug] = useState<string | null>(null);
   const [variantId, setVariantId] = useState("");
@@ -164,8 +175,20 @@ export function OrderFlowPage() {
   // Payment step state
   const [paymentMethod, setPaymentMethod] = useState<"online" | "pay_at_pickup">("online");
 
-  const showPaymentChoice = needsPickup && !needsShipping;
-  const payingAtPickup = showPaymentChoice && paymentMethod === "pay_at_pickup";
+  const canChoosePayment = needsPickup && !needsShipping;
+  const showPaymentChoice = canChoosePayment && onlinePaymentsEnabled;
+  // When online payments are off, a pickup-only cart always pays at pickup;
+  // carts needing shipping keep the prior default (never offered
+  // pay-at-pickup) and will 422 if online is disabled, which is acceptable
+  // while shipped items are placeholders.
+  const effectivePaymentMethod: "online" | "pay_at_pickup" = !onlinePaymentsEnabled
+    ? canChoosePayment
+      ? "pay_at_pickup"
+      : "online"
+    : showPaymentChoice
+      ? paymentMethod
+      : "online";
+  const payingAtPickup = effectivePaymentMethod === "pay_at_pickup";
 
   const add = useMutation({
     mutationFn: (payload: CartItemIn) => api<Cart>("/cart/items", { method: "PUT", body: JSON.stringify(payload) }),
@@ -185,7 +208,7 @@ export function OrderFlowPage() {
     mutationFn: () => {
       const payload: CheckoutIn = {
         email: signedIn ? undefined : email.trim(),
-        payment_method: showPaymentChoice ? paymentMethod : "online",
+        payment_method: effectivePaymentMethod,
       };
       if (contactHandle.trim()) payload.contact_handle = contactHandle.trim();
       if (needsPickup && selectedSlot) payload.pickup_at = selectedSlot;
@@ -590,8 +613,22 @@ export function OrderFlowPage() {
                         checked={paymentMethod === "pay_at_pickup"}
                         onChange={() => setPaymentMethod("pay_at_pickup")}
                       />
-                      Pay at pickup — cash or Revolut/Swish transfer
+                      Pay at pickup — cash or Revolut transfer
                     </label>
+                  </div>
+                )}
+
+                {!onlinePaymentsEnabled && canChoosePayment && (
+                  <div className="payment-choice">
+                    <h2>Payment</h2>
+                    <p>
+                      Pay when you collect — cash, or send a Revolut transfer and message us on
+                      Telegram{" "}
+                      <a href={CONTACT_TELEGRAM_URL} target="_blank" rel="noreferrer">{CONTACT_TELEGRAM_HANDLE}</a>{" "}
+                      or WhatsApp{" "}
+                      <a href={CONTACT_WHATSAPP_URL} target="_blank" rel="noreferrer">{CONTACT_WHATSAPP_HANDLE}</a>{" "}
+                      so we can confirm it.
+                    </p>
                   </div>
                 )}
                 <p className="contact-line">

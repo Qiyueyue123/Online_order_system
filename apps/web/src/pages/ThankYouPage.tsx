@@ -22,6 +22,9 @@ export function ThankYouPage() {
       <h1>{order ? <>Thanks — your order <strong>{order}</strong> is in.</> : "Thanks — your order is in."}</h1>
       {pickup && <p className="pickup-time">Pickup {formatPickup(pickup)} at {PICKUP_ADDRESS}</p>}
       <p>A confirmation email with the details is on its way.</p>
+      <p>
+        Paying by Revolut? Message us once you've sent it so we can confirm it arrived.
+      </p>
       <p className="contact-line">
         Questions or payment issues? Telegram{" "}
         <a href={CONTACT_TELEGRAM_URL} target="_blank" rel="noreferrer">{CONTACT_TELEGRAM_HANDLE}</a>{" "}

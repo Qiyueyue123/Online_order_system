@@ -35,9 +35,13 @@ class Settings(BaseSettings):
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     email_from: str = "orders@morimatcha.example"
-    # Shown in the pay-at-pickup confirmation email as a Revolut/Swish handle;
-    # empty means the email falls back to a generic "cash at pickup" line.
+    # Shown in the pay-at-pickup confirmation email as a Revolut handle; empty
+    # means the email falls back to a generic "cash at pickup" line.
     pickup_payment_note: str = ""
+    # Stripe/online checkout is off until the owner trusts an automated
+    # confirmation flow; customers pay cash or Revolut-transfer at pickup and
+    # message to confirm. Flip this back on (env var) for the Stripe go-live.
+    online_payments_enabled: bool = False
     # Street address printed on confirmation emails and the storefront wherever
     # the pickup spot is described.
     pickup_address: str = "Stipendiegränd 10C, room 0202, Umeå"

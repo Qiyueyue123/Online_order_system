@@ -37,7 +37,9 @@ services:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg://matcha:matcha@postgres:5432/matcha
       APP_SECRET: development-only-secret-change-me
-      WEB_ORIGIN: http://localhost:5173
+      # Override in .env with your Mac's LAN IP (e.g. http://192.168.x.x:5173)
+      # to test payment redirects from a phone on the same Wi-Fi.
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
       COOKIE_SECURE: "false"
       EMAIL_BACKEND: smtp
       SMTP_HOST: mailpit

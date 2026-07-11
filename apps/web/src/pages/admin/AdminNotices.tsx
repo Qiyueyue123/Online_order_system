@@ -167,7 +167,7 @@ export function AdminNotices({ csrfToken }: { csrfToken: string }) {
           />
         ))}
       </div>
-      {notices.data?.length === 0 && <p>No notices yet — post one below to greet visitors on the homepage.</p>}
+      {notices.data?.length === 0 && <p>No notices yet — post one below to greet visitors across the site.</p>}
 
       <h2>Post a notice</h2>
       <form onSubmit={handleSubmit(submitNewNotice)}>

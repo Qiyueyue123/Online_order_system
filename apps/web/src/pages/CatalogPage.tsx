@@ -1,34 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { api, formatNoticeDate, money, Notice, Product, ProductPage as ProductPageResult } from "../api/client";
+import { api, money, Product, ProductPage as ProductPageResult } from "../api/client";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { MediaCarousel } from "../components/MediaCarousel";
 import { ProductArt } from "../components/ProductArt";
-
-function Noticeboard() {
-  // Best-effort: a broken or empty notice list should never break the
-  // homepage, so failures and empty results both render nothing.
-  const notices = useQuery({
-    queryKey: ["notices"],
-    queryFn: () => api<Notice[]>("/notices"),
-    retry: false,
-  });
-  if (!notices.data || notices.data.length === 0) return null;
-  return (
-    <section className="noticeboard" aria-label="Shop notices">
-      {notices.data.map((notice) => (
-        <article key={notice.id} className="notice-card">
-          <div className="notice-heading">
-            <h3>{notice.title}</h3>
-            <span className="notice-date">{formatNoticeDate(notice.created_at)}</span>
-          </div>
-          <p>{notice.body}</p>
-        </article>
-      ))}
-    </section>
-  );
-}
 
 export function ProductCard({ product, index }: { product: Product; index: number }) {
   const images = product.images;
@@ -77,7 +53,6 @@ export function CatalogPage() {
   const items = products.data?.items ?? [];
   return (
     <>
-      <Noticeboard />
       <section className="hero grain">
         <HeroCarousel />
         <p className="vertical-label">一服 · WHISKED TO ORDER</p>

@@ -25,6 +25,7 @@ import {
   CONTACT_WHATSAPP_URL,
   PICKUP_ADDRESS,
 } from "../contact";
+import { MediaCarousel } from "../components/MediaCarousel";
 import { ProductArt } from "../components/ProductArt";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 
@@ -73,17 +74,29 @@ function MenuCard({
   onSelect: () => void;
 }) {
   const variant = product.variants[0];
-  const image = product.images[0];
+  const images = product.images;
   return (
-    <button
-      type="button"
+    // A carousel with its own arrow/dot buttons can live inside this card, so
+    // it can't be a native <button> (no nested interactive controls) — a
+    // div with a button role plus keyboard handling stands in for one. The
+    // carousel's own controls call stopPropagation, so they don't select
+    // the card when clicked.
+    <div
+      role="button"
+      tabIndex={0}
       className={`menu-card${selected ? " selected" : ""}`}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       aria-pressed={selected}
     >
       <span className="menu-card-art">
-        {image ? (
-          <img src={image.url} alt="" loading="lazy" />
+        {images.length > 0 ? (
+          <MediaCarousel items={images} mediaClassName="menu-card-photo" label={`${product.name} photos`} />
         ) : (
           <ProductArt slug={product.slug} category={product.category} name={product.name} />
         )}
@@ -97,7 +110,7 @@ function MenuCard({
       <span className={`check-circle${selected ? " active" : ""}`} aria-hidden="true">
         {selected ? "✓" : ""}
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -307,8 +320,13 @@ export function OrderFlowPage() {
         {step === "customise" && activeProduct && (
           <section aria-labelledby="order-step-heading">
             <div className="order-customise-art">
-              {activeProduct.images[0] ? (
-                <img src={activeProduct.images[0].url} alt="" loading="lazy" />
+              {activeProduct.images.length > 0 ? (
+                <MediaCarousel
+                  items={activeProduct.images}
+                  mediaClassName="order-customise-media"
+                  label={`${activeProduct.name} photos`}
+                  eagerFirst
+                />
               ) : (
                 <ProductArt slug={activeProduct.slug} category={activeProduct.category} name={activeProduct.name} />
               )}

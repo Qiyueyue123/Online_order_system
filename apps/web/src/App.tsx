@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet } from "react-router-dom";
 import { api, ApiError, Cart, Session } from "./api/client";
+import { NoticeBanner } from "./components/NoticeBanner";
 import {
   CONTACT_TELEGRAM_HANDLE,
   CONTACT_TELEGRAM_URL,
@@ -18,6 +19,7 @@ export function App() {
   const itemCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   return (
     <>
+      <NoticeBanner />
       <div className="demo-strip">Prices in SEK · Pickup in Umeå</div>
       <header>
         <Link className="brand" to="/" aria-label="QY &amp; YX's Cafe home">

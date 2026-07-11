@@ -69,13 +69,7 @@ describe("CatalogPage", () => {
   it("renders products returned by the API", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn((input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input.toString();
-        if (url.includes("/notices")) {
-          return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-        }
-        return Promise.resolve(new Response(JSON.stringify(productPage), { status: 200 }));
-      }),
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify(productPage), { status: 200 }))),
     );
 
     renderWithProviders(<CatalogPage />);
@@ -86,55 +80,5 @@ describe("CatalogPage", () => {
     expect(screen.getByText(/45,00\s*kr/)).toBeInTheDocument();
 
     await waitFor(() => expect(screen.queryByText(/Preparing the collection/)).not.toBeInTheDocument());
-  });
-
-  it("shows active notices above the menu", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input.toString();
-        if (url.includes("/notices")) {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify([
-                {
-                  id: "notice-1",
-                  title: "Closed this weekend",
-                  body: "We're away at a matcha festival — back Monday.",
-                  created_at: new Date().toISOString(),
-                },
-              ]),
-              { status: 200 },
-            ),
-          );
-        }
-        return Promise.resolve(new Response(JSON.stringify(productPage), { status: 200 }));
-      }),
-    );
-
-    renderWithProviders(<CatalogPage />);
-
-    expect(await screen.findByText("Closed this weekend")).toBeInTheDocument();
-    expect(
-      screen.getByText("We're away at a matcha festival — back Monday."),
-    ).toBeInTheDocument();
-  });
-
-  it("renders nothing extra when the notices request fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input.toString();
-        if (url.includes("/notices")) {
-          return Promise.resolve(new Response(JSON.stringify({ detail: "nope" }), { status: 500 }));
-        }
-        return Promise.resolve(new Response(JSON.stringify(productPage), { status: 200 }));
-      }),
-    );
-
-    renderWithProviders(<CatalogPage />);
-
-    expect(await screen.findByText("Ceremonial Matcha")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Shop notices" })).not.toBeInTheDocument();
   });
 });

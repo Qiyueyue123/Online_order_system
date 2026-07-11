@@ -53,7 +53,12 @@ class Settings(BaseSettings):
     # fine for dev/tests; docker-compose points this at a mounted volume.
     uploads_dir: str = "uploads"
     max_image_upload_mb: int = 15
+    # Videos over this size are auto-compressed rather than rejected; only
+    # `max_video_upload_hard_mb` below is an outright reject cap.
     max_video_upload_mb: int = 100
+    # Absolute reject cap so a runaway upload can't fill the disk. Videos
+    # between max_video_upload_mb and this are accepted and compressed.
+    max_video_upload_hard_mb: int = 500
 
     @field_validator("shipping_countries", mode="before")
     @classmethod

@@ -23,7 +23,7 @@ pillow_heif.register_avif_opener()
 
 MAX_IMAGE_DIMENSION = 1600
 MAX_VIDEO_DURATION_SECONDS = 90
-FFMPEG_TIMEOUT_SECONDS = 300
+FFMPEG_TIMEOUT_SECONDS = 600
 _UNSUPPORTED_MESSAGE = (
     "That doesn't look like a supported photo or video -- try a JPEG, PNG, "
     "HEIC, MP4 or MOV file."
@@ -41,8 +41,10 @@ def save_product_media(upload: UploadFile, settings: Settings) -> tuple[str, str
     # Cap the streamed-to-disk size at the larger of the two limits so we
     # don't reject a valid video while still bailing out of a runaway upload
     # long before it fills the disk; the tighter per-kind cap is enforced
-    # below once we know what we're looking at.
-    combined_cap_mb = max(settings.max_image_upload_mb, settings.max_video_upload_mb)
+    # below once we know what we're looking at. Videos use their hard reject
+    # cap here (not the compression threshold), since anything between the
+    # threshold and the hard cap is accepted and compressed, not rejected.
+    combined_cap_mb = max(settings.max_image_upload_mb, settings.max_video_upload_hard_mb)
     combined_cap_bytes = combined_cap_mb * 1024 * 1024
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -51,18 +53,23 @@ def save_product_media(upload: UploadFile, settings: Settings) -> tuple[str, str
         if kind is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, _UNSUPPORTED_MESSAGE)
 
-        cap_mb = settings.max_image_upload_mb if kind == "image" else settings.max_video_upload_mb
-        if tmp_path.stat().st_size > cap_mb * 1024 * 1024:
-            noun = "photo" if kind == "image" else "video"
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                f"That {noun} is larger than {cap_mb} MB -- try a smaller file.",
-            )
-
         if kind == "image":
+            cap_mb = settings.max_image_upload_mb
+            if tmp_path.stat().st_size > cap_mb * 1024 * 1024:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    f"That photo is larger than {cap_mb} MB -- try a smaller file.",
+                )
             filename = _process_image(tmp_path, uploads_dir)
         else:
-            filename = _process_video(tmp_path, uploads_dir)
+            hard_cap_mb = settings.max_video_upload_hard_mb
+            if tmp_path.stat().st_size > hard_cap_mb * 1024 * 1024:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    f"That video is larger than {hard_cap_mb} MB -- trim or export a smaller file.",
+                )
+            compress = tmp_path.stat().st_size > settings.max_video_upload_mb * 1024 * 1024
+            filename = _process_video(tmp_path, uploads_dir, compress=compress)
 
     return f"/uploads/{filename}", kind
 
@@ -151,7 +158,7 @@ def _process_image(tmp_path: Path, dest_dir: Path) -> str:
         return filename
 
 
-def _process_video(tmp_path: Path, dest_dir: Path) -> str:
+def _process_video(tmp_path: Path, dest_dir: Path, compress: bool = False) -> str:
     duration = _video_duration(tmp_path)
     if duration is None or duration > MAX_VIDEO_DURATION_SECONDS:
         raise HTTPException(
@@ -163,7 +170,33 @@ def _process_video(tmp_path: Path, dest_dir: Path) -> str:
     dest = dest_dir / filename
     video_codec, audio_codec = _stream_codecs(tmp_path)
 
-    if video_codec == "h264":
+    if compress:
+        # Over the compression threshold: always transcode (even if already
+        # h264) to actually shrink the file, rather than remuxing it as-is.
+        # crf 21 is near-transparent for real-world footage and reliably
+        # shrinks phone videos well under the threshold; original resolution
+        # is kept since crf-based quality scaling makes a downscale
+        # unnecessary for a size win.
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(tmp_path),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "21",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "160k",
+            "-movflags",
+            "+faststart",
+            str(dest),
+        ]
+    elif video_codec == "h264":
         # Already browser-playable: remux into an mp4 container losslessly
         # instead of re-encoding, so uploaded quality is preserved exactly.
         # Audio is copied as-is when it's already aac; anything else (e.g.

@@ -184,6 +184,112 @@ def test_admin_can_upload_and_remux_an_h264_video(client, db, uploads_dir_overri
     assert stored_probe["height"] == source_probe["height"]
 
 
+def _make_clip(path, seconds, size="320x240"):
+    """A near-lossless, noisy (so it doesn't compress away to nothing) clip
+    whose size scales predictably with duration -- used to land reliably on
+    either side of a (monkeypatched, small) size threshold in tests."""
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"testsrc=duration={seconds}:size={size}:rate=24",
+            "-f",
+            "lavfi",
+            "-i",
+            f"sine=frequency=1000:duration={seconds}",
+            "-vf",
+            "noise=alls=5:allf=t+u",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "0",
+            "-c:a",
+            "aac",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_admin_upload_compresses_video_over_threshold(client, db, uploads_dir_override):
+    """A video over the compression threshold (but under the hard cap) is
+    accepted and transcoded down, not rejected."""
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    settings = get_settings().model_copy(
+        update={
+            "uploads_dir": str(uploads_dir_override),
+            "max_video_upload_mb": 1,
+            "max_video_upload_hard_mb": 3,
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    clip = uploads_dir_override / "clip.mp4"
+    _make_clip(clip, seconds=2)
+    source_bytes = clip.read_bytes()
+    assert len(source_bytes) > 1 * 1024 * 1024
+    assert len(source_bytes) < 3 * 1024 * 1024
+    source_probe = _video_probe(clip)
+
+    response = client.post(
+        f"/api/v1/admin/products/{product.id}/images/upload",
+        headers=headers,
+        files={"file": ("clip.mp4", source_bytes, "video/mp4")},
+        data={"alt_text": "Pouring the drink"},
+    )
+    assert response.status_code == 201
+    image = response.json()["images"][0]
+    assert image["media_type"] == "video"
+
+    stored = uploads_dir_override / image["url"].removeprefix("/uploads/")
+    stored_probe = _video_probe(stored)
+    assert stored_probe["codec_name"] == "h264"
+    # Compression keeps original resolution...
+    assert stored_probe["width"] == source_probe["width"]
+    assert stored_probe["height"] == source_probe["height"]
+    # ...but the file must actually be transcoded down, not remuxed as-is.
+    assert stored.stat().st_size < len(source_bytes)
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_admin_upload_rejects_video_over_hard_cap(client, db, uploads_dir_override):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    settings = get_settings().model_copy(
+        update={
+            "uploads_dir": str(uploads_dir_override),
+            "max_video_upload_mb": 1,
+            "max_video_upload_hard_mb": 3,
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    clip = uploads_dir_override / "clip.mp4"
+    _make_clip(clip, seconds=4)
+    source_bytes = clip.read_bytes()
+    assert len(source_bytes) > 3 * 1024 * 1024
+
+    response = client.post(
+        f"/api/v1/admin/products/{product.id}/images/upload",
+        headers=headers,
+        files={"file": ("clip.mp4", source_bytes, "video/mp4")},
+        data={"alt_text": "Pouring the drink"},
+    )
+    assert response.status_code == 422
+    assert "3 MB" in response.json()["detail"]
+    assert db.query(ProductImage).count() == 0
+
+
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
 def test_admin_upload_transcodes_non_h264_video_at_full_resolution(
     client, db, uploads_dir_override

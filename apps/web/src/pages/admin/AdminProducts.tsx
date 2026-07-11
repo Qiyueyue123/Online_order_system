@@ -464,7 +464,8 @@ function MediaManager({
         </button>
       </form>
       <p className="field-hint">
-        Photos up to 15 MB, videos up to 100 MB / 90 seconds — most formats accepted.
+        Photos up to 15 MB, videos up to 500 MB / 90 seconds — most formats accepted.
+        Videos over 100 MB are compressed automatically.
       </p>
     </div>
   );

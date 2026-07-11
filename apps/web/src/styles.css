@@ -85,17 +85,8 @@ p { line-height: 1.65; }
 }
 
 /* -------------------------------------------------------------- */
-/* Demo strip / header / footer                                   */
+/* Header / footer                                                */
 /* -------------------------------------------------------------- */
-.demo-strip {
-  padding: 0.6rem;
-  color: var(--paper);
-  background: var(--pine-dark);
-  text-align: center;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
 
 header {
   height: 88px;

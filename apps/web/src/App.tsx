@@ -20,7 +20,6 @@ export function App() {
   return (
     <>
       <NoticeBanner />
-      <div className="demo-strip">Prices in SEK · Pickup in Umeå</div>
       <header>
         <Link className="brand" to="/" aria-label="QY &amp; YX's Cafe home">
           <span>抹茶</span> QY &amp; YX&rsquo;S CAFE

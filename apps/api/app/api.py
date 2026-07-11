@@ -39,6 +39,7 @@ from .schemas import (
     AdminCatalogPage,
     AdminCatalogProductOut,
     AdminImageIn,
+    AdminImageOrderIn,
     AdminImageUpdateIn,
     AdminNoticeIn,
     AdminNoticeOut,
@@ -86,10 +87,12 @@ from .services.admin import (
     add_product_image,
     apply_order_transition,
     create_product,
+    delete_product,
     get_product_image,
     list_audit_log,
     list_orders_admin,
     remove_product_image,
+    reorder_product_images,
     update_notice,
     update_product,
     update_product_image,
@@ -649,6 +652,28 @@ def patch_admin_product(
     return _product_out(product)
 
 
+@router.delete("/admin/products/{product_id}", status_code=204)
+def delete_admin_product(
+    product_id: str,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    slug, name = product.slug, product.name
+    delete_product(db, product)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_deleted",
+        entity_type="product",
+        entity_id=product_id,
+        detail={"slug": slug, "name": name},
+    )
+    db.commit()
+
+
 @router.post(
     "/admin/products/{product_id}/images", response_model=AdminCatalogProductOut, status_code=201
 )
@@ -741,6 +766,32 @@ def patch_admin_product_image(
         entity_type="product",
         entity_id=product.id,
         detail={"image_id": str(image.id), **(changes or {})},
+    )
+    db.commit()
+    db.refresh(product)
+    return _admin_product_out(product)
+
+
+@router.put(
+    "/admin/products/{product_id}/images/order", response_model=AdminCatalogProductOut
+)
+def reorder_admin_product_images(
+    product_id: str,
+    data: AdminImageOrderIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    changes = reorder_product_images(db, product, data)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_images_reordered",
+        entity_type="product",
+        entity_id=product.id,
+        detail=changes,
     )
     db.commit()
     db.refresh(product)

@@ -334,7 +334,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Admin Product */
+        delete: operations["delete_admin_product_api_v1_admin_products__product_id__delete"];
         options?: never;
         head?: never;
         /** Patch Admin Product */
@@ -391,6 +392,23 @@ export interface paths {
         head?: never;
         /** Patch Admin Product Image */
         patch: operations["patch_admin_product_image_api_v1_admin_products__product_id__images__image_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/products/{product_id}/images/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Admin Product Images */
+        put: operations["reorder_admin_product_images_api_v1_admin_products__product_id__images_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/orders": {
@@ -614,6 +632,11 @@ export interface components {
              * @enum {string}
              */
             media_type: "image" | "video";
+        };
+        /** AdminImageOrderIn */
+        AdminImageOrderIn: {
+            /** Image Ids */
+            image_ids: string[];
         };
         /** AdminImageOut */
         AdminImageOut: {
@@ -1929,6 +1952,39 @@ export interface operations {
             };
         };
     };
+    delete_admin_product_api_v1_admin_products__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     patch_admin_product_api_v1_admin_products__product_id__patch: {
         parameters: {
             query?: never;
@@ -2099,6 +2155,45 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AdminImageUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCatalogProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_admin_product_images_api_v1_admin_products__product_id__images_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminImageOrderIn"];
             };
         };
         responses: {

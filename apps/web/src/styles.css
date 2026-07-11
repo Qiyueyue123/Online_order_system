@@ -811,7 +811,29 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
   text-transform: uppercase;
   cursor: pointer;
 }
+.admin-media-order-actions { display: flex; gap: 0.2rem; position: absolute; top: 0; right: 0; }
+.admin-media-order-actions button {
+  position: static;
+  padding: 0.15rem 0.4rem;
+  background: rgba(15, 33, 24, 0.72);
+  color: var(--paper);
+  border: 0;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.admin-media-order-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
 .admin-media-form label, .admin-media-upload-form label { margin-top: 0; }
+.admin-delete-product { margin-top: 1rem; }
+.admin-delete-confirm { display: inline-flex; align-items: center; gap: 0.4rem; }
+.button-danger {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--persimmon-dark);
+  background: var(--persimmon);
+  color: var(--paper);
+  cursor: pointer;
+}
+.button-danger:hover { background: var(--persimmon-dark); }
+.button-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 .field-hint { font-size: 0.8rem; color: var(--ink-soft); margin: 0.4rem 0 0; }
 .admin td button, .admin form button {
   margin-right: 0.4rem;

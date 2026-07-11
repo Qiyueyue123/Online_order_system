@@ -335,6 +335,137 @@ describe("AdminProducts", () => {
     );
   });
 
+  it("sends the reordered id array when moving a media item later", async () => {
+    const productWithImages: AdminCatalogPage = {
+      ...productsPage,
+      items: [
+        {
+          ...productsPage.items[0],
+          images: [
+            { id: "image-1", url: "https://example.com/a.jpg", alt_text: "A jar", media_type: "image" },
+            { id: "image-2", url: "https://example.com/b.jpg", alt_text: "A cup", media_type: "image" },
+          ],
+        },
+      ],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PUT" && url.includes("/images/order")) {
+        return Promise.resolve(new Response(JSON.stringify(productWithImages.items[0]), { status: 200 }));
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productWithImages), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    const moveLater = await screen.findAllByRole("button", { name: "Move later" });
+    fireEvent.click(moveLater[0]);
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/products/product-1/images/order",
+        expect.objectContaining({
+          method: "PUT",
+          headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token-1" }),
+        }),
+      ),
+    );
+    const putCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    const body = JSON.parse(putCall![1]!.body as string);
+    expect(body).toEqual({ image_ids: ["image-2", "image-1"] });
+  });
+
+  it("disables the first item's Move earlier and the last item's Move later button", async () => {
+    const productWithImages: AdminCatalogPage = {
+      ...productsPage,
+      items: [
+        {
+          ...productsPage.items[0],
+          images: [
+            { id: "image-1", url: "https://example.com/a.jpg", alt_text: "A jar", media_type: "image" },
+            { id: "image-2", url: "https://example.com/b.jpg", alt_text: "A cup", media_type: "image" },
+          ],
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(productWithImages), { status: 200 })),
+    );
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    const moveEarlier = await screen.findAllByRole("button", { name: "Move earlier" });
+    const moveLater = await screen.findAllByRole("button", { name: "Move later" });
+    expect(moveEarlier[0]).toBeDisabled();
+    expect(moveLater[moveLater.length - 1]).toBeDisabled();
+  });
+
+  it("deletes a product after a two-step confirm", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "DELETE" && !url.includes("/images/")) {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    await screen.findByRole("button", { name: "Delete product" });
+    // Clicking once only asks for confirmation, no request yet.
+    fireEvent.click(screen.getByRole("button", { name: "Delete product" }));
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/products/product-1",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token-1" }),
+        }),
+      ),
+    );
+  });
+
+  it("shows the API's 409 message inline when deleting a product with order history", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "DELETE" && !url.includes("/images/")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ detail: "This product has order history — mark it inactive instead." }),
+            { status: 409 },
+          ),
+        );
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete product" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
+
+    expect(
+      await screen.findByText("This product has order history — mark it inactive instead."),
+    ).toBeInTheDocument();
+  });
+
   it("shows a validation error and does not submit when the new-product form is incomplete", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(productsPage), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

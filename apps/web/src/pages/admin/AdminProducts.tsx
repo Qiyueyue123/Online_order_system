@@ -6,6 +6,7 @@ import {
   AdminCatalogProduct,
   AdminImage,
   AdminImageIn,
+  AdminImageOrderIn,
   AdminImageUpdateIn,
   AdminProductIn,
   AdminProductUpdateIn,
@@ -185,19 +186,23 @@ function MediaManager({
   disabled,
   uploading,
   savingCaption,
+  reordering,
   onAdd,
   onRemove,
   onUpload,
   onUpdateCaption,
+  onReorder,
 }: {
   product: AdminCatalogProduct;
   disabled: boolean;
   uploading: boolean;
   savingCaption: boolean;
+  reordering: boolean;
   onAdd: (productId: string, body: AdminImageIn) => void;
   onRemove: (productId: string, imageId: string) => void;
   onUpload: (productId: string, file: File, caption: string) => void;
   onUpdateCaption: (productId: string, imageId: string, caption: string) => void;
+  onReorder: (productId: string, imageIds: string[]) => void;
 }) {
   const [url, setUrl] = useState("");
   const [altText, setAltText] = useState("");
@@ -232,35 +237,67 @@ function MediaManager({
     if (uploadInputRef.current) uploadInputRef.current.value = "";
   }
 
+  function moveImage(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= product.images.length) return;
+    const ids = product.images.map((image) => image.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    onReorder(product.id, ids);
+  }
+
   return (
     <div className="admin-media-manager">
       <p className="option-label">Photos &amp; videos</p>
       {product.images.length > 0 && (
         <div className="admin-media-list">
-          {product.images.map((image) => (
-            <div className="admin-media-item" key={image.id}>
-              {image.media_type === "video" ? (
-                <video src={image.url} muted playsInline />
-              ) : (
-                <img src={image.url} alt="" loading="lazy" />
-              )}
-              <MediaCaptionEditor
-                productName={product.name}
-                image={image}
-                disabled={savingCaption}
-                onSave={(next) => onUpdateCaption(product.id, image.id, next)}
-              />
-              <button
-                type="button"
-                aria-label={`Remove ${image.alt_text || (image.media_type === "video" ? "video" : "photo")}`}
-                disabled={disabled}
-                onClick={() => onRemove(product.id, image.id)}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+          {product.images.map((image, index) => {
+            const label = image.alt_text || (image.media_type === "video" ? "video" : "photo");
+            return (
+              <div className="admin-media-item" key={image.id}>
+                {image.media_type === "video" ? (
+                  <video src={image.url} muted playsInline />
+                ) : (
+                  <img src={image.url} alt="" loading="lazy" />
+                )}
+                <MediaCaptionEditor
+                  productName={product.name}
+                  image={image}
+                  disabled={savingCaption}
+                  onSave={(next) => onUpdateCaption(product.id, image.id, next)}
+                />
+                <div className="admin-media-order-actions">
+                  <button
+                    type="button"
+                    aria-label="Move earlier"
+                    disabled={disabled || reordering || index === 0}
+                    onClick={() => moveImage(index, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Move later"
+                    disabled={disabled || reordering || index === product.images.length - 1}
+                    onClick={() => moveImage(index, 1)}
+                  >
+                    ↓
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Remove ${label}`}
+                  disabled={disabled}
+                  onClick={() => onRemove(product.id, image.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            );
+          })}
         </div>
+      )}
+      {product.images.length > 1 && (
+        <p className="field-hint">First item is the cover — it's shown as the storefront card thumbnail.</p>
       )}
       <form className="admin-media-form field-pair" onSubmit={submit}>
         <label>
@@ -335,6 +372,50 @@ function MediaManager({
   );
 }
 
+function DeleteProductControl({
+  product,
+  pending,
+  error,
+  onDelete,
+}: {
+  product: AdminCatalogProduct;
+  pending: boolean;
+  error: string | null;
+  onDelete: (productId: string) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="admin-delete-product">
+      {!confirming ? (
+        <button
+          type="button"
+          className="button-danger"
+          onClick={() => setConfirming(true)}
+        >
+          Delete product
+        </button>
+      ) : (
+        <span className="admin-delete-confirm">
+          Really delete?{" "}
+          <button
+            type="button"
+            className="button-danger"
+            disabled={pending}
+            onClick={() => onDelete(product.id)}
+          >
+            Yes, delete
+          </button>{" "}
+          <button type="button" disabled={pending} onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </span>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+
 export function AdminProducts({ csrfToken }: { csrfToken: string }) {
   const queryClient = useQueryClient();
   const products = useQuery({
@@ -404,6 +485,16 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     onSuccess: invalidate,
   });
 
+  const reorderImages = useMutation({
+    mutationFn: ({ productId, body }: { productId: string; body: AdminImageOrderIn }) =>
+      api<AdminCatalogProduct>(`/admin/products/${productId}/images/order`, {
+        method: "PUT",
+        headers: { "X-CSRF-Token": csrfToken },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: invalidate,
+  });
+
   const removeImage = useMutation({
     mutationFn: ({ productId, imageId }: { productId: string; imageId: string }) =>
       api<AdminCatalogProduct>(`/admin/products/${productId}/images/${imageId}`, {
@@ -411,6 +502,18 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         headers: { "X-CSRF-Token": csrfToken },
       }),
     onSuccess: invalidate,
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: (productId: string) =>
+      api<void>(`/admin/products/${productId}`, {
+        method: "DELETE",
+        headers: { "X-CSRF-Token": csrfToken },
+      }),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
   });
 
   const createProduct = useMutation({
@@ -467,6 +570,10 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     updateImageCaption.mutate({ productId, imageId, body: { caption: caption || null } });
   }
 
+  function reorderProductImages(productId: string, imageIds: string[]) {
+    reorderImages.mutate({ productId, body: { image_ids: imageIds } });
+  }
+
   function submitNewProduct(fields: NewProductFields) {
     createProduct.mutate({
       slug: fields.slug,
@@ -493,6 +600,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
       {uploadImage.isError && <p role="alert">{humanizeError(uploadImage.error)}</p>}
       {removeImage.isError && <p role="alert">{humanizeError(removeImage.error)}</p>}
       {updateImageCaption.isError && <p role="alert">{humanizeError(updateImageCaption.error)}</p>}
+      {reorderImages.isError && <p role="alert">{humanizeError(reorderImages.error)}</p>}
       {products.isLoading && <p role="status">Loading products…</p>}
       {products.data?.items.map((product) => (
         <div className="admin-product-group" key={product.id}>
@@ -506,10 +614,22 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
             disabled={addImage.isPending || uploadImage.isPending || removeImage.isPending}
             uploading={uploadImage.isPending}
             savingCaption={updateImageCaption.isPending}
+            reordering={reorderImages.isPending}
             onAdd={addProductImage}
             onRemove={removeProductImage}
             onUpload={uploadProductImage}
             onUpdateCaption={updateProductImageCaption}
+            onReorder={reorderProductImages}
+          />
+          <DeleteProductControl
+            product={product}
+            pending={deleteProduct.isPending && deleteProduct.variables === product.id}
+            error={
+              deleteProduct.isError && deleteProduct.variables === product.id
+                ? humanizeError(deleteProduct.error)
+                : null
+            }
+            onDelete={(productId) => deleteProduct.mutate(productId)}
           />
           <table>
             <thead>

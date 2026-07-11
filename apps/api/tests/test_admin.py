@@ -93,6 +93,16 @@ ADMIN_ROUTES = [
         "00000000-0000-0000-0000-000000000000",
         None,
     ),
+    (
+        "PUT",
+        "/api/v1/admin/products/00000000-0000-0000-0000-000000000000/images/order",
+        {"image_ids": ["00000000-0000-0000-0000-000000000000"]},
+    ),
+    (
+        "DELETE",
+        "/api/v1/admin/products/00000000-0000-0000-0000-000000000000",
+        None,
+    ),
 ]
 
 
@@ -337,6 +347,126 @@ def test_admin_variant_update_rejects_stock_below_reservations(client, db):
         headers=headers,
     )
     assert response.status_code == 409
+
+
+def _add_two_images(client, headers, product):
+    first = client.post(
+        f"/api/v1/admin/products/{product.id}/images",
+        json={"url": "https://example.com/one.jpg", "alt_text": "One", "position": 0},
+        headers=headers,
+    ).json()["images"][0]
+    second = client.post(
+        f"/api/v1/admin/products/{product.id}/images",
+        json={"url": "https://example.com/two.jpg", "alt_text": "Two", "position": 1},
+        headers=headers,
+    ).json()["images"][-1]
+    return first, second
+
+
+def test_admin_can_reorder_product_images(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    first, second = _add_two_images(client, headers, product)
+
+    reordered = client.put(
+        f"/api/v1/admin/products/{product.id}/images/order",
+        json={"image_ids": [second["id"], first["id"]]},
+        headers=headers,
+    )
+    assert reordered.status_code == 200
+    ids_in_order = [image["id"] for image in reordered.json()["images"]]
+    assert ids_in_order == [second["id"], first["id"]]
+
+    public = client.get(f"/api/v1/products/{product.slug}")
+    assert public.status_code == 200
+    public_urls = [image["url"] for image in public.json()["images"]]
+    assert public_urls == ["https://example.com/two.jpg", "https://example.com/one.jpg"]
+
+    log = db.query(AdminAuditLog).filter_by(action="product_images_reordered").one()
+    assert log.entity_id == str(product.id)
+
+
+def test_admin_reorder_rejects_mismatched_id_set(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    first, _second = _add_two_images(client, headers, product)
+
+    response = client.put(
+        f"/api/v1/admin/products/{product.id}/images/order",
+        json={"image_ids": [first["id"]]},
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+    response = client.put(
+        f"/api/v1/admin/products/{product.id}/images/order",
+        json={"image_ids": [first["id"], "00000000-0000-0000-0000-000000000000"]},
+        headers=headers,
+    )
+    assert response.status_code == 400
+
+
+def test_admin_reorder_requires_csrf(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    first, second = _add_two_images(client, headers, product)
+
+    response = client.put(
+        f"/api/v1/admin/products/{product.id}/images/order",
+        json={"image_ids": [second["id"], first["id"]]},
+    )
+    assert response.status_code == 403
+
+
+def test_admin_can_delete_a_product_without_order_history(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    product_id = product.id
+
+    response = client.delete(f"/api/v1/admin/products/{product_id}", headers=headers)
+    assert response.status_code == 204
+
+    admin_list = client.get("/api/v1/admin/products", headers=headers).json()
+    assert not any(item["id"] == str(product_id) for item in admin_list["items"])
+
+    public_list = client.get("/api/v1/products").json()
+    assert not any(item["slug"] == product.slug for item in public_list["items"])
+
+    log = db.query(AdminAuditLog).filter_by(action="product_deleted").one()
+    assert log.entity_id == str(product_id)
+
+
+def test_admin_delete_rejects_product_with_order_history(client, db):
+    headers = admin_headers(client, db)
+    order, variant = make_order(db, OrderStatus.FULFILLED)
+
+    response = client.delete(f"/api/v1/admin/products/{variant.product_id}", headers=headers)
+    assert response.status_code == 409
+    assert "inactive" in response.json()["detail"]
+
+
+def test_admin_delete_ignores_cart_items_referencing_the_product(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    variant = product.variants[0]
+
+    add_response = client.put(
+        "/api/v1/cart/items",
+        json={"variant_id": str(variant.id), "quantity": 1},
+    )
+    assert add_response.status_code == 200
+
+    response = client.delete(f"/api/v1/admin/products/{product.id}", headers=headers)
+    assert response.status_code == 204
+
+
+def test_admin_delete_unknown_product_is_404(client, db):
+    headers = admin_headers(client, db)
+    response = client.delete(
+        "/api/v1/admin/products/00000000-0000-0000-0000-000000000000",
+        headers=headers,
+    )
+    assert response.status_code == 404
 
 
 def test_admin_variant_update_requires_a_field(client, db):

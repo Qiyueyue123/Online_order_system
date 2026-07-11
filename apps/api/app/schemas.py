@@ -256,6 +256,10 @@ class AdminImageUpdateIn(BaseModel):
     caption: str | None = Field(default=None, max_length=300)
 
 
+class AdminImageOrderIn(BaseModel):
+    image_ids: list[uuid.UUID] = Field(min_length=1)
+
+
 class AdminVariantCreateIn(BaseModel):
     sku: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=120)

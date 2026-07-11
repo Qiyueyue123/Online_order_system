@@ -2,14 +2,16 @@ import json
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..models import (
     AdminAuditLog,
+    CartItem,
     Category,
     Notice,
     Order,
+    OrderItem,
     OrderStatus,
     PaymentStatus,
     Product,
@@ -19,6 +21,7 @@ from ..models import (
 )
 from ..schemas import (
     AdminImageIn,
+    AdminImageOrderIn,
     AdminImageUpdateIn,
     AdminNoticeUpdateIn,
     AdminProductIn,
@@ -240,6 +243,50 @@ def update_product_image(db: Session, image: ProductImage, data: AdminImageUpdat
     _set_if_changed(changes, image, "alt_text", data.alt_text)
     _set_if_changed(changes, image, "caption", data.caption)
     return changes
+
+
+def reorder_product_images(db: Session, product: Product, data: AdminImageOrderIn) -> dict:
+    """Reassign ProductImage.position from the given ordering. The submitted id
+    set must exactly match the product's current images -- a partial list would
+    silently orphan the missing images at whatever position they already had,
+    and an id from another product would let an admin scramble a listing they
+    didn't mean to touch."""
+    existing_ids = {image.id for image in product.images}
+    submitted_ids = list(data.image_ids)
+    if set(submitted_ids) != existing_ids or len(submitted_ids) != len(existing_ids):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "image_ids must contain exactly this product's image ids",
+        )
+    images_by_id = {image.id: image for image in product.images}
+    for index, image_id in enumerate(submitted_ids):
+        images_by_id[image_id].position = index
+    db.flush()
+    return {"image_ids": [str(image_id) for image_id in submitted_ids]}
+
+
+def delete_product(db: Session, product: Product) -> None:
+    """Hard-delete a product. Refuses (409) if any order has ever included one
+    of its variants -- that history must stay queryable, so the admin is
+    steered to deactivate instead. Cart items are transient and not "history",
+    so any referencing this product's variants are deleted first to avoid an
+    FK violation (CartItem.variant_id has no ON DELETE CASCADE). Variant/image
+    rows cascade via the Product relationships. Uploaded media files are left
+    on disk -- an orphaned file is harmless in this local/demo setup and isn't
+    worth the risk of deleting the wrong thing."""
+    variant_ids = [variant.id for variant in product.variants]
+    if variant_ids:
+        has_order_history = db.scalar(
+            select(OrderItem.id).where(OrderItem.variant_id.in_(variant_ids)).limit(1)
+        )
+        if has_order_history:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "This product has order history — mark it inactive instead.",
+            )
+        db.execute(delete(CartItem).where(CartItem.variant_id.in_(variant_ids)))
+    db.delete(product)
+    db.flush()
 
 
 def update_notice(db: Session, notice: Notice, data: AdminNoticeUpdateIn) -> dict:

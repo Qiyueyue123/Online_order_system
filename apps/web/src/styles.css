@@ -119,6 +119,17 @@ nav a:not(.cart-link)::after {
   transition: right 0.25s ease;
 }
 nav a:not(.cart-link):hover::after { right: 0; }
+.nav-order {
+  padding: 0.55rem 1.1rem;
+  border-radius: 2rem;
+  background: var(--pine);
+  color: var(--paper);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.nav-order:hover { background: var(--pine-dark); transform: translateY(-1px); }
+.nav-order::after { content: none !important; }
 .cart-link { display: inline-flex; align-items: center; }
 .cart-link span {
   display: inline-grid;
@@ -265,6 +276,14 @@ footer {
 .button:hover { background: var(--pine-dark); box-shadow: var(--shadow); transform: translateY(-2px); }
 .button:active { transform: translateY(0); }
 .button:disabled { opacity: 0.55; cursor: wait; transform: none; box-shadow: none; }
+.hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.hero-actions .button { margin-top: 0; }
+.button-ghost {
+  background: transparent;
+  border-color: rgba(244, 238, 221, 0.6);
+  color: #f8f4e8;
+}
+.button-ghost:hover { background: rgba(244, 238, 221, 0.12); box-shadow: none; }
 .text-button {
   padding: 0.75rem 0;
   border: 0;
@@ -824,4 +843,224 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
     animation: none !important;
   }
   .product-card { opacity: 1 !important; }
+}
+
+/* -------------------------------------------------------------- */
+/* Order flow                                                      */
+/* -------------------------------------------------------------- */
+.order-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+.order-topbar {
+  display: grid;
+  grid-template-columns: 2.75rem 1fr 2.75rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  max-width: 520px;
+  width: 100%;
+  margin: 0 auto;
+}
+.order-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--paper-panel);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.order-back:hover { border-color: var(--pine); background: var(--pine-mist); }
+.order-brand {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+.order-topbar-spacer { width: 2.75rem; }
+
+.order-progress {
+  max-width: 520px;
+  width: 100%;
+  margin: 0 auto;
+  height: 3px;
+  background: var(--line);
+}
+.order-progress-bar {
+  height: 100%;
+  background: var(--pine);
+  transition: width 0.3s ease;
+}
+
+.order-content {
+  flex: 1;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 8rem;
+}
+.order-content h1 {
+  font-size: clamp(1.85rem, 6vw, 2.4rem);
+  margin: 0 0 1.5rem;
+}
+.order-content label {
+  display: block;
+  margin-top: 1.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.order-content select,
+.order-content input {
+  margin-top: 0.5rem;
+}
+
+/* Step transition: quick fade + slight rise. Remounted per step via a
+   React `key`, so the animation plays fresh on every step change. */
+.order-step {
+  animation: order-step-enter 0.35s ease;
+}
+.order-step.no-anim { animation: none; }
+@keyframes order-step-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .order-step { animation: none; }
+}
+
+.order-cta {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(244, 238, 221, 0), var(--paper) 30%);
+}
+.order-cta .button {
+  margin-top: 0;
+  min-height: 52px;
+  justify-content: center;
+  font-size: 1rem;
+}
+.order-cta .hint { margin: 0.6rem 0 0; text-align: center; }
+
+/* Menu step */
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.menu-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--paper-panel);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.menu-card:hover { transform: translateY(-2px); }
+.menu-card.selected { border-color: var(--pine); }
+.menu-card-art {
+  display: block;
+  aspect-ratio: 4 / 5;
+  background: var(--paper-panel);
+}
+.menu-card-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.menu-card-art .product-art-panel { width: 100%; height: 100%; padding: 18%; color: var(--pine); }
+.menu-card-body { padding: 0.8rem 0.9rem 0.95rem; }
+.menu-card-name { display: block; font-weight: 600; }
+.menu-card-price { display: block; margin-top: 0.25rem; color: var(--ink-soft); font-size: 0.85rem; }
+.check-circle {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid rgba(244, 238, 221, 0.85);
+  background: rgba(244, 238, 221, 0.55);
+  color: var(--paper);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.check-circle.active { background: var(--pine); border-color: var(--pine); }
+
+.order-lines { margin-top: 2rem; }
+.order-lines h2 {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 0.75rem;
+}
+.order-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-line-name { margin: 0; font-weight: 600; }
+.order-line-meta { margin: 0.25rem 0 0; color: var(--ink-soft); font-size: 0.82rem; }
+.order-line-end { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; }
+.order-line-end .text-button { padding: 0; font-size: 0.78rem; }
+.order-subtotal { margin: 1rem 0 0; font-weight: 600; text-align: right; }
+
+/* Customise step */
+.order-customise-art {
+  aspect-ratio: 16 / 10;
+  max-height: 220px;
+  border-radius: 0.9rem;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: var(--paper-panel);
+}
+.order-customise-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.order-customise-art .product-art-panel { width: 100%; height: 100%; padding: 10%; color: var(--pine); }
+
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+.qty-stepper button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-panel);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.qty-stepper button:hover:not(:disabled) { border-color: var(--pine); background: var(--pine-mist); }
+.qty-stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+.qty-stepper span { min-width: 1.5rem; text-align: center; font-size: 1.1rem; font-weight: 600; }
+
+@media (max-width: 400px) {
+  .menu-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 }

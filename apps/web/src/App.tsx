@@ -27,6 +27,7 @@ export function App() {
           <Link to="/">Drinks</Link>
           <Link to="/store">Store</Link>
           <Link to="/#story">Our story</Link>
+          <Link className="nav-order" to="/order">Order now</Link>
           {session?.user.role === "admin" ? (
             <Link to="/admin">Admin</Link>
           ) : (

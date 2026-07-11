@@ -9,6 +9,7 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
 import { AuthPage } from "./pages/AuthPage";
 import { DemoPaymentPage } from "./pages/DemoPaymentPage";
+import { OrderFlowPage } from "./pages/OrderFlowPage";
 import { ProductPage } from "./pages/ProductPage";
 import { StorePage } from "./pages/StorePage";
 import { ThankYouPage } from "./pages/ThankYouPage";
@@ -34,6 +35,9 @@ const router = createBrowserRouter([
       { path: "/admin", element: <AdminPage /> },
     ],
   },
+  // Top-level, outside the App layout: the order flow is a full-screen
+  // "scroll-through" experience without the site header/footer.
+  { path: "/order", element: <OrderFlowPage /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(

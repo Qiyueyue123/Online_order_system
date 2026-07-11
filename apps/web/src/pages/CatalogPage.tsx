@@ -85,7 +85,10 @@ export function CatalogPage() {
           <p className="eyebrow">UMEÅ · MADE TO ORDER</p>
           <h1>Matcha, whisked<br />just for you.</h1>
           <p>Order online, then swing by our dorm kitchen — every cup is whisked fresh the moment you arrive.</p>
-          <a className="button" href="#collection">See the menu</a>
+          <div className="hero-actions">
+            <Link className="button order-cta-hero" to="/order">Order now</Link>
+            <a className="button button-ghost" href="#collection">See the menu</a>
+          </div>
         </div>
       </section>
       <section id="collection" className="collection">

@@ -8,7 +8,6 @@ import {
   CartItemIn,
   CheckoutIn,
   CheckoutOut,
-  DrinkOptions,
   formatDrinkOptions,
   formatSlotTime,
   humanizeError,
@@ -35,14 +34,29 @@ type Step = "menu" | "customise" | "contact" | "pickup" | "payment";
 const STEP_INDEX: Record<Step, number> = { menu: 1, customise: 2, contact: 3, pickup: 4, payment: 5 };
 const TOTAL_STEPS = 5;
 
-const SUGAR_OPTIONS: DrinkOptions["sugar_g"][] = [2, 4, 6, 8];
-const MATCHA_OPTIONS: DrinkOptions["matcha_g"][] = [4, 6];
-const MILK_VOLUME_OPTIONS: DrinkOptions["milk_ml"][] = [130, 160];
-// Must match app.services.cart.MATCHA_UPGRADE_SURCHARGE_CENTS — preview-only,
-// the server is the source of truth for what's actually charged.
-const MATCHA_UPGRADE_SURCHARGE_CENTS = 1500;
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Builds the initial selection map: one entry per option group, defaulted to
+// the choice the group marks default: true (falling back to the first choice
+// if a misconfigured group somehow has none).
+function defaultSelections(product: Product): Record<string, string> {
+  const selections: Record<string, string> = {};
+  for (const group of product.options ?? []) {
+    const defaultChoice = group.choices.find((choice) => choice.default) ?? group.choices[0];
+    if (defaultChoice) selections[group.key] = defaultChoice.value;
+  }
+  return selections;
+}
+
+// Sum of surcharge_cents for the currently selected choice in each group.
+function surchargeTotal(product: Product, selections: Record<string, string>): number {
+  let total = 0;
+  for (const group of product.options ?? []) {
+    const choice = group.choices.find((c) => c.value === selections[group.key]);
+    if (choice) total += choice.surcharge_cents;
+  }
+  return total;
+}
 
 function ProgressBar({ step }: { step: Step }) {
   const pct = (STEP_INDEX[step] / TOTAL_STEPS) * 100;
@@ -155,11 +169,7 @@ export function OrderFlowPage() {
   // Customise step state
   const [customiseSlug, setCustomiseSlug] = useState<string | null>(null);
   const [variantId, setVariantId] = useState("");
-  const [matchaG, setMatchaG] = useState<DrinkOptions["matcha_g"]>(4);
-  const [whisk, setWhisk] = useState<DrinkOptions["whisk"]>("water");
-  const [baseMilk, setBaseMilk] = useState<DrinkOptions["base_milk"]>("cow");
-  const [milkMl, setMilkMl] = useState<DrinkOptions["milk_ml"]>(130);
-  const [sugarG, setSugarG] = useState<DrinkOptions["sugar_g"]>(4);
+  const [selectionOverrides, setSelectionOverrides] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
 
   // Contact step state
@@ -216,6 +226,9 @@ export function OrderFlowPage() {
     },
     onSuccess: (result) => {
       if (result.guest_lookup_token) sessionStorage.setItem("guestOrderToken", result.guest_lookup_token);
+      // The server emptied the cart; drop the cached copy so the header
+      // badge doesn't keep showing the old count on the thank-you page.
+      queryClient.removeQueries({ queryKey: ["cart"] });
       if (payingAtPickup) {
         const params = new URLSearchParams({ order: result.display_number });
         if (selectedSlot) params.set("pickup", selectedSlot);
@@ -241,11 +254,7 @@ export function OrderFlowPage() {
   function openCustomise(product: Product) {
     setCustomiseSlug(product.slug);
     setVariantId(product.variants[0]?.id ?? "");
-    setMatchaG(4);
-    setWhisk("water");
-    setBaseMilk("cow");
-    setMilkMl(130);
-    setSugarG(4);
+    setSelectionOverrides({});
     setQty(1);
     setStep("customise");
   }
@@ -274,8 +283,10 @@ export function OrderFlowPage() {
   const itemCount = cart.data?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const activeProduct = products.data?.items.find((p) => p.slug === customiseSlug);
   const activeVariant = activeProduct?.variants.find((v) => v.id === variantId) ?? activeProduct?.variants[0];
-  const isDrink = activeProduct?.category_slug === "drinks";
-  const surcharge = isDrink && matchaG === 6 ? MATCHA_UPGRADE_SURCHARGE_CENTS : 0;
+  const optionGroups = activeProduct?.options ?? [];
+  const hasOptions = optionGroups.length > 0;
+  const selections = activeProduct ? { ...defaultSelections(activeProduct), ...selectionOverrides } : {};
+  const surcharge = hasOptions && activeProduct ? surchargeTotal(activeProduct, selections) : 0;
   const unitPrice = (activeVariant?.price_cents ?? 0) + surcharge;
   const soldOut = !!activeVariant && activeVariant.available_stock === 0;
 
@@ -311,7 +322,7 @@ export function OrderFlowPage() {
               <div className="order-lines">
                 <h2>Your order</h2>
                 {cart.data.items.map((item) => {
-                  const options = formatDrinkOptions(item.options);
+                  const options = item.options_label ?? formatDrinkOptions(item.options);
                   return (
                     <div className="order-line" key={item.id}>
                       <div>
@@ -368,89 +379,27 @@ export function OrderFlowPage() {
                 </select>
               </>
             )}
-            {isDrink && (
+            {hasOptions && (
               <div className="drink-options">
                 <div className="option-grid">
-                  <div>
-                    <p className="option-label">Matcha</p>
-                    <div className="chip-row" role="group" aria-label="Matcha amount">
-                      {MATCHA_OPTIONS.map((grams) => (
-                        <button
-                          type="button"
-                          key={grams}
-                          className={`chip${matchaG === grams ? " active" : ""}`}
-                          onClick={() => setMatchaG(grams)}
-                        >
-                          {grams} g{grams === 4 ? " (standard)" : " stronger (+15 kr)"}
-                        </button>
-                      ))}
+                  {optionGroups.map((group) => (
+                    <div key={group.key}>
+                      <p className="option-label">{group.label}</p>
+                      <div className="chip-row" role="group" aria-label={group.label}>
+                        {group.choices.map((choice) => (
+                          <button
+                            type="button"
+                            key={choice.value}
+                            className={`chip${selections[group.key] === choice.value ? " active" : ""}`}
+                            onClick={() =>
+                              setSelectionOverrides((current) => ({ ...current, [group.key]: choice.value }))
+                            }
+                          >
+                            {choice.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="option-label">Whisked with</p>
-                    <div className="chip-row" role="group" aria-label="Whisked with">
-                      <button
-                        type="button"
-                        className={`chip${whisk === "water" ? " active" : ""}`}
-                        onClick={() => setWhisk("water")}
-                      >
-                        Water (standard)
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip${whisk === "oat" ? " active" : ""}`}
-                        onClick={() => setWhisk("oat")}
-                      >
-                        Oat milk (frothier)
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="option-label">Base milk</p>
-                    <div className="chip-row" role="group" aria-label="Base milk">
-                      <button
-                        type="button"
-                        className={`chip${baseMilk === "cow" ? " active" : ""}`}
-                        onClick={() => setBaseMilk("cow")}
-                      >
-                        Cow&rsquo;s milk (standard)
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip${baseMilk === "oat" ? " active" : ""}`}
-                        onClick={() => setBaseMilk("oat")}
-                      >
-                        Oat milk
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="option-label">Milk amount</p>
-                    <div className="chip-row" role="group" aria-label="Milk amount">
-                      {MILK_VOLUME_OPTIONS.map((ml) => (
-                        <button
-                          type="button"
-                          key={ml}
-                          className={`chip${milkMl === ml ? " active" : ""}`}
-                          onClick={() => setMilkMl(ml)}
-                        >
-                          {ml} ml{ml === 130 ? " (standard)" : " (milkier)"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <p className="option-label">Sugar</p>
-                <div className="chip-row" role="group" aria-label="Sugar">
-                  {SUGAR_OPTIONS.map((grams) => (
-                    <button
-                      type="button"
-                      key={grams}
-                      className={`chip${sugarG === grams ? " active" : ""}`}
-                      onClick={() => setSugarG(grams)}
-                    >
-                      {grams} g{grams === 4 ? " (standard)" : ""}
-                    </button>
                   ))}
                 </div>
               </div>
@@ -570,7 +519,7 @@ export function OrderFlowPage() {
             <h1 id="order-step-heading">Review &amp; pay</h1>
             <div className="order-lines">
               {cart.data?.items.map((item) => {
-                const options = formatDrinkOptions(item.options);
+                const options = item.options_label ?? formatDrinkOptions(item.options);
                 return (
                   <div className="order-line" key={item.id}>
                     <div>
@@ -670,12 +619,8 @@ export function OrderFlowPage() {
             onClick={() =>
               activeVariant &&
               add.mutate(
-                isDrink
-                  ? {
-                      variant_id: activeVariant.id,
-                      quantity: qty,
-                      options: { matcha_g: matchaG, whisk, base_milk: baseMilk, milk_ml: milkMl, sugar_g: sugarG },
-                    }
+                hasOptions
+                  ? { variant_id: activeVariant.id, quantity: qty, options: selections }
                   : { variant_id: activeVariant.id, quantity: qty },
               )
             }

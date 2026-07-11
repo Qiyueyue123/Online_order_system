@@ -30,6 +30,50 @@ const drink: Product = {
     { id: "var-iced", sku: "SKU-D1", name: "Iced", weight_grams: 0, price_cents: 4000, available_stock: 10 },
   ],
   images: [],
+  options: [
+    {
+      key: "matcha_g",
+      label: "Matcha",
+      choices: [
+        { value: "4", label: "4 g (standard)", surcharge_cents: 0, default: true },
+        { value: "6", label: "6 g stronger (+15 kr)", surcharge_cents: 1500, default: false },
+      ],
+    },
+    {
+      key: "whisk",
+      label: "Whisked with",
+      choices: [
+        { value: "water", label: "Water (standard)", surcharge_cents: 0, default: true },
+        { value: "oat", label: "Oat milk (frothier)", surcharge_cents: 0, default: false },
+      ],
+    },
+    {
+      key: "base_milk",
+      label: "Base milk",
+      choices: [
+        { value: "cow", label: "Cow's milk (standard)", surcharge_cents: 0, default: true },
+        { value: "oat", label: "Oat milk", surcharge_cents: 0, default: false },
+      ],
+    },
+    {
+      key: "milk_ml",
+      label: "Milk amount",
+      choices: [
+        { value: "130", label: "130 ml (standard)", surcharge_cents: 0, default: true },
+        { value: "160", label: "160 ml (milkier)", surcharge_cents: 0, default: false },
+      ],
+    },
+    {
+      key: "sugar_g",
+      label: "Sugar",
+      choices: [
+        { value: "2", label: "2 g", surcharge_cents: 0, default: false },
+        { value: "4", label: "4 g (standard)", surcharge_cents: 0, default: true },
+        { value: "6", label: "6 g", surcharge_cents: 0, default: false },
+        { value: "8", label: "8 g", surcharge_cents: 0, default: false },
+      ],
+    },
+  ],
 };
 
 const retail: Product = {
@@ -73,7 +117,7 @@ describe("ProductPage", () => {
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.getByText(/Served iced/)).toBeInTheDocument();
 
-    const matchaGroup = screen.getByRole("group", { name: "Matcha amount" });
+    const matchaGroup = screen.getByRole("group", { name: "Matcha" });
     expect(within(matchaGroup).getByRole("button", { name: /4 g \(standard\)/ })).toHaveClass("active");
     const whiskGroup = screen.getByRole("group", { name: "Whisked with" });
     expect(within(whiskGroup).getByRole("button", { name: /Water \(standard\)/ })).toHaveClass("active");
@@ -92,7 +136,7 @@ describe("ProductPage", () => {
     renderWithProviders(<ProductPage />, ["/products/ajisai-latte"]);
 
     await screen.findByText("Ajisai 2.0 Matcha Latte");
-    const matchaGroup = screen.getByRole("group", { name: "Matcha amount" });
+    const matchaGroup = screen.getByRole("group", { name: "Matcha" });
     fireEvent.click(within(matchaGroup).getByRole("button", { name: /6 g/ }));
 
     expect(screen.getByRole("button", { name: /Add to bag — 55,00\s*kr/ })).toBeInTheDocument();
@@ -124,7 +168,7 @@ describe("ProductPage", () => {
     expect(body).toEqual({
       variant_id: "var-iced",
       quantity: 1,
-      options: { matcha_g: 4, whisk: "oat", base_milk: "oat", milk_ml: 160, sugar_g: 6 },
+      options: { matcha_g: "4", whisk: "oat", base_milk: "oat", milk_ml: "160", sugar_g: "6" },
     });
   });
 

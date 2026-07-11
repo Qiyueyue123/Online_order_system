@@ -46,6 +46,28 @@ const cart: Cart = {
   needs_shipping: true,
 };
 
+const cartWithOptionsLabel: Cart = {
+  items: [
+    {
+      id: "item-3",
+      variant_id: "var-3",
+      product_slug: "ajisai-latte",
+      product_name: "Ajisai 2.0 Matcha Latte",
+      variant_name: "Iced",
+      sku: "SKU-D1",
+      quantity: 1,
+      unit_price_cents: 5500,
+      line_total_cents: 5500,
+      options: { matcha_g: "6", whisk: "oat" },
+      options_label: "6 g matcha · Oat milk whisk",
+    },
+  ],
+  subtotal_cents: 5500,
+  currency: "SEK",
+  needs_pickup: true,
+  needs_shipping: false,
+};
+
 describe("CartPage", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -126,6 +148,17 @@ describe("CartPage", () => {
       ),
     );
     setTimeoutSpy.mockRestore();
+  });
+
+  it("shows the server-provided options_label for a customised item", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(cartWithOptionsLabel), { status: 200 })),
+    );
+
+    renderWithProviders(<CartPage />);
+
+    expect(await screen.findByText("6 g matcha · Oat milk whisk")).toBeInTheDocument();
   });
 
   it("shows an empty state when the bag has no items", async () => {

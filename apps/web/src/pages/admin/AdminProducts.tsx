@@ -12,11 +12,109 @@ import {
   AdminProductUpdateIn,
   AdminVariant,
   AdminVariantUpdateIn,
+  OptionGroupIn,
   Product,
   api,
   apiUpload,
   humanizeError,
 } from "../../api/client";
+
+// Turns a free-text label into a slug-safe key/value: lowercase, non
+// [a-z0-9] runs collapsed to a single underscore, no leading/trailing
+// underscore. Falls back to "option" so an empty label never produces an
+// empty (and therefore invalid) key.
+function slugify(text: string): string {
+  const slug = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return slug || "option";
+}
+
+// Appends _2, _3, … until the candidate isn't already in `taken`, so two
+// choices/groups with the same label don't collide on the same slug.
+function uniqueSlug(base: string, taken: Set<string>): string {
+  let candidate = base;
+  let suffix = 2;
+  while (taken.has(candidate)) {
+    candidate = `${base}_${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+type ChoiceDraft = {
+  value: string;
+  label: string;
+  surchargeKr: string;
+  default: boolean;
+  isNew: boolean;
+};
+
+type GroupDraft = {
+  key: string;
+  label: string;
+  choices: ChoiceDraft[];
+  isNew: boolean;
+};
+
+function groupsFromProduct(product: AdminCatalogProduct): GroupDraft[] {
+  return (product.options ?? []).map((group) => ({
+    key: group.key,
+    label: group.label,
+    isNew: false,
+    choices: group.choices.map((choice) => ({
+      value: choice.value,
+      label: choice.label,
+      surchargeKr: String(choice.surcharge_cents / 100),
+      default: choice.default,
+      isNew: false,
+    })),
+  }));
+}
+
+// Only a group/choice error blocks the save outright (labels, at-least-one-
+// choice) — a missing default is auto-fixed in buildOptionsPayload rather
+// than rejected, per spec.
+function validateGroups(groups: GroupDraft[]): string | null {
+  for (const group of groups) {
+    if (!group.label.trim()) return "Every option group needs a label.";
+    if (group.choices.length === 0) return `"${group.label}" needs at least one choice.`;
+    for (const choice of group.choices) {
+      if (!choice.label.trim()) return `Every choice in "${group.label}" needs a label.`;
+    }
+  }
+  return null;
+}
+
+function buildOptionsPayload(groups: GroupDraft[]): OptionGroupIn[] {
+  const takenKeys = new Set(groups.filter((group) => !group.isNew).map((group) => group.key));
+  return groups.map((group) => {
+    let key = group.key;
+    if (group.isNew) {
+      key = uniqueSlug(slugify(group.label), takenKeys);
+      takenKeys.add(key);
+    }
+    const takenValues = new Set(group.choices.filter((choice) => !choice.isNew).map((choice) => choice.value));
+    const hasDefault = group.choices.some((choice) => choice.default);
+    const choices = group.choices.map((choice, index) => {
+      let value = choice.value;
+      if (choice.isNew) {
+        value = uniqueSlug(slugify(choice.label), takenValues);
+        takenValues.add(value);
+      }
+      return {
+        value,
+        label: choice.label.trim(),
+        surcharge_cents: Math.round(Number(choice.surchargeKr || "0") * 100),
+        // If nothing was marked default (e.g. the default choice got
+        // removed), fall back to the first choice rather than reject.
+        default: hasDefault ? choice.default : index === 0,
+      };
+    });
+    return { key, label: group.label.trim(), choices };
+  });
+}
 
 type NewProductFields = {
   name: string;
@@ -372,6 +470,191 @@ function MediaManager({
   );
 }
 
+function OptionsEditor({
+  product,
+  pending,
+  error,
+  success,
+  onSave,
+}: {
+  product: AdminCatalogProduct;
+  pending: boolean;
+  error: string | null;
+  success: boolean;
+  onSave: (productId: string, options: OptionGroupIn[]) => void;
+}) {
+  const [groups, setGroups] = useState<GroupDraft[]>(() => groupsFromProduct(product));
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  function updateGroup(groupIndex: number, label: string) {
+    setGroups((current) => current.map((group, i) => (i === groupIndex ? { ...group, label } : group)));
+  }
+
+  function updateChoice(groupIndex: number, choiceIndex: number, patch: Partial<ChoiceDraft>) {
+    setGroups((current) =>
+      current.map((group, i) =>
+        i === groupIndex
+          ? { ...group, choices: group.choices.map((choice, ci) => (ci === choiceIndex ? { ...choice, ...patch } : choice)) }
+          : group,
+      ),
+    );
+  }
+
+  function setDefault(groupIndex: number, choiceIndex: number) {
+    setGroups((current) =>
+      current.map((group, i) =>
+        i === groupIndex
+          ? { ...group, choices: group.choices.map((choice, ci) => ({ ...choice, default: ci === choiceIndex })) }
+          : group,
+      ),
+    );
+  }
+
+  function addChoice(groupIndex: number) {
+    setGroups((current) =>
+      current.map((group, i) =>
+        i === groupIndex
+          ? {
+              ...group,
+              choices: [
+                ...group.choices,
+                { value: "", label: "", surchargeKr: "0", default: group.choices.length === 0, isNew: true },
+              ],
+            }
+          : group,
+      ),
+    );
+  }
+
+  function removeChoice(groupIndex: number, choiceIndex: number) {
+    setGroups((current) =>
+      current.map((group, i) =>
+        i === groupIndex ? { ...group, choices: group.choices.filter((_, ci) => ci !== choiceIndex) } : group,
+      ),
+    );
+  }
+
+  function addGroup() {
+    setGroups((current) => [
+      ...current,
+      {
+        key: "",
+        label: "",
+        isNew: true,
+        choices: [{ value: "", label: "", surchargeKr: "0", default: true, isNew: true }],
+      },
+    ]);
+  }
+
+  function removeGroup(groupIndex: number) {
+    setGroups((current) => current.filter((_, i) => i !== groupIndex));
+  }
+
+  function submit() {
+    const validationError = validateGroups(groups);
+    if (validationError) {
+      setLocalError(validationError);
+      return;
+    }
+    setLocalError(null);
+    onSave(product.id, buildOptionsPayload(groups));
+  }
+
+  return (
+    <div className="admin-options-editor">
+      <p className="option-label">Customisation options</p>
+      <p className="field-hint">
+        These are the buttons customers see on the product page. Extra price is added per drink.
+      </p>
+      {groups.map((group, groupIndex) => (
+        <div className="admin-options-group" key={groupIndex}>
+          <label>
+            Group label
+            <input
+              aria-label={`${product.name} option group ${groupIndex + 1} label`}
+              value={group.label}
+              onChange={(event) => updateGroup(groupIndex, event.target.value)}
+              title={group.key || undefined}
+            />
+          </label>
+          <table>
+            <thead>
+              <tr>
+                <th>Choice</th>
+                <th>Extra price (SEK)</th>
+                <th>Default</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.choices.map((choice, choiceIndex) => (
+                <tr key={choiceIndex}>
+                  <td>
+                    <input
+                      aria-label={`${product.name} option group ${groupIndex + 1} choice ${choiceIndex + 1} label`}
+                      value={choice.label}
+                      onChange={(event) => updateChoice(groupIndex, choiceIndex, { label: event.target.value })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      aria-label={`${product.name} option group ${groupIndex + 1} choice ${choiceIndex + 1} extra price`}
+                      value={choice.surchargeKr}
+                      onChange={(event) =>
+                        updateChoice(groupIndex, choiceIndex, { surchargeKr: event.target.value })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="radio"
+                      name={`admin-option-default-${product.id}-${groupIndex}`}
+                      aria-label={`${product.name} option group ${groupIndex + 1} choice ${choiceIndex + 1} default`}
+                      checked={choice.default}
+                      onChange={() => setDefault(groupIndex, choiceIndex)}
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${product.name} option group ${groupIndex + 1} choice ${choiceIndex + 1}`}
+                      onClick={() => removeChoice(groupIndex, choiceIndex)}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="admin-options-group-actions">
+            <button type="button" onClick={() => addChoice(groupIndex)}>
+              Add choice
+            </button>
+            <button type="button" className="button-danger" onClick={() => removeGroup(groupIndex)}>
+              Remove group
+            </button>
+          </div>
+        </div>
+      ))}
+      <div className="admin-options-group-actions">
+        <button type="button" onClick={addGroup}>
+          Add option group
+        </button>
+        <button type="button" className="button" disabled={pending} onClick={submit}>
+          {pending ? "Saving…" : "Save options"}
+        </button>
+      </div>
+      {localError && <p role="alert">{localError}</p>}
+      {!localError && error && <p role="alert">{error}</p>}
+      {!localError && !error && success && <p role="status">Options saved.</p>}
+    </div>
+  );
+}
+
 function DeleteProductControl({
   product,
   pending,
@@ -443,6 +726,23 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
         body: JSON.stringify(body),
       }),
     onSuccess: invalidate,
+  });
+
+  // Separate from updateProduct: an options change also has to bust the
+  // public product queries (ProductPage, OrderFlowPage's menu) since
+  // shoppers see these chips directly, not just the admin list.
+  const updateOptions = useMutation({
+    mutationFn: ({ productId, body }: { productId: string; body: AdminProductUpdateIn }) =>
+      api<Product>(`/admin/products/${productId}`, {
+        method: "PATCH",
+        headers: { "X-CSRF-Token": csrfToken },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["product"] });
+    },
   });
 
   const addImage = useMutation({
@@ -554,6 +854,10 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     updateProduct.mutate({ productId, body });
   }
 
+  function saveOptions(productId: string, options: OptionGroupIn[]) {
+    updateOptions.mutate({ productId, body: { options } });
+  }
+
   function addProductImage(productId: string, body: AdminImageIn) {
     addImage.mutate({ productId, body });
   }
@@ -620,6 +924,22 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
             onUpload={uploadProductImage}
             onUpdateCaption={updateProductImageCaption}
             onReorder={reorderProductImages}
+          />
+          <OptionsEditor
+            // Remount when the server's option data actually changes (e.g.
+            // right after a successful save) so drafted keys/values sync up;
+            // unrelated refetches (a variant save elsewhere) leave this
+            // identical and don't clobber an in-progress edit.
+            key={JSON.stringify(product.options ?? [])}
+            product={product}
+            pending={updateOptions.isPending && updateOptions.variables?.productId === product.id}
+            error={
+              updateOptions.isError && updateOptions.variables?.productId === product.id
+                ? humanizeError(updateOptions.error)
+                : null
+            }
+            success={updateOptions.isSuccess && updateOptions.variables?.productId === product.id}
+            onSave={saveOptions}
           />
           <DeleteProductControl
             product={product}

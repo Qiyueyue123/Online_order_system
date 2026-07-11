@@ -1,17 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, Cart, CartItemIn, DrinkOptions, humanizeError, money, Product } from "../api/client";
+import { api, Cart, CartItemIn, humanizeError, money, Product } from "../api/client";
 import { MediaCarousel } from "../components/MediaCarousel";
 import { ProductArt } from "../components/ProductArt";
 
-const SUGAR_OPTIONS: DrinkOptions["sugar_g"][] = [2, 4, 6, 8];
-const MATCHA_OPTIONS: DrinkOptions["matcha_g"][] = [4, 6];
-const MILK_VOLUME_OPTIONS: DrinkOptions["milk_ml"][] = [130, 160];
-// Must match app.services.cart.MATCHA_UPGRADE_SURCHARGE_CENTS — only used
-// here to preview the price before adding to bag; the server is the source
-// of truth for what's actually charged.
-const MATCHA_UPGRADE_SURCHARGE_CENTS = 1500;
+// Builds the initial selection map: one entry per option group, defaulted to
+// the choice the group marks default: true (falling back to the first choice
+// if a misconfigured group somehow has none).
+function defaultSelections(product: Product): Record<string, string> {
+  const selections: Record<string, string> = {};
+  for (const group of product.options ?? []) {
+    const defaultChoice = group.choices.find((choice) => choice.default) ?? group.choices[0];
+    if (defaultChoice) selections[group.key] = defaultChoice.value;
+  }
+  return selections;
+}
+
+// Sum of surcharge_cents for the currently selected choice in each group.
+function surchargeTotal(product: Product, selections: Record<string, string>): number {
+  let total = 0;
+  for (const group of product.options ?? []) {
+    const choice = group.choices.find((c) => c.value === selections[group.key]);
+    if (choice) total += choice.surcharge_cents;
+  }
+  return total;
+}
 
 function ProductGallery({ product }: { product: Product }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -65,11 +79,10 @@ export function ProductPage() {
   const queryClient = useQueryClient();
   const product = useQuery({ queryKey: ["product", slug], queryFn: () => api<Product>(`/products/${slug}`) });
   const [variantId, setVariantId] = useState("");
-  const [matchaG, setMatchaG] = useState<DrinkOptions["matcha_g"]>(4);
-  const [whisk, setWhisk] = useState<DrinkOptions["whisk"]>("water");
-  const [baseMilk, setBaseMilk] = useState<DrinkOptions["base_milk"]>("cow");
-  const [milkMl, setMilkMl] = useState<DrinkOptions["milk_ml"]>(130);
-  const [sugarG, setSugarG] = useState<DrinkOptions["sugar_g"]>(4);
+  // Overrides on top of each group's default choice; only holds the groups the
+  // shopper has actually touched, so it re-defaults cleanly if the product
+  // changes underneath it (e.g. slug navigation) without needing an effect.
+  const [selectionOverrides, setSelectionOverrides] = useState<Record<string, string>>({});
   const add = useMutation({
     mutationFn: (payload: CartItemIn) =>
       api<Cart>("/cart/items", { method: "PUT", body: JSON.stringify(payload) }),
@@ -81,7 +94,10 @@ export function ProductPage() {
   const selected = variantId || variants[0]?.id;
   const activeVariant = variants.find((variant) => variant.id === selected) ?? variants[0];
   const isDrink = product.data.category_slug === "drinks";
-  const surcharge = isDrink && matchaG === 6 ? MATCHA_UPGRADE_SURCHARGE_CENTS : 0;
+  const optionGroups = product.data.options ?? [];
+  const hasOptions = optionGroups.length > 0;
+  const selections = { ...defaultSelections(product.data), ...selectionOverrides };
+  const surcharge = hasOptions ? surchargeTotal(product.data, selections) : 0;
   const totalPrice = (activeVariant?.price_cents ?? 0) + surcharge;
   const soldOut = !!activeVariant && activeVariant.available_stock === 0;
   return (
@@ -112,93 +128,35 @@ export function ProductPage() {
             </p>
           )
         )}
-        {isDrink && (
+        {hasOptions && (
           <div className="drink-options">
             <div className="option-grid">
-              <div>
-                <p className="option-label">Matcha</p>
-                <div className="chip-row" role="group" aria-label="Matcha amount">
-                  {MATCHA_OPTIONS.map((grams) => (
-                    <button
-                      type="button"
-                      key={grams}
-                      className={`chip${matchaG === grams ? " active" : ""}`}
-                      onClick={() => setMatchaG(grams)}
-                    >
-                      {grams} g{grams === 4 ? " (standard)" : " stronger (+15 kr)"}
-                    </button>
-                  ))}
+              {optionGroups.map((group) => (
+                <div key={group.key}>
+                  <p className="option-label">{group.label}</p>
+                  <div className="chip-row" role="group" aria-label={group.label}>
+                    {group.choices.map((choice) => (
+                      <button
+                        type="button"
+                        key={choice.value}
+                        className={`chip${selections[group.key] === choice.value ? " active" : ""}`}
+                        onClick={() =>
+                          setSelectionOverrides((current) => ({ ...current, [group.key]: choice.value }))
+                        }
+                      >
+                        {choice.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <p className="option-label">Whisked with</p>
-                <div className="chip-row" role="group" aria-label="Whisked with">
-                  <button
-                    type="button"
-                    className={`chip${whisk === "water" ? " active" : ""}`}
-                    onClick={() => setWhisk("water")}
-                  >
-                    Water (standard)
-                  </button>
-                  <button
-                    type="button"
-                    className={`chip${whisk === "oat" ? " active" : ""}`}
-                    onClick={() => setWhisk("oat")}
-                  >
-                    Oat milk (frothier)
-                  </button>
-                </div>
-              </div>
-              <div>
-                <p className="option-label">Base milk</p>
-                <div className="chip-row" role="group" aria-label="Base milk">
-                  <button
-                    type="button"
-                    className={`chip${baseMilk === "cow" ? " active" : ""}`}
-                    onClick={() => setBaseMilk("cow")}
-                  >
-                    Cow&rsquo;s milk (standard)
-                  </button>
-                  <button
-                    type="button"
-                    className={`chip${baseMilk === "oat" ? " active" : ""}`}
-                    onClick={() => setBaseMilk("oat")}
-                  >
-                    Oat milk
-                  </button>
-                </div>
-              </div>
-              <div>
-                <p className="option-label">Milk amount</p>
-                <div className="chip-row" role="group" aria-label="Milk amount">
-                  {MILK_VOLUME_OPTIONS.map((ml) => (
-                    <button
-                      type="button"
-                      key={ml}
-                      className={`chip${milkMl === ml ? " active" : ""}`}
-                      onClick={() => setMilkMl(ml)}
-                    >
-                      {ml} ml{ml === 130 ? " (standard)" : " (milkier)"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <p className="option-label">Sugar</p>
-            <div className="chip-row" role="group" aria-label="Sugar">
-              {SUGAR_OPTIONS.map((grams) => (
-                <button
-                  type="button"
-                  key={grams}
-                  className={`chip${sugarG === grams ? " active" : ""}`}
-                  onClick={() => setSugarG(grams)}
-                >
-                  {grams} g{grams === 4 ? " (standard)" : ""}
-                </button>
               ))}
             </div>
-            <p className="recipe-line">Every latte is served iced: 4 g Ajisai 2.0, whisked, poured over 130 ml cow&rsquo;s milk (standard).</p>
-            <p className="food-safety-note">Good to know: we use store-bought packaged ice, and every drink comes sealed in a plastic cup with a lid.</p>
+            {isDrink && (
+              <>
+                <p className="recipe-line">Every latte is served iced: 4 g Ajisai 2.0, whisked, poured over 130 ml cow&rsquo;s milk (standard).</p>
+                <p className="food-safety-note">Good to know: we use store-bought packaged ice, and every drink comes sealed in a plastic cup with a lid.</p>
+              </>
+            )}
           </div>
         )}
         <button
@@ -207,12 +165,8 @@ export function ProductPage() {
           onClick={() =>
             selected &&
             add.mutate(
-              isDrink
-                ? {
-                    variant_id: selected,
-                    quantity: 1,
-                    options: { matcha_g: matchaG, whisk, base_milk: baseMilk, milk_ml: milkMl, sugar_g: sugarG },
-                  }
+              hasOptions
+                ? { variant_id: selected, quantity: 1, options: selections }
                 : { variant_id: selected, quantity: 1 },
             )
           }

@@ -2,6 +2,7 @@ import json
 import secrets
 
 from fastapi import HTTPException, Response, status
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,22 +15,78 @@ DRINKS_CATEGORY_SLUG = "drinks"
 
 # The 6 g matcha upgrade is the only option that changes price; 130ml/160ml
 # base milk and the whisk/sugar choices are all included at the listed price.
+# Legacy fallback only -- used when a product has no options_config (either
+# a pre-migration drink row, or a non-drink product with no options at all).
 MATCHA_UPGRADE_SURCHARGE_CENTS = 1500
 
 
-def option_surcharge_cents(raw_options: str | None) -> int:
-    """Extra cost on top of variant.price_cents implied by a line's options
-    (e.g. the 6 g matcha upgrade). Shared by cart_payload and checkout so the
-    two never compute a line's price differently."""
+def option_surcharge_cents(raw_options: str | None, options_config: str | None = None) -> int:
+    """Extra cost on top of variant.price_cents implied by a line's options.
+
+    If the product has an options_config, the surcharge is the sum of the
+    chosen choices' surcharge_cents (unknown/missing keys contribute 0, so a
+    stale cart/order row from before a config change still prices sanely).
+    Otherwise falls back to the pre-configurable-options hardcoded rule (the
+    6 g matcha upgrade). Shared by cart_payload and checkout so the two never
+    compute a line's price differently.
+    """
     if not raw_options:
         return 0
     options = json.loads(raw_options)
+    if options_config:
+        total = 0
+        for group in json.loads(options_config):
+            key = group["key"]
+            if key not in options:
+                continue
+            chosen = str(options[key])
+            for choice in group["choices"]:
+                if choice["value"] == chosen:
+                    total += choice.get("surcharge_cents", 0)
+                    break
+        return total
     return MATCHA_UPGRADE_SURCHARGE_CENTS if options.get("matcha_g") == 6 else 0
 
 
-def _canonical_options(variant: Variant, options: DrinkOptionsIn | None) -> str | None:
-    """Normalise incoming cart-item options to the stable string stored on
-    CartItem/OrderItem.options.
+def _resolve_configured_options(
+    options_config: str, raw_options: dict | None
+) -> tuple[str, str]:
+    """Validate/normalise `raw_options` against a product's options_config.
+
+    Unknown keys or values not present among a group's choices are rejected
+    with 422; groups missing from `raw_options` are filled with that group's
+    default choice. Returns (canonical JSON options, human-readable label --
+    the chosen choices' labels, in group order, joined with " · ")."""
+    groups = json.loads(options_config)
+    raw = raw_options or {}
+    valid_keys = {group["key"] for group in groups}
+    unknown = sorted(set(raw.keys()) - valid_keys)
+    if unknown:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unknown option(s): {', '.join(unknown)}"
+        )
+    normalised: dict[str, str] = {}
+    labels: list[str] = []
+    for group in groups:
+        key = group["key"]
+        choices = group["choices"]
+        if key in raw:
+            chosen = str(raw[key])
+            choice = next((c for c in choices if c["value"] == chosen), None)
+            if choice is None:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    f"Invalid value {chosen!r} for option {key!r}",
+                )
+        else:
+            choice = next(c for c in choices if c.get("default"))
+        normalised[key] = choice["value"]
+        labels.append(choice["label"])
+    return json.dumps(normalised, sort_keys=True), " · ".join(labels)
+
+
+def _canonical_options(variant: Variant, options: dict | None) -> str | None:
+    """Legacy normalisation, used only when the product has no options_config.
 
     Drinks always get a fully-defaulted options dict (water whisk, 4 g sugar)
     even if the caller sent nothing, so two drink lines can be compared and
@@ -44,8 +101,23 @@ def _canonical_options(variant: Variant, options: DrinkOptionsIn | None) -> str 
     )
     if not is_drink:
         return None
-    normalised = (options or DrinkOptionsIn()).model_dump()
+    try:
+        normalised = DrinkOptionsIn(**(options or {})).model_dump()
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     return json.dumps(normalised, sort_keys=True)
+
+
+def resolve_options(variant: Variant, options: dict | None) -> tuple[str | None, str | None]:
+    """Normalise incoming cart-item options into (canonical options JSON,
+    options_label) for storage on CartItem. Products with an options_config
+    go through admin-defined validation; everything else keeps the legacy
+    permissive behaviour (store as-is, no label) so pre-existing behaviour
+    for products without a config is unchanged."""
+    product = variant.product
+    if product is not None and product.options_config:
+        return _resolve_configured_options(product.options_config, options)
+    return _canonical_options(variant, options), None
 
 
 def get_or_create_cart(
@@ -94,14 +166,14 @@ def set_item(
     cart: Cart,
     variant_id,
     quantity: int,
-    options: DrinkOptionsIn | None = None,
+    options: dict | None = None,
 ) -> None:
     variant = db.get(Variant, variant_id)
     if not variant or not variant.active or not variant.product.active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
     if quantity > variant.available_stock:
         raise HTTPException(status.HTTP_409_CONFLICT, "Requested quantity is unavailable")
-    canonical_options = _canonical_options(variant, options)
+    canonical_options, options_label = resolve_options(variant, options)
     # Same variant with different options is a distinct line (e.g. one Iced/oat/6g
     # line and one Iced/water/4g line), so the match key is (variant_id, options)
     # rather than variant_id alone.
@@ -116,6 +188,7 @@ def set_item(
     )
     if item:
         item.quantity = quantity
+        item.options_label = options_label
     else:
         db.add(
             CartItem(
@@ -123,6 +196,7 @@ def set_item(
                 variant_id=variant_id,
                 quantity=quantity,
                 options=canonical_options,
+                options_label=options_label,
             )
         )
     db.commit()
@@ -203,7 +277,9 @@ def classify_cart(cart: Cart) -> tuple[bool, bool]:
 def cart_payload(cart: Cart) -> dict:
     items = []
     for item in cart.items:
-        unit_price_cents = item.variant.price_cents + option_surcharge_cents(item.options)
+        unit_price_cents = item.variant.price_cents + option_surcharge_cents(
+            item.options, item.variant.product.options_config
+        )
         items.append(
             {
                 "id": item.id,
@@ -216,6 +292,7 @@ def cart_payload(cart: Cart) -> dict:
                 "unit_price_cents": unit_price_cents,
                 "line_total_cents": item.quantity * unit_price_cents,
                 "options": json.loads(item.options) if item.options else None,
+                "options_label": item.options_label,
             }
         )
     needs_pickup, needs_shipping = classify_cart(cart)

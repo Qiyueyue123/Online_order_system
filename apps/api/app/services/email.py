@@ -82,10 +82,15 @@ def _render_order_confirmation(order: Order, settings: Settings | None = None) -
         "Items:",
     ]
     for item in order.items:
+        options_suffix = (
+            f" — {item.options_label}"
+            if item.options_label
+            else _format_options_suffix(item.options)
+        )
         lines.append(
             f"  {item.product_name} ({item.variant_name}) x{item.quantity} "
             f"@ {_format_money(item.unit_price_cents)} {order.currency}"
-            f"{_format_options_suffix(item.options)}"
+            f"{options_suffix}"
         )
     lines += [
         "",

@@ -143,6 +143,10 @@ def _parse_uuid_or_404(value: str, detail: str) -> uuid.UUID:
     return parsed
 
 
+def _parse_options_config(raw: str | None) -> list[dict] | None:
+    return json.loads(raw) if raw else None
+
+
 def _product_out(product) -> ProductOut:
     return ProductOut(
         id=product.id,
@@ -164,6 +168,7 @@ def _product_out(product) -> ProductOut:
             if variant.active
         ],
         images=product.images,
+        options=_parse_options_config(product.options_config),
     )
 
 
@@ -191,6 +196,7 @@ def _admin_product_out(product) -> AdminCatalogProductOut:
             for variant in product.variants
         ],
         images=product.images,
+        options=_parse_options_config(product.options_config),
     )
 
 

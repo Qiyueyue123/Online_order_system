@@ -2560,6 +2560,20 @@
             },
             "type": "array",
             "title": "Images"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OptionGroupOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
           }
         },
         "type": "object",
@@ -3189,6 +3203,20 @@
             "type": "array",
             "minItems": 1,
             "title": "Variants"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OptionGroupIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
           }
         },
         "type": "object",
@@ -3237,6 +3265,20 @@
               }
             ],
             "title": "Active"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OptionGroupIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
           }
         },
         "type": "object",
@@ -3548,12 +3590,23 @@
           "options": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DrinkOptionsIn"
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "type": "object"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Options"
           }
         },
         "type": "object",
@@ -3614,6 +3667,17 @@
               }
             ],
             "title": "Options"
+          },
+          "options_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options Label"
           }
         },
         "type": "object",
@@ -3787,61 +3851,6 @@
         ],
         "title": "CheckoutOut"
       },
-      "DrinkOptionsIn": {
-        "properties": {
-          "matcha_g": {
-            "type": "integer",
-            "enum": [
-              4,
-              6
-            ],
-            "title": "Matcha G",
-            "default": 4
-          },
-          "whisk": {
-            "type": "string",
-            "enum": [
-              "water",
-              "oat"
-            ],
-            "title": "Whisk",
-            "default": "water"
-          },
-          "base_milk": {
-            "type": "string",
-            "enum": [
-              "cow",
-              "oat"
-            ],
-            "title": "Base Milk",
-            "default": "cow"
-          },
-          "milk_ml": {
-            "type": "integer",
-            "enum": [
-              130,
-              160
-            ],
-            "title": "Milk Ml",
-            "default": 130
-          },
-          "sugar_g": {
-            "type": "integer",
-            "enum": [
-              2,
-              4,
-              6,
-              8
-            ],
-            "title": "Sugar G",
-            "default": 4
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "DrinkOptionsIn",
-        "description": "Per-line customisation for a drink. Unknown keys are rejected (422) rather\nthan silently ignored, so a typo in a future field doesn't get dropped\nwithout notice."
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3942,6 +3951,126 @@
         ],
         "title": "NoticeOut"
       },
+      "OptionChoiceIn": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "surcharge_cents": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Surcharge Cents",
+            "default": 0
+          },
+          "default": {
+            "type": "boolean",
+            "title": "Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "OptionChoiceIn"
+      },
+      "OptionChoiceOut": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "surcharge_cents": {
+            "type": "integer",
+            "title": "Surcharge Cents",
+            "default": 0
+          },
+          "default": {
+            "type": "boolean",
+            "title": "Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "OptionChoiceOut"
+      },
+      "OptionGroupIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/OptionChoiceIn"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Choices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "choices"
+        ],
+        "title": "OptionGroupIn",
+        "description": "One admin-editable customisation group (e.g. \"Matcha\") with its choices.\n\nValidated so a broken config can never be saved: at least one choice,\nexactly one default, unique choice values, and a slug-safe key (products'\noptions_config is stored as opaque JSON, so nothing else checks this)."
+      },
+      "OptionGroupOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/OptionChoiceOut"
+            },
+            "type": "array",
+            "title": "Choices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "choices"
+        ],
+        "title": "OptionGroupOut"
+      },
       "OrderItemOut": {
         "properties": {
           "product_name": {
@@ -3975,6 +4104,17 @@
               }
             ],
             "title": "Options"
+          },
+          "options_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options Label"
           }
         },
         "type": "object",
@@ -4163,6 +4303,20 @@
             },
             "type": "array",
             "title": "Images"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OptionGroupOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
           }
         },
         "type": "object",

@@ -56,7 +56,7 @@ export function CartPage() {
             </article>
           );
         }
-        const options = formatDrinkOptions(item.options);
+        const options = item.options_label ?? formatDrinkOptions(item.options);
         return (
           <article className="cart-row" key={item.id}>
             <div>

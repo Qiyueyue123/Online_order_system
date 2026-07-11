@@ -633,6 +633,8 @@ export interface components {
             variants: components["schemas"]["AdminVariantOut"][];
             /** Images */
             images: components["schemas"]["AdminImageOut"][];
+            /** Options */
+            options?: components["schemas"]["OptionGroupOut"][] | null;
         };
         /** AdminImageIn */
         AdminImageIn: {
@@ -873,6 +875,8 @@ export interface components {
             images?: components["schemas"]["AdminImageIn"][];
             /** Variants */
             variants: components["schemas"]["AdminVariantCreateIn"][];
+            /** Options */
+            options?: components["schemas"]["OptionGroupIn"][] | null;
         };
         /** AdminProductUpdateIn */
         AdminProductUpdateIn: {
@@ -882,6 +886,8 @@ export interface components {
             description?: string | null;
             /** Active */
             active?: boolean | null;
+            /** Options */
+            options?: components["schemas"]["OptionGroupIn"][] | null;
         };
         /** AdminStockIn */
         AdminStockIn: {
@@ -1011,7 +1017,10 @@ export interface components {
             variant_id: string;
             /** Quantity */
             quantity: number;
-            options?: components["schemas"]["DrinkOptionsIn"] | null;
+            /** Options */
+            options?: {
+                [key: string]: string | number;
+            } | null;
         };
         /** CartItemOut */
         CartItemOut: {
@@ -1043,6 +1052,8 @@ export interface components {
             options?: {
                 [key: string]: unknown;
             } | null;
+            /** Options Label */
+            options_label?: string | null;
         };
         /** CartOut */
         CartOut: {
@@ -1100,44 +1111,6 @@ export interface components {
             /** Reservation Expires At */
             reservation_expires_at?: string | null;
         };
-        /**
-         * DrinkOptionsIn
-         * @description Per-line customisation for a drink. Unknown keys are rejected (422) rather
-         *     than silently ignored, so a typo in a future field doesn't get dropped
-         *     without notice.
-         */
-        DrinkOptionsIn: {
-            /**
-             * Matcha G
-             * @default 4
-             * @enum {integer}
-             */
-            matcha_g: 4 | 6;
-            /**
-             * Whisk
-             * @default water
-             * @enum {string}
-             */
-            whisk: "water" | "oat";
-            /**
-             * Base Milk
-             * @default cow
-             * @enum {string}
-             */
-            base_milk: "cow" | "oat";
-            /**
-             * Milk Ml
-             * @default 130
-             * @enum {integer}
-             */
-            milk_ml: 130 | 160;
-            /**
-             * Sugar G
-             * @default 4
-             * @enum {integer}
-             */
-            sugar_g: 2 | 4 | 6 | 8;
-        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1185,6 +1158,65 @@ export interface components {
              */
             created_at: string;
         };
+        /** OptionChoiceIn */
+        OptionChoiceIn: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /**
+             * Surcharge Cents
+             * @default 0
+             */
+            surcharge_cents: number;
+            /**
+             * Default
+             * @default false
+             */
+            default: boolean;
+        };
+        /** OptionChoiceOut */
+        OptionChoiceOut: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /**
+             * Surcharge Cents
+             * @default 0
+             */
+            surcharge_cents: number;
+            /**
+             * Default
+             * @default false
+             */
+            default: boolean;
+        };
+        /**
+         * OptionGroupIn
+         * @description One admin-editable customisation group (e.g. "Matcha") with its choices.
+         *
+         *     Validated so a broken config can never be saved: at least one choice,
+         *     exactly one default, unique choice values, and a slug-safe key (products'
+         *     options_config is stored as opaque JSON, so nothing else checks this).
+         */
+        OptionGroupIn: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Choices */
+            choices: components["schemas"]["OptionChoiceIn"][];
+        };
+        /** OptionGroupOut */
+        OptionGroupOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Choices */
+            choices: components["schemas"]["OptionChoiceOut"][];
+        };
         /** OrderItemOut */
         OrderItemOut: {
             /** Product Name */
@@ -1201,6 +1233,8 @@ export interface components {
             options?: {
                 [key: string]: unknown;
             } | null;
+            /** Options Label */
+            options_label?: string | null;
         };
         /** OrderOut */
         OrderOut: {
@@ -1276,6 +1310,8 @@ export interface components {
             variants: components["schemas"]["VariantOut"][];
             /** Images */
             images: components["schemas"]["ImageOut"][];
+            /** Options */
+            options?: components["schemas"]["OptionGroupOut"][] | null;
         };
         /** ProductPage */
         ProductPage: {

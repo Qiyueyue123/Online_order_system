@@ -127,11 +127,17 @@ def create_product(db: Session, data: AdminProductIn) -> Product:
         category = db.scalar(select(Category).where(Category.slug == data.category_slug))
         if category is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+    options_config = (
+        json.dumps([group.model_dump() for group in data.options], sort_keys=True)
+        if data.options
+        else None
+    )
     product = Product(
         category=category,
         slug=data.slug,
         name=data.name,
         description=data.description,
+        options_config=options_config,
         variants=[
             Variant(
                 sku=variant.sku,
@@ -166,6 +172,17 @@ def update_product(db: Session, product: Product, data: AdminProductUpdateIn) ->
     _set_if_changed(changes, product, "name", data.name)
     _set_if_changed(changes, product, "description", data.description)
     _set_if_changed(changes, product, "active", data.active)
+    # None means "leave options unchanged" (field not sent); an explicit []
+    # clears all option groups -- see AdminProductUpdateIn.options docstring.
+    if data.options is not None:
+        new_config = (
+            json.dumps([group.model_dump() for group in data.options], sort_keys=True)
+            if data.options
+            else None
+        )
+        if new_config != product.options_config:
+            changes["options"] = {"from": product.options_config, "to": new_config}
+            product.options_config = new_config
     return changes
 
 

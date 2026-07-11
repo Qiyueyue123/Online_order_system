@@ -123,6 +123,9 @@ export function CheckoutPage() {
     },
     onSuccess: (result) => {
       if (result.guest_lookup_token) sessionStorage.setItem("guestOrderToken", result.guest_lookup_token);
+      // The server emptied the cart; drop the cached copy so the header
+      // badge doesn't keep showing the old count on the thank-you page.
+      queryClient.removeQueries({ queryKey: ["cart"] });
       if (payingAtPickup) {
         // Nothing to pay online — skip the redirect and land straight on the
         // thank-you page instead of following checkout_url.

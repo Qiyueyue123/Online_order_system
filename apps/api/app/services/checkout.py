@@ -113,7 +113,10 @@ def create_pending_order(
                 f"{variant.product.name} ({variant.name}) just sold out — "
                 "remove it from your bag and try another option.",
             )
-        subtotal += (variant.price_cents + option_surcharge_cents(item.options)) * item.quantity
+        subtotal += (
+            variant.price_cents
+            + option_surcharge_cents(item.options, variant.product.options_config)
+        ) * item.quantity
 
     discount = 0
     if data.coupon_code:
@@ -176,9 +179,11 @@ def create_pending_order(
                 product_name=variant.product.name,
                 variant_name=variant.name,
                 sku=variant.sku,
-                unit_price_cents=variant.price_cents + option_surcharge_cents(cart_item.options),
+                unit_price_cents=variant.price_cents
+                + option_surcharge_cents(cart_item.options, variant.product.options_config),
                 quantity=cart_item.quantity,
                 options=cart_item.options,
+                options_label=cart_item.options_label,
             )
         )
         db.add(

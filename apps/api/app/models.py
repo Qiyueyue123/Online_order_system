@@ -108,6 +108,11 @@ class Product(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    # Serialised JSON list of option groups (matcha grams, whisk liquid, etc.) --
+    # see schemas.OptionGroupIn/Out for the shape. NULL means the product has no
+    # customisation options (e.g. retail tins). Same text-column pattern as
+    # CartItem.options for SQLite/Postgres portability.
+    options_config: Mapped[str | None] = mapped_column(Text)
     category: Mapped[Category | None] = relationship(lazy="joined")
     variants: Mapped[list["Variant"]] = relationship(
         back_populates="product", cascade="all, delete-orphan", lazy="selectin"
@@ -190,6 +195,12 @@ class CartItem(Base):
     # {"matcha_g": 4|6, "whisk": "water"|"oat", "base_milk": "cow"|"oat",
     # "milk_ml": 130|160, "sugar_g": 2|4|6|8}.
     options: Mapped[str | None] = mapped_column(Text)
+    # Human-readable snapshot of the chosen options, e.g. "6 g stronger (+15 kr) ·
+    # Oat milk (frothier) · Cow's milk (standard) · 130 ml (standard) · 4 g
+    # (standard)" -- the chosen choice labels, in the product's option-group
+    # order, joined with " · ". NULL for legacy rows / products without
+    # options_config (callers fall back to formatting the raw `options` dict).
+    options_label: Mapped[str | None] = mapped_column(Text)
     variant: Mapped[Variant] = relationship(lazy="joined")
 
 
@@ -272,6 +283,8 @@ class OrderItem(Base):
     # Snapshot of the CartItem.options that produced this line at checkout time
     # (same serialisation convention; see CartItem.options).
     options: Mapped[str | None] = mapped_column(Text)
+    # Snapshot of CartItem.options_label at checkout time (see CartItem.options_label).
+    options_label: Mapped[str | None] = mapped_column(Text)
 
 
 class Payment(TimestampMixin, Base):

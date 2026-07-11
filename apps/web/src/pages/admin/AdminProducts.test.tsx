@@ -466,6 +466,100 @@ describe("AdminProducts", () => {
     ).toBeInTheDocument();
   });
 
+  it("adds an option group and a choice, then PATCHes the full options array on Save options", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH") {
+        return Promise.resolve(new Response(JSON.stringify(productsPage.items[0]), { status: 200 }));
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    await screen.findByLabelText("Ceremonial Matcha name");
+    fireEvent.click(screen.getByRole("button", { name: "Add option group" }));
+
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha option group 1 label"), {
+      target: { value: "Frothed milk" },
+    });
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha option group 1 choice 1 label"), {
+      target: { value: "Regular" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add choice" }));
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha option group 1 choice 2 label"), {
+      target: { value: "Extra frothy" },
+    });
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha option group 1 choice 2 extra price"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByLabelText("Ceremonial Matcha option group 1 choice 2 default"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save options" }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/products/product-1",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token-1" }),
+        }),
+      ),
+    );
+    const patchCall = fetchMock.mock.calls.find(
+      ([url, init]) => init?.method === "PATCH" && typeof url === "string" && url.includes("/admin/products/"),
+    );
+    const body = JSON.parse(patchCall![1]!.body as string);
+    expect(body).toEqual({
+      options: [
+        {
+          key: "frothed_milk",
+          label: "Frothed milk",
+          choices: [
+            { value: "regular", label: "Regular", surcharge_cents: 0, default: false },
+            { value: "extra_frothy", label: "Extra frothy", surcharge_cents: 500, default: true },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("shows the server's 422 message inline when saving options fails validation", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: "Validation failed" }), { status: 422 }),
+        );
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    await screen.findByLabelText("Ceremonial Matcha name");
+    fireEvent.click(screen.getByRole("button", { name: "Add option group" }));
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha option group 1 label"), {
+      target: { value: "Frothed milk" },
+    });
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha option group 1 choice 1 label"), {
+      target: { value: "Regular" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save options" }));
+
+    expect(
+      await screen.findByText("That doesn't look right — check the highlighted fields and try again."),
+    ).toBeInTheDocument();
+  });
+
   it("shows a validation error and does not submit when the new-product form is incomplete", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(productsPage), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

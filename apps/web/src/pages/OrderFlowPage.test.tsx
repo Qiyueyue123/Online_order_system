@@ -26,6 +26,50 @@ const drinkProduct: Product = {
     { id: "var-1", sku: "SKU-D1", name: "Iced", weight_grams: 0, price_cents: 4000, available_stock: 20 },
   ],
   images: [],
+  options: [
+    {
+      key: "matcha_g",
+      label: "Matcha",
+      choices: [
+        { value: "4", label: "4 g (standard)", surcharge_cents: 0, default: true },
+        { value: "6", label: "6 g stronger (+15 kr)", surcharge_cents: 1500, default: false },
+      ],
+    },
+    {
+      key: "whisk",
+      label: "Whisked with",
+      choices: [
+        { value: "water", label: "Water (standard)", surcharge_cents: 0, default: true },
+        { value: "oat", label: "Oat milk (frothier)", surcharge_cents: 0, default: false },
+      ],
+    },
+    {
+      key: "base_milk",
+      label: "Base milk",
+      choices: [
+        { value: "cow", label: "Cow's milk (standard)", surcharge_cents: 0, default: true },
+        { value: "oat", label: "Oat milk", surcharge_cents: 0, default: false },
+      ],
+    },
+    {
+      key: "milk_ml",
+      label: "Milk amount",
+      choices: [
+        { value: "130", label: "130 ml (standard)", surcharge_cents: 0, default: true },
+        { value: "160", label: "160 ml (milkier)", surcharge_cents: 0, default: false },
+      ],
+    },
+    {
+      key: "sugar_g",
+      label: "Sugar",
+      choices: [
+        { value: "2", label: "2 g", surcharge_cents: 0, default: false },
+        { value: "4", label: "4 g (standard)", surcharge_cents: 0, default: true },
+        { value: "6", label: "6 g", surcharge_cents: 0, default: false },
+        { value: "8", label: "8 g", surcharge_cents: 0, default: false },
+      ],
+    },
+  ],
 };
 
 const emptyCart: Cart = {
@@ -200,7 +244,7 @@ describe("OrderFlowPage", () => {
     expect(body).toEqual({
       variant_id: "var-1",
       quantity: 1,
-      options: { matcha_g: 6, whisk: "water", base_milk: "cow", milk_ml: 130, sugar_g: 4 },
+      options: { matcha_g: "6", whisk: "water", base_milk: "cow", milk_ml: "130", sugar_g: "4" },
     });
 
     // Returns to the menu step after a successful add.

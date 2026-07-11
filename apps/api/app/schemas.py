@@ -1,8 +1,9 @@
+import re
 import uuid
 from datetime import date, datetime, time
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class ApiModel(BaseModel):
@@ -29,6 +30,71 @@ class AdminImageOut(ImageOut):
     id: uuid.UUID
 
 
+class OptionChoiceOut(ApiModel):
+    value: str
+    label: str
+    surcharge_cents: int = 0
+    default: bool = False
+
+
+class OptionGroupOut(ApiModel):
+    key: str
+    label: str
+    choices: list[OptionChoiceOut]
+
+
+class OptionChoiceIn(BaseModel):
+    value: str = Field(min_length=1, max_length=60)
+    label: str = Field(min_length=1, max_length=120)
+    surcharge_cents: int = Field(default=0, ge=0, le=100000)
+    default: bool = False
+
+
+_OPTION_KEY_RE = re.compile(r"^[a-z0-9_]+$")
+
+
+class OptionGroupIn(BaseModel):
+    """One admin-editable customisation group (e.g. "Matcha") with its choices.
+
+    Validated so a broken config can never be saved: at least one choice,
+    exactly one default, unique choice values, and a slug-safe key (products'
+    options_config is stored as opaque JSON, so nothing else checks this)."""
+
+    key: str = Field(min_length=1, max_length=60)
+    label: str = Field(min_length=1, max_length=120)
+    choices: list[OptionChoiceIn] = Field(min_length=1)
+
+    @field_validator("key")
+    @classmethod
+    def _slug_key(cls, value: str) -> str:
+        if not _OPTION_KEY_RE.fullmatch(value):
+            raise ValueError(
+                "key must be lowercase letters, digits, and underscores only"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_choices(self) -> "OptionGroupIn":
+        values = [choice.value for choice in self.choices]
+        if len(values) != len(set(values)):
+            raise ValueError("choice values must be unique within a group")
+        defaults = sum(1 for choice in self.choices if choice.default)
+        if defaults != 1:
+            raise ValueError("exactly one choice must be marked default")
+        return self
+
+
+def _validate_option_groups(
+    groups: list[OptionGroupIn] | None,
+) -> list[OptionGroupIn] | None:
+    if groups is None:
+        return None
+    keys = [group.key for group in groups]
+    if len(keys) != len(set(keys)):
+        raise ValueError("option group keys must be unique")
+    return groups
+
+
 class ProductOut(ApiModel):
     id: uuid.UUID
     slug: str
@@ -38,6 +104,7 @@ class ProductOut(ApiModel):
     category_slug: str | None
     variants: list[VariantOut]
     images: list[ImageOut]
+    options: list[OptionGroupOut] | None = None
 
 
 class ProductPage(BaseModel):
@@ -71,6 +138,7 @@ class AdminCatalogProductOut(ApiModel):
     category_slug: str | None
     variants: list[AdminVariantOut]
     images: list[AdminImageOut]
+    options: list[OptionGroupOut] | None = None
 
 
 class AdminCatalogPage(BaseModel):
@@ -121,7 +189,10 @@ class DrinkOptionsIn(BaseModel):
 class CartItemIn(BaseModel):
     variant_id: uuid.UUID
     quantity: int = Field(ge=1, le=20)
-    options: DrinkOptionsIn | None = None
+    # Loosely typed on purpose: the set of valid keys/values is defined per
+    # product by Product.options_config (admin-editable), not by a fixed
+    # schema here -- see services.cart for the actual validation against it.
+    options: dict[str, str | int] | None = None
 
 
 class CartItemOut(BaseModel):
@@ -135,6 +206,7 @@ class CartItemOut(BaseModel):
     unit_price_cents: int
     line_total_cents: int
     options: dict | None = None
+    options_label: str | None = None
 
 
 class CartOut(BaseModel):
@@ -192,6 +264,7 @@ class OrderItemOut(ApiModel):
     unit_price_cents: int
     quantity: int
     options: dict | None = None
+    options_label: str | None = None
 
     @field_validator("options", mode="before")
     @classmethod
@@ -275,12 +348,29 @@ class AdminProductIn(BaseModel):
     category_slug: str | None = Field(default=None, max_length=80)
     images: list[AdminImageIn] = Field(default_factory=list)
     variants: list[AdminVariantCreateIn] = Field(min_length=1)
+    options: list[OptionGroupIn] | None = None
+
+    @field_validator("options")
+    @classmethod
+    def _check_option_groups(
+        cls, value: list[OptionGroupIn] | None
+    ) -> list[OptionGroupIn] | None:
+        return _validate_option_groups(value)
 
 
 class AdminProductUpdateIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = Field(default=None, min_length=1)
     active: bool | None = None
+    # None = leave options unchanged; an explicit [] clears all option groups.
+    options: list[OptionGroupIn] | None = None
+
+    @field_validator("options")
+    @classmethod
+    def _check_option_groups(
+        cls, value: list[OptionGroupIn] | None
+    ) -> list[OptionGroupIn] | None:
+        return _validate_option_groups(value)
 
 
 class AdminVariantUpdateIn(BaseModel):

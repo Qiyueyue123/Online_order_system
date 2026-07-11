@@ -326,6 +326,7 @@ export function OrderFlowPage() {
                   mediaClassName="order-customise-media"
                   label={`${activeProduct.name} photos`}
                   eagerFirst
+                  showCaptions
                 />
               ) : (
                 <ProductArt slug={activeProduct.slug} category={activeProduct.category} name={activeProduct.name} />

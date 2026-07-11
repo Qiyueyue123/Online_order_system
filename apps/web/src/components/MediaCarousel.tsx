@@ -5,14 +5,19 @@ export type MediaCarouselItem = {
   url: string;
   alt_text: string;
   media_type: "image" | "video" | string;
+  caption?: string | null;
 };
+
+const AUTO_ADVANCE_MS = 5000;
 
 /**
  * Reusable photo/video carousel: arrow buttons, dot indicators, and a
  * crossfade between stacked absolutely-positioned slides — the same idea as
- * HeroCarousel, but user-driven (no auto-rotation) and usable either
- * uncontrolled (its own state) or controlled (e.g. synced with thumbnail
- * buttons on the product page via `activeIndex`/`onActiveIndexChange`).
+ * HeroCarousel. Auto-advances every ~5s when it has 2+ items, pausing on
+ * hover/focus and resetting after any manual interaction; a video slide
+ * holds the timer and instead advances when it finishes playing. Usable
+ * either uncontrolled (its own state) or controlled (e.g. synced with
+ * thumbnail buttons on the product page via `activeIndex`/`onActiveIndexChange`).
  */
 export function MediaCarousel({
   items,
@@ -21,6 +26,7 @@ export function MediaCarousel({
   mediaClassName = "",
   label = "Product media",
   eagerFirst = false,
+  showCaptions = false,
 }: {
   items: MediaCarouselItem[];
   activeIndex?: number;
@@ -29,9 +35,12 @@ export function MediaCarousel({
   label?: string;
   /** Load the first slide eagerly — for a single above-the-fold gallery, not a grid of cards. */
   eagerFirst?: boolean;
+  /** Show the active item's caption in a bar under the media. Off by default to avoid clutter on small cards. */
+  showCaptions?: boolean;
 }) {
   const reducedMotion = usePrefersReducedMotion();
   const [internalIndex, setInternalIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
   const active = activeIndex !== undefined ? activeIndex % items.length : internalIndex;
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
 
@@ -59,10 +68,36 @@ export function MediaCarousel({
     });
   }, [active]);
 
+  const activeItem = items[active] as MediaCarouselItem | undefined;
+  const activeIsVideo = activeItem?.media_type === "video";
+
+  // Auto-advance on a timer, unless reduced motion is on, there's only one
+  // item, the carousel is paused (hover/focus), or the active slide is a
+  // video -- videos advance via their own `ended` event below instead.
+  useEffect(() => {
+    if (reducedMotion || paused || items.length < 2 || activeIsVideo) return;
+    const id = window.setTimeout(() => setActive(active + 1), AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, reducedMotion, paused, items.length, activeIsVideo]);
+
+  function handleVideoEnded(index: number) {
+    if (reducedMotion || paused || items.length < 2 || index !== active) return;
+    setActive(active + 1);
+  }
+
   if (items.length === 0) return null;
 
   return (
-    <div className="media-carousel">
+    <div
+      className={`media-carousel${showCaptions && activeItem?.caption ? " media-carousel--has-caption" : ""}`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false);
+      }}
+    >
       {items.map((item, index) => {
         const isActive = index === active;
         if (reducedMotion && !isActive) return null;
@@ -80,10 +115,11 @@ export function MediaCarousel({
                 className={mediaClassName}
                 src={item.url}
                 muted
-                loop
+                loop={items.length < 2}
                 playsInline
                 autoPlay={isActive}
                 aria-label={item.alt_text}
+                onEnded={() => handleVideoEnded(index)}
               />
             ) : (
               <img
@@ -96,6 +132,9 @@ export function MediaCarousel({
           </div>
         );
       })}
+      {showCaptions && activeItem?.caption ? (
+        <p className="media-carousel-caption">{activeItem.caption}</p>
+      ) : null}
       {items.length > 1 && (
         <>
           <button

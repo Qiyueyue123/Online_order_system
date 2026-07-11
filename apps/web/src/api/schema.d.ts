@@ -389,7 +389,8 @@ export interface paths {
         delete: operations["delete_admin_product_image_api_v1_admin_products__product_id__images__image_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Patch Admin Product Image */
+        patch: operations["patch_admin_product_image_api_v1_admin_products__product_id__images__image_id__patch"];
         trace?: never;
     };
     "/api/v1/admin/orders": {
@@ -600,6 +601,8 @@ export interface components {
              * @default
              */
             alt_text: string;
+            /** Caption */
+            caption?: string | null;
             /**
              * Position
              * @default 0
@@ -618,6 +621,8 @@ export interface components {
             url: string;
             /** Alt Text */
             alt_text: string;
+            /** Caption */
+            caption?: string | null;
             /**
              * Media Type
              * @default image
@@ -629,6 +634,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /** AdminImageUpdateIn */
+        AdminImageUpdateIn: {
+            /** Alt Text */
+            alt_text?: string | null;
+            /** Caption */
+            caption?: string | null;
         };
         /** AdminNoticeIn */
         AdminNoticeIn: {
@@ -935,6 +947,8 @@ export interface components {
              * @default
              */
             alt_text: string;
+            /** Caption */
+            caption?: string | null;
             /**
              * Position
              * @default 0
@@ -1088,6 +1102,8 @@ export interface components {
             url: string;
             /** Alt Text */
             alt_text: string;
+            /** Caption */
+            caption?: string | null;
             /**
              * Media Type
              * @default image
@@ -2045,6 +2061,46 @@ export interface operations {
             };
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCatalogProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_admin_product_image_api_v1_admin_products__product_id__images__image_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-CSRF-Token"?: string | null;
+            };
+            path: {
+                product_id: string;
+                image_id: string;
+            };
+            cookie?: {
+                matcha_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminImageUpdateIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

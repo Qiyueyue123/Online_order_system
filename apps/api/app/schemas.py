@@ -21,6 +21,7 @@ class VariantOut(ApiModel):
 class ImageOut(ApiModel):
     url: str
     alt_text: str
+    caption: str | None = None
     media_type: Literal["image", "video"] = "image"
 
 
@@ -245,8 +246,14 @@ class AdminOrderStatusIn(BaseModel):
 class AdminImageIn(BaseModel):
     url: str = Field(min_length=1, max_length=1000)
     alt_text: str = Field(default="", max_length=240)
+    caption: str | None = Field(default=None, max_length=300)
     position: int = Field(default=0, ge=0)
     media_type: Literal["image", "video"] = "image"
+
+
+class AdminImageUpdateIn(BaseModel):
+    alt_text: str | None = Field(default=None, max_length=240)
+    caption: str | None = Field(default=None, max_length=300)
 
 
 class AdminVariantCreateIn(BaseModel):

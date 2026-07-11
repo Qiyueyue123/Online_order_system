@@ -27,6 +27,7 @@ export type AdminCatalogProduct = components["schemas"]["AdminCatalogProductOut"
 export type AdminCatalogPage = components["schemas"]["AdminCatalogPage"];
 export type AdminImage = components["schemas"]["AdminImageOut"];
 export type AdminImageIn = components["schemas"]["AdminImageIn"];
+export type AdminImageUpdateIn = components["schemas"]["AdminImageUpdateIn"];
 export type AuditLogEntry = components["schemas"]["AuditLogOut"];
 export type AuditLogPage = components["schemas"]["AuditLogPage"];
 export type AddressIn = components["schemas"]["AddressIn"];

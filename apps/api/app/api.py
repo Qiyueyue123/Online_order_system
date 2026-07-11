@@ -39,6 +39,7 @@ from .schemas import (
     AdminCatalogPage,
     AdminCatalogProductOut,
     AdminImageIn,
+    AdminImageUpdateIn,
     AdminNoticeIn,
     AdminNoticeOut,
     AdminNoticeUpdateIn,
@@ -85,11 +86,13 @@ from .services.admin import (
     add_product_image,
     apply_order_transition,
     create_product,
+    get_product_image,
     list_audit_log,
     list_orders_admin,
     remove_product_image,
     update_notice,
     update_product,
+    update_product_image,
     update_variant,
     write_audit,
 )
@@ -681,6 +684,7 @@ def upload_admin_product_image(
     product_id: str,
     file: UploadFile,
     alt_text: str = Form(default=""),
+    caption: str | None = Form(default=None),
     position: int = Form(default=0),
     session: LoginSession = Depends(admin_csrf_session),
     db: Session = Depends(get_db),
@@ -693,7 +697,9 @@ def upload_admin_product_image(
     image = add_product_image(
         db,
         product,
-        AdminImageIn(url=url, alt_text=alt_text, position=position, media_type=media_type),
+        AdminImageIn(
+            url=url, alt_text=alt_text, caption=caption, position=position, media_type=media_type
+        ),
     )
     write_audit(
         db,
@@ -707,6 +713,34 @@ def upload_admin_product_image(
             "media_type": media_type,
             "filename": file.filename,
         },
+    )
+    db.commit()
+    db.refresh(product)
+    return _admin_product_out(product)
+
+
+@router.patch(
+    "/admin/products/{product_id}/images/{image_id}", response_model=AdminCatalogProductOut
+)
+def patch_admin_product_image(
+    product_id: str,
+    image_id: str,
+    data: AdminImageUpdateIn,
+    session: LoginSession = Depends(admin_csrf_session),
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, _parse_uuid_or_404(product_id, "Product not found"))
+    if not product:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    image = get_product_image(db, product.id, _parse_uuid_or_404(image_id, "Image not found"))
+    changes = update_product_image(db, image, data)
+    write_audit(
+        db,
+        actor_user_id=session.user_id,
+        action="product_image_updated",
+        entity_type="product",
+        entity_id=product.id,
+        detail={"image_id": str(image.id), **(changes or {})},
     )
     db.commit()
     db.refresh(product)

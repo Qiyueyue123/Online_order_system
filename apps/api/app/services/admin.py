@@ -17,7 +17,13 @@ from ..models import (
     User,
     Variant,
 )
-from ..schemas import AdminImageIn, AdminNoticeUpdateIn, AdminProductIn, AdminProductUpdateIn
+from ..schemas import (
+    AdminImageIn,
+    AdminImageUpdateIn,
+    AdminNoticeUpdateIn,
+    AdminProductIn,
+    AdminProductUpdateIn,
+)
 from .checkout import cancel_confirmed_order, cancel_order
 
 
@@ -198,6 +204,7 @@ def add_product_image(db: Session, product: Product, data: AdminImageIn) -> Prod
         product_id=product.id,
         url=data.url,
         alt_text=data.alt_text,
+        caption=data.caption,
         position=data.position,
         media_type=data.media_type,
     )
@@ -215,6 +222,24 @@ def remove_product_image(db: Session, product_id: uuid.UUID, image_id: uuid.UUID
     if not image:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
     db.delete(image)
+
+
+def get_product_image(db: Session, product_id: uuid.UUID, image_id: uuid.UUID) -> ProductImage:
+    image = db.scalar(
+        select(ProductImage).where(
+            ProductImage.id == image_id, ProductImage.product_id == product_id
+        )
+    )
+    if not image:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Image not found")
+    return image
+
+
+def update_product_image(db: Session, image: ProductImage, data: AdminImageUpdateIn) -> dict:
+    changes: dict = {}
+    _set_if_changed(changes, image, "alt_text", data.alt_text)
+    _set_if_changed(changes, image, "caption", data.caption)
+    return changes
 
 
 def update_notice(db: Session, notice: Notice, data: AdminNoticeUpdateIn) -> dict:

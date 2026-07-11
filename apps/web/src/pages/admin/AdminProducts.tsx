@@ -4,7 +4,9 @@ import { useForm } from "react-hook-form";
 import {
   AdminCatalogPage,
   AdminCatalogProduct,
+  AdminImage,
   AdminImageIn,
+  AdminImageUpdateIn,
   AdminProductIn,
   AdminProductUpdateIn,
   AdminVariant,
@@ -140,25 +142,69 @@ function ProductEditor({
   );
 }
 
+function MediaCaptionEditor({
+  productName,
+  image,
+  disabled,
+  onSave,
+}: {
+  productName: string;
+  image: AdminImage;
+  disabled: boolean;
+  onSave: (caption: string) => void;
+}) {
+  const [caption, setCaption] = useState(image.caption ?? "");
+  const dirty = caption !== (image.caption ?? "");
+
+  return (
+    <form
+      className="admin-media-caption-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(caption.trim());
+      }}
+    >
+      <label>
+        Caption
+        <input
+          aria-label={`${productName} media caption for ${image.alt_text || image.media_type}`}
+          value={caption}
+          onChange={(event) => setCaption(event.target.value)}
+          placeholder="Shown under this photo or video"
+        />
+      </label>
+      <button type="submit" disabled={disabled || !dirty}>
+        Save caption
+      </button>
+    </form>
+  );
+}
+
 function MediaManager({
   product,
   disabled,
   uploading,
+  savingCaption,
   onAdd,
   onRemove,
   onUpload,
+  onUpdateCaption,
 }: {
   product: AdminCatalogProduct;
   disabled: boolean;
   uploading: boolean;
+  savingCaption: boolean;
   onAdd: (productId: string, body: AdminImageIn) => void;
   onRemove: (productId: string, imageId: string) => void;
-  onUpload: (productId: string, file: File) => void;
+  onUpload: (productId: string, file: File, caption: string) => void;
+  onUpdateCaption: (productId: string, imageId: string, caption: string) => void;
 }) {
   const [url, setUrl] = useState("");
   const [altText, setAltText] = useState("");
+  const [caption, setCaption] = useState("");
   const [mediaType, setMediaType] = useState<AdminImageIn["media_type"]>("image");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadCaption, setUploadCaption] = useState("");
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   function submit(event: FormEvent) {
@@ -167,19 +213,22 @@ function MediaManager({
     onAdd(product.id, {
       url: url.trim(),
       alt_text: altText.trim(),
+      caption: caption.trim() || null,
       media_type: mediaType,
       position: product.images.length,
     });
     setUrl("");
     setAltText("");
+    setCaption("");
     setMediaType("image");
   }
 
   function submitUpload(event: FormEvent) {
     event.preventDefault();
     if (!uploadFile) return;
-    onUpload(product.id, uploadFile);
+    onUpload(product.id, uploadFile, uploadCaption.trim());
     setUploadFile(null);
+    setUploadCaption("");
     if (uploadInputRef.current) uploadInputRef.current.value = "";
   }
 
@@ -195,6 +244,12 @@ function MediaManager({
               ) : (
                 <img src={image.url} alt="" loading="lazy" />
               )}
+              <MediaCaptionEditor
+                productName={product.name}
+                image={image}
+                disabled={savingCaption}
+                onSave={(next) => onUpdateCaption(product.id, image.id, next)}
+              />
               <button
                 type="button"
                 aria-label={`Remove ${image.alt_text || (image.media_type === "video" ? "video" : "photo")}`}
@@ -226,6 +281,15 @@ function MediaManager({
           />
         </label>
         <label>
+          Caption
+          <input
+            aria-label={`${product.name} new media caption`}
+            value={caption}
+            onChange={(event) => setCaption(event.target.value)}
+            placeholder="Shown under this photo or video"
+          />
+        </label>
+        <label>
           Type
           <select
             aria-label={`${product.name} new media type`}
@@ -249,6 +313,15 @@ function MediaManager({
             type="file"
             accept="image/*,video/*"
             onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        <label>
+          Caption
+          <input
+            aria-label={`${product.name} upload caption`}
+            value={uploadCaption}
+            onChange={(event) => setUploadCaption(event.target.value)}
+            placeholder="Shown under this photo or video"
           />
         </label>
         <button type="submit" disabled={disabled || uploading || !uploadFile}>
@@ -302,13 +375,32 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
   });
 
   const uploadImage = useMutation({
-    mutationFn: ({ productId, file }: { productId: string; file: File }) => {
+    mutationFn: ({ productId, file, caption }: { productId: string; file: File; caption: string }) => {
       const body = new FormData();
       body.append("file", file);
+      if (caption) body.append("caption", caption);
       return apiUpload<AdminCatalogProduct>(`/admin/products/${productId}/images/upload`, body, {
         headers: { "X-CSRF-Token": csrfToken },
       });
     },
+    onSuccess: invalidate,
+  });
+
+  const updateImageCaption = useMutation({
+    mutationFn: ({
+      productId,
+      imageId,
+      body,
+    }: {
+      productId: string;
+      imageId: string;
+      body: AdminImageUpdateIn;
+    }) =>
+      api<AdminCatalogProduct>(`/admin/products/${productId}/images/${imageId}`, {
+        method: "PATCH",
+        headers: { "X-CSRF-Token": csrfToken },
+        body: JSON.stringify(body),
+      }),
     onSuccess: invalidate,
   });
 
@@ -367,8 +459,12 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
     removeImage.mutate({ productId, imageId });
   }
 
-  function uploadProductImage(productId: string, file: File) {
-    uploadImage.mutate({ productId, file });
+  function uploadProductImage(productId: string, file: File, caption: string) {
+    uploadImage.mutate({ productId, file, caption });
+  }
+
+  function updateProductImageCaption(productId: string, imageId: string, caption: string) {
+    updateImageCaption.mutate({ productId, imageId, body: { caption: caption || null } });
   }
 
   function submitNewProduct(fields: NewProductFields) {
@@ -396,6 +492,7 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
       {addImage.isError && <p role="alert">{humanizeError(addImage.error)}</p>}
       {uploadImage.isError && <p role="alert">{humanizeError(uploadImage.error)}</p>}
       {removeImage.isError && <p role="alert">{humanizeError(removeImage.error)}</p>}
+      {updateImageCaption.isError && <p role="alert">{humanizeError(updateImageCaption.error)}</p>}
       {products.isLoading && <p role="status">Loading products…</p>}
       {products.data?.items.map((product) => (
         <div className="admin-product-group" key={product.id}>
@@ -408,9 +505,11 @@ export function AdminProducts({ csrfToken }: { csrfToken: string }) {
             product={product}
             disabled={addImage.isPending || uploadImage.isPending || removeImage.isPending}
             uploading={uploadImage.isPending}
+            savingCaption={updateImageCaption.isPending}
             onAdd={addProductImage}
             onRemove={removeProductImage}
             onUpload={uploadProductImage}
+            onUpdateCaption={updateProductImageCaption}
           />
           <table>
             <thead>

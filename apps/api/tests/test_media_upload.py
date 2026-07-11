@@ -47,7 +47,7 @@ def test_admin_can_upload_a_photo(client, db, uploads_dir_override):
         f"/api/v1/admin/products/{product.id}/images/upload",
         headers=headers,
         files={"file": ("photo.png", _tiny_png(), "image/png")},
-        data={"alt_text": "A cup of matcha"},
+        data={"alt_text": "A cup of matcha", "caption": "Whisked fresh at pickup"},
     )
     assert response.status_code == 201
     body = response.json()
@@ -55,6 +55,12 @@ def test_admin_can_upload_a_photo(client, db, uploads_dir_override):
     image = body["images"][0]
     assert image["media_type"] == "image"
     assert image["url"].startswith("/uploads/")
+    assert image["caption"] == "Whisked fresh at pickup"
+
+    product_response = client.get(f"/api/v1/products/{product.slug}")
+    assert product_response.status_code == 200
+    public_image = product_response.json()["images"][0]
+    assert public_image["caption"] == "Whisked fresh at pickup"
 
     stored = db.query(ProductImage).filter_by(id=uuid.UUID(image["id"])).one()
     assert stored.url == image["url"]

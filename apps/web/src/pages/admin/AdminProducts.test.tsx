@@ -176,6 +176,7 @@ describe("AdminProducts", () => {
     expect(body).toEqual({
       url: "https://example.com/photo.jpg",
       alt_text: "A jar of matcha",
+      caption: null,
       media_type: "video",
       position: 0,
     });
@@ -216,6 +217,84 @@ describe("AdminProducts", () => {
     const body = uploadCall![1]!.body as FormData;
     expect(body instanceof FormData).toBe(true);
     expect(body.get("file")).toBe(file);
+  });
+
+  it("sends the caption field when set on an upload", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "POST" && url.includes("/images/upload")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage.items[0]), { status: 201 }));
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productsPage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    const fileInput = await screen.findByLabelText("Ceremonial Matcha upload file");
+    const file = new File(["fake-image-bytes"], "photo.jpg", { type: "image/jpeg" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText("Ceremonial Matcha upload caption"), {
+      target: { value: "Whisked fresh at pickup" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/products/product-1/images/upload",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    const uploadCall = fetchMock.mock.calls.find(([input]) =>
+      (typeof input === "string" ? input : input.toString()).includes("/images/upload"),
+    );
+    const body = uploadCall![1]!.body as FormData;
+    expect(body.get("caption")).toBe("Whisked fresh at pickup");
+  });
+
+  it("patches an image caption from the media manager", async () => {
+    const productWithImage: AdminCatalogPage = {
+      ...productsPage,
+      items: [
+        {
+          ...productsPage.items[0],
+          images: [{ id: "image-1", url: "https://example.com/a.jpg", alt_text: "A jar", media_type: "image" }],
+        },
+      ],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method === "PATCH") {
+        return Promise.resolve(new Response(JSON.stringify(productWithImage.items[0]), { status: 200 }));
+      }
+      if (url.includes("/admin/products")) {
+        return Promise.resolve(new Response(JSON.stringify(productWithImage), { status: 200 }));
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AdminProducts csrfToken="csrf-token-1" />);
+
+    const captionInput = await screen.findByLabelText("Ceremonial Matcha media caption for A jar");
+    fireEvent.change(captionInput, { target: { value: "Whisked to order" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save caption" }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/admin/products/product-1/images/image-1",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token-1" }),
+        }),
+      ),
+    );
+    const patchCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
+    const body = JSON.parse(patchCall![1]!.body as string);
+    expect(body).toEqual({ caption: "Whisked to order" });
   });
 
   it("removes a photo from the media manager", async () => {

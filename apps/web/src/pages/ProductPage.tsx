@@ -33,6 +33,7 @@ function ProductGallery({ product }: { product: Product }) {
           mediaClassName="detail-media"
           label="Product photos"
           eagerFirst
+          showCaptions
         />
       </div>
       {images.length > 1 && (

@@ -1360,6 +1360,94 @@
       }
     },
     "/api/v1/admin/products/{product_id}/images/{image_id}": {
+      "patch": {
+        "summary": "Patch Admin Product Image",
+        "operationId": "patch_admin_product_image_api_v1_admin_products__product_id__images__image_id__patch",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "matcha_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matcha Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminImageUpdateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCatalogProductOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "summary": "Delete Admin Product Image",
         "operationId": "delete_admin_product_image_api_v1_admin_products__product_id__images__image_id__delete",
@@ -2341,6 +2429,18 @@
             "title": "Alt Text",
             "default": ""
           },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
           "position": {
             "type": "integer",
             "minimum": 0.0,
@@ -2373,6 +2473,17 @@
             "type": "string",
             "title": "Alt Text"
           },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
           "media_type": {
             "type": "string",
             "enum": [
@@ -2395,6 +2506,36 @@
           "id"
         ],
         "title": "AdminImageOut"
+      },
+      "AdminImageUpdateIn": {
+        "properties": {
+          "alt_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Text"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          }
+        },
+        "type": "object",
+        "title": "AdminImageUpdateIn"
       },
       "AdminNoticeIn": {
         "properties": {
@@ -3188,6 +3329,17 @@
             "title": "Alt Text",
             "default": ""
           },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
           "position": {
             "type": "integer",
             "title": "Position",
@@ -3532,6 +3684,17 @@
           "alt_text": {
             "type": "string",
             "title": "Alt Text"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
           },
           "media_type": {
             "type": "string",

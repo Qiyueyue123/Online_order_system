@@ -123,6 +123,7 @@ class ProductImage(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
     url: Mapped[str] = mapped_column(String(1000))
     alt_text: Mapped[str] = mapped_column(String(240))
+    caption: Mapped[str | None] = mapped_column(String(300), nullable=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     # "image" or "video" -- lets the product gallery render a <video> instead
     # of an <img> for the same slot (e.g. a short clip of the drink being made).

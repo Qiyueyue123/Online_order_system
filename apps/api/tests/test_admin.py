@@ -82,6 +82,12 @@ ADMIN_ROUTES = [
         {"url": "https://example.com/photo.jpg"},
     ),
     (
+        "PATCH",
+        "/api/v1/admin/products/00000000-0000-0000-0000-000000000000/images/"
+        "00000000-0000-0000-0000-000000000000",
+        {"caption": "Nope"},
+    ),
+    (
         "DELETE",
         "/api/v1/admin/products/00000000-0000-0000-0000-000000000000/images/"
         "00000000-0000-0000-0000-000000000000",
@@ -247,6 +253,49 @@ def test_admin_can_add_and_remove_a_product_image(client, db):
     assert removed.json()["images"] == []
 
     db.query(AdminAuditLog).filter_by(action="product_image_removed").one()
+
+
+def test_admin_can_update_an_image_caption(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+
+    added = client.post(
+        f"/api/v1/admin/products/{product.id}/images",
+        json={"url": "https://example.com/photo.jpg", "alt_text": "A jar of matcha", "position": 0},
+        headers=headers,
+    )
+    image_id = added.json()["images"][0]["id"]
+
+    patched = client.patch(
+        f"/api/v1/admin/products/{product.id}/images/{image_id}",
+        json={"caption": "Whisked to order"},
+        headers=headers,
+    )
+    assert patched.status_code == 200
+    image = patched.json()["images"][0]
+    assert image["caption"] == "Whisked to order"
+    assert image["alt_text"] == "A jar of matcha"
+
+    log = db.query(AdminAuditLog).filter_by(action="product_image_updated").one()
+    assert log.entity_id == str(product.id)
+
+    no_csrf = client.patch(
+        f"/api/v1/admin/products/{product.id}/images/{image_id}",
+        json={"caption": "Nope"},
+    )
+    assert no_csrf.status_code == 403
+    assert no_csrf.json()["detail"] == "Invalid CSRF token"
+
+
+def test_admin_update_unknown_image_is_404(client, db):
+    headers = admin_headers(client, db)
+    product = add_product(db)
+    response = client.patch(
+        f"/api/v1/admin/products/{product.id}/images/00000000-0000-0000-0000-000000000000",
+        json={"caption": "Nope"},
+        headers=headers,
+    )
+    assert response.status_code == 404
 
 
 def test_admin_can_add_a_video(client, db):

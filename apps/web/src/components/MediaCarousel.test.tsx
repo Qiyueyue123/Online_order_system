@@ -9,6 +9,11 @@ const twoItems: MediaCarouselItem[] = [
 
 const oneItem: MediaCarouselItem[] = [{ url: "/media/a.jpg", alt_text: "Only photo", media_type: "image" }];
 
+const videoItem: MediaCarouselItem[] = [
+  { url: "/media/clip.mp4", alt_text: "Whisking video", media_type: "video" },
+  { url: "/media/b.jpg", alt_text: "Second photo", media_type: "image" },
+];
+
 function stubMatchMedia(reduced: boolean) {
   vi.stubGlobal(
     "matchMedia",
@@ -92,5 +97,98 @@ describe("MediaCarousel", () => {
 
     rerender(<MediaCarousel items={items} showCaptions />);
     expect(screen.getByText("Whisked to order")).toBeInTheDocument();
+  });
+
+  it("renders a mute toggle on the active video slide, starts muted, and toggles on click", () => {
+    render(<MediaCarousel items={videoItem} />);
+
+    const toggle = screen.getByRole("button", { name: "Unmute video" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    const video = screen.getByLabelText("Whisking video") as HTMLVideoElement;
+    expect(video.muted).toBe(true);
+
+    fireEvent.click(toggle);
+
+    expect(video.muted).toBe(false);
+    expect(screen.getByRole("button", { name: "Mute video" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("does not render mute toggle or progress bar for image slides", () => {
+    render(<MediaCarousel items={twoItems} />);
+    expect(screen.queryByRole("button", { name: /mute video/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "Video progress" })).not.toBeInTheDocument();
+  });
+
+  it("stops propagation so the mute toggle does not trigger a wrapping card click", () => {
+    const onCardClick = vi.fn();
+    render(
+      <div onClick={onCardClick}>
+        <MediaCarousel items={videoItem} />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Unmute video" }));
+
+    expect(onCardClick).not.toHaveBeenCalled();
+  });
+
+  it("seeks on progress bar click and stops propagation", () => {
+    const onCardClick = vi.fn();
+    render(
+      <div onClick={onCardClick}>
+        <MediaCarousel items={videoItem} />
+      </div>,
+    );
+
+    const video = screen.getByLabelText("Whisking video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 100, configurable: true });
+    Object.defineProperty(video, "currentTime", { value: 0, writable: true, configurable: true });
+
+    const progress = screen.getByRole("slider", { name: "Video progress" });
+    vi.spyOn(progress, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 200,
+      width: 200,
+      top: 0,
+      bottom: 10,
+      height: 10,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(progress, { clientX: 50 });
+
+    expect(video.currentTime).toBe(25);
+    expect(progress).toHaveAttribute("aria-valuenow", "25");
+    expect(onCardClick).not.toHaveBeenCalled();
+  });
+
+  it("seeks +/-5s with arrow keys on the focused progress bar", () => {
+    render(<MediaCarousel items={videoItem} />);
+
+    const video = screen.getByLabelText("Whisking video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 100, configurable: true });
+    Object.defineProperty(video, "currentTime", { value: 10, writable: true, configurable: true });
+
+    const progress = screen.getByRole("slider", { name: "Video progress" });
+    fireEvent.keyDown(progress, { key: "ArrowRight" });
+    expect(video.currentTime).toBe(15);
+
+    fireEvent.keyDown(progress, { key: "ArrowLeft" });
+    expect(video.currentTime).toBe(10);
+  });
+
+  it("updates the progress bar as the video plays via timeupdate", () => {
+    render(<MediaCarousel items={videoItem} />);
+
+    const video = screen.getByLabelText("Whisking video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 40, configurable: true });
+    Object.defineProperty(video, "currentTime", { value: 10, writable: true, configurable: true });
+
+    fireEvent.timeUpdate(video);
+
+    expect(screen.getByRole("slider", { name: "Video progress" })).toHaveAttribute("aria-valuenow", "25");
   });
 });

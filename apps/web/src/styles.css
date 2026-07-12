@@ -447,6 +447,55 @@ footer {
   text-align: left;
 }
 .media-carousel--has-caption .media-carousel-dots { bottom: 2.5rem; }
+.media-carousel--has-progress .media-carousel-dots { bottom: 1.35rem; }
+.media-carousel--has-caption.media-carousel--has-progress .media-carousel-dots { bottom: 3.1rem; }
+.media-carousel-mute-toggle {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 1.5rem;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid rgba(244, 238, 221, 0.55);
+  border-radius: 50%;
+  color: #f4eedd;
+  background: rgba(15, 33, 24, 0.55);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.media-carousel-mute-toggle:hover { background: rgba(15, 33, 24, 0.75); }
+.media-carousel--has-caption .media-carousel-mute-toggle { bottom: 2.35rem; }
+.media-carousel-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 1rem;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  touch-action: none;
+}
+.media-carousel-progress-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(244, 238, 221, 0.25);
+  transition: height 0.15s ease;
+}
+.media-carousel-progress:hover .media-carousel-progress-track,
+.media-carousel-progress:focus-visible .media-carousel-progress-track {
+  height: 6px;
+}
+.media-carousel-progress-fill {
+  height: 100%;
+  background: #f4eedd;
+  width: 0%;
+}
+.media-carousel--has-caption .media-carousel-progress { bottom: 1.9rem; }
 @media (prefers-reduced-motion: reduce) {
   .media-carousel-slide { transition: none; }
 }

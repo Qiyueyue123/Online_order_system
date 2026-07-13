@@ -133,7 +133,7 @@ describe("MediaCarousel", () => {
     expect(onCardClick).not.toHaveBeenCalled();
   });
 
-  it("seeks on progress bar click and stops propagation", () => {
+  it("seeks on progress bar press and drag, and stops propagation", () => {
     const onCardClick = vi.fn();
     render(
       <div onClick={onCardClick}>
@@ -158,11 +158,33 @@ describe("MediaCarousel", () => {
       toJSON: () => ({}),
     });
 
-    fireEvent.click(progress, { clientX: 50 });
+    // jsdom has no PointerEvent; MouseEvent carries clientX and React
+    // listens by event name, so these reach onPointerDown/onPointerMove.
+    fireEvent(progress, new MouseEvent("pointerdown", { bubbles: true, clientX: 50 }));
 
     expect(video.currentTime).toBe(25);
     expect(progress).toHaveAttribute("aria-valuenow", "25");
+
+    fireEvent(progress, new MouseEvent("pointermove", { bubbles: true, clientX: 100, buttons: 1 }));
+
+    expect(video.currentTime).toBe(50);
+    expect(progress).toHaveAttribute("aria-valuenow", "50");
+
+    fireEvent.click(progress, { clientX: 100 });
     expect(onCardClick).not.toHaveBeenCalled();
+  });
+
+  it("renders a visible drag handle positioned at the playback position", () => {
+    render(<MediaCarousel items={videoItem} />);
+
+    const video = screen.getByLabelText("Whisking video") as HTMLVideoElement;
+    Object.defineProperty(video, "duration", { value: 100, configurable: true });
+    Object.defineProperty(video, "currentTime", { value: 25, writable: true, configurable: true });
+    fireEvent.timeUpdate(video);
+
+    const thumb = document.querySelector(".media-carousel-progress-thumb") as HTMLElement;
+    expect(thumb).toBeInTheDocument();
+    expect(thumb.style.left).toBe("25%");
   });
 
   it("seeks +/-5s with arrow keys on the focused progress bar", () => {

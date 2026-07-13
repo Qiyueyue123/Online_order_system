@@ -470,20 +470,21 @@ footer {
 .media-carousel--has-caption .media-carousel-mute-toggle { bottom: 2.35rem; }
 .media-carousel-progress {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 0.6rem;
+  right: 0.6rem;
   bottom: 0;
   z-index: 2;
-  height: 1rem;
+  height: 1.25rem;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   cursor: pointer;
   touch-action: none;
 }
 .media-carousel-progress-track {
   width: 100%;
   height: 4px;
-  background: rgba(244, 238, 221, 0.25);
+  border-radius: 2px;
+  background: rgba(244, 238, 221, 0.35);
   transition: height 0.15s ease;
 }
 .media-carousel-progress:hover .media-carousel-progress-track,
@@ -492,8 +493,22 @@ footer {
 }
 .media-carousel-progress-fill {
   height: 100%;
+  border-radius: inherit;
   background: #f4eedd;
   width: 0%;
+}
+/* Always-visible drag handle riding the end of the fill. pointer-events:
+   none so the container's pointer handlers own the whole drag gesture. */
+.media-carousel-progress-thumb {
+  position: absolute;
+  top: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: #f4eedd;
+  box-shadow: 0 0 0 1px rgba(15, 33, 24, 0.4), 0 1px 3px rgba(15, 33, 24, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 .media-carousel--has-caption .media-carousel-progress { bottom: 1.9rem; }
 @media (prefers-reduced-motion: reduce) {
@@ -550,10 +565,12 @@ footer {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
   gap: clamp(2rem, 7vw, 6rem);
-  align-items: center;
+  align-items: start;
 }
 .product-detail .detail-art { aspect-ratio: 1 / 1; }
-.detail-gallery { display: grid; gap: 1rem; }
+/* Sticky so the photos ride along while the (much taller) options column
+   scrolls, instead of floating vertically centered in dead space. */
+.detail-gallery { display: grid; gap: 1rem; position: sticky; top: 1.5rem; }
 .gallery-thumbs { display: flex; gap: 0.75rem; }
 .gallery-thumb {
   width: 4.5rem;
@@ -930,6 +947,7 @@ select:focus, input:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgb
   .product-grid { grid-template-columns: 1fr 1fr; }
   .section-heading, .product-detail, .checkout, .auth-page { display: grid; grid-template-columns: 1fr; }
   .product-detail { padding-top: 2rem; }
+  .detail-gallery { position: static; }
   .field-pair { grid-template-columns: 1fr; }
   .option-grid { grid-template-columns: 1fr; }
   footer { display: grid; }

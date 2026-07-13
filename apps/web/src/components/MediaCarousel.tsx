@@ -223,6 +223,23 @@ export function MediaCarousel({
                   aria-valuemax={100}
                   aria-valuenow={Math.round(activeProgress)}
                   onClick={(event) => {
+                    // Seeking happens on the pointer events; this only keeps
+                    // the click from bubbling to a wrapping card link.
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    try {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    } catch {
+                      // Pointer capture is unavailable in some test environments.
+                    }
+                    seekToClientX(index, event.clientX, event.currentTarget);
+                  }}
+                  onPointerMove={(event) => {
+                    if (event.buttons !== 1) return;
                     event.preventDefault();
                     event.stopPropagation();
                     seekToClientX(index, event.clientX, event.currentTarget);
@@ -242,6 +259,7 @@ export function MediaCarousel({
                   <div className="media-carousel-progress-track">
                     <div className="media-carousel-progress-fill" style={{ width: `${activeProgress}%` }} />
                   </div>
+                  <div className="media-carousel-progress-thumb" style={{ left: `${activeProgress}%` }} />
                 </div>
               </>
             ) : null}

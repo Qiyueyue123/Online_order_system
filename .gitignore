@@ -2,7 +2,18 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
+*.egg-info/
+node_modules/
+*.tsbuildinfo
 .env
-instance/*.db
-instance/*.sqlite3
-instance/uploads/
+legacy/instance/*.db
+legacy/instance/*.sqlite3
+legacy/instance/uploads/
+apps/api/*.db
+apps/web/dist/
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
+
+# Terraform local cache (providers/modules); lockfile IS committed
+**/.terraform/

@@ -1,0 +1,3 @@
+alert_email      = "owner@example.com"
+database_password = "replace-with-a-secret-manager-value"
+ses_sender         = "demo@example.com"

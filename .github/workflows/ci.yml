@@ -1,0 +1,154 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest
+      - run: python -c "import json; from app.main import app; json.dump(app.openapi(), open('openapi.json','w'), indent=2)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: apps/api/openapi.json
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run lint
+        working-directory: apps/web
+      - run: npm run test
+        working-directory: apps/web
+      - run: npm run build
+        working-directory: apps/web
+  contract:
+    needs: api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: openapi
+          path: apps/api
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run generate:api
+        working-directory: apps/web
+      - run: git diff --exit-code -- apps/api/openapi.json apps/web/src/api/schema.d.ts
+  legacy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legacy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest tests
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write CI env file for legacy service
+        run: |
+          cat > .env <<'EOF'
+          SECRET_KEY=ci-smoke-test-secret-not-for-production-0000
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD=ci-smoke-only-password
+          MANUAL_ORDER_ONLY=1
+          SESSION_COOKIE_SECURE=0
+          EOF
+      # The legacy container runs as a non-root user; on Linux runners the
+      # bind-mounted ./instance dir is owned by the runner uid, so SQLite
+      # can't create its database file without opening up permissions.
+      - name: Make instance dir writable for the legacy container
+        run: mkdir -p legacy/instance && chmod -R 777 legacy/instance
+      - name: Build and start the stack
+        run: docker compose up -d --build
+      - name: Wait for api to be ready (migrate + seed must finish first)
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8001/healthz | grep -q '"status":"ok"'; then
+              echo "api is healthy"
+              exit 0
+            fi
+            echo "waiting for api... (${i}/60)"
+            sleep 2
+          done
+          echo "::error::api did not become healthy within 120s"
+          exit 1
+      - name: Assert seeded products are served by the api
+        run: |
+          body=$(curl -fsS http://localhost:8001/api/v1/products)
+          echo "$body" | jq -e '.items | length > 0' > /dev/null
+      - name: Wait for storefront to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:5173/ > /dev/null 2>&1; then
+              echo "storefront is up"
+              exit 0
+            fi
+            echo "waiting for storefront... (${i}/30)"
+            sleep 2
+          done
+          echo "::error::storefront did not come up within 60s"
+          exit 1
+      - name: Assert storefront serves the shop page
+        run: curl -fsS http://localhost:5173/ | grep -q "QY & YX"
+      - name: Wait for legacy app to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/healthz | grep -q '"status":"ok"'; then
+              echo "legacy is healthy"
+              exit 0
+            fi
+            echo "waiting for legacy... (${i}/30)"
+            sleep 2
+          done
+          echo "::error::legacy did not become healthy within 60s"
+          exit 1
+      - name: Dump service logs on failure
+        if: failure()
+        run: docker compose logs --tail 100
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/environments/demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive ../..
+      - run: terraform init -backend=false
+      - run: terraform validate

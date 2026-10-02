@@ -1,0 +1,106 @@
+name: Deploy
+
+# Continuous deployment for the FastAPI image (apps/api) to the demo ECS
+# service. Runs on every push to main, plus manual dispatch.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Read-only by default. If/when this workflow moves to OIDC role assumption
+# (recommended over long-lived access keys), add `id-token: write` here and
+# swap the `aws-actions/configure-aws-credentials` step below to use
+# `role-to-assume` instead of access-key secrets.
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: matcha-demo-api
+  ECS_CLUSTER: matcha-demo
+  ECS_SERVICE: api
+  ECS_TASK_DEFINITION_FAMILY: matcha-demo-api
+  CONTAINER_NAME: api
+
+jobs:
+  build-and-push:
+    # Gate on a repository variable so forks/clones without AWS credentials
+    # configured don't get a red X on every push to main. Enable by setting
+    # the repository variable DEPLOY_ENABLED=true (Settings > Secrets and
+    # variables > Actions > Variables) once AWS_ACCESS_KEY_ID and
+    # AWS_SECRET_ACCESS_KEY secrets are populated.
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: upgrade to OIDC role assumption (role-to-assume) instead of
+      # long-lived access-key secrets once an IAM role/OIDC provider is set
+      # up for this repo.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        id: build
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -t "$REGISTRY/$ECR_REPOSITORY:latest" apps/api
+          docker push "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push "$REGISTRY/$ECR_REPOSITORY:latest"
+          echo "image=$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build-and-push
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Render a fresh task definition revision pinned to the SHA-tagged
+      # image (rather than `ecs update-service --force-new-deployment`,
+      # which would just restart existing tasks against whatever the task
+      # definition's `:latest` tag currently resolves to at pull time --
+      # not guaranteed to be this build, and leaves no task-def revision
+      # history to roll back to). Rendering a new revision is a few extra
+      # steps but gives us an auditable, reproducible deploy per commit.
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION_FAMILY" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render new task definition with the pushed image
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build-and-push.outputs.image }}
+
+      - name: Deploy new task definition to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          wait-for-service-stability: true
